@@ -6,7 +6,7 @@ Planned slices:
 2. Slice 1.1: Docker build hygiene and scaffold hardening
 3. Slice 2: accounts/auth baseline and web-capable deployment docs
 4. Slice 3: customer and vehicle models (customers app, vehicles app, VIN validation, admin)
-5. Slice 4: repair order/status/status history
+5. Slice 4: repair order/status/status history (RepairOrder, RepairOrderStatusHistory, controlled TextChoices status, admin)
 6. Slice 5: admin operational prototype
 7. Slice 6: billing foundation
 8. Slice 7: first custom UI

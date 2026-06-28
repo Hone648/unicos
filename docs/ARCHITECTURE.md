@@ -19,6 +19,10 @@ Current domain models:
 
 - `customers.Customer` — individual or business customer; one-to-many with vehicles
 - `vehicles.Vehicle` — VIN-keyed vehicle belonging to one customer; FK uses `PROTECT` to preserve history
+- `repair_orders.RepairOrder` — central shop workflow record linking customer, vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a configurable DB table); FKs to customer and vehicle use `PROTECT`
+- `repair_orders.RepairOrderStatusHistory` — append-only audit trail of status changes on a repair order; cascades with the repair order
+
+Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No configurable status table exists yet.
 
 Deployment:
 
@@ -36,5 +40,5 @@ Future domain spine:
 Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Payment
 ```
 
-This spine is directional planning only. The current slices do not define these
-domain models.
+Customer, Vehicle, and Repair Order (with status history) now exist. Invoice and
+Payment are planned for later slices.
