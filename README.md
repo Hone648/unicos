@@ -1,7 +1,10 @@
 # Unicos
 
-Unicos is a local-first body shop repair order management app. This slice only
-sets up the Django, PostgreSQL, Docker, and CI foundation.
+Unicos is a web-based body shop repair order management app. Local development
+runs on Docker Compose; the intended shop has internet access, so a future
+internet-accessible hosted deployment is planned (not implemented yet). This
+slice adds the accounts/auth baseline on top of the Django, PostgreSQL, Docker,
+and CI foundation.
 
 ## Stack
 
@@ -51,3 +54,38 @@ docker compose exec web python app/manage.py test
 
 For non-Docker local runs, install `requirements.txt` and provide the same
 environment variables shown in `.env.example`.
+
+## Authentication
+
+The app now has a login/logout baseline backed by a custom user model
+(`accounts.User`).
+
+- `/` is an authenticated dashboard. Unauthenticated visitors are redirected to
+  `/accounts/login/?next=/`.
+- `/accounts/login/` and `/accounts/logout/` handle sign in and sign out.
+- `/healthz/` remains public.
+
+Create a superuser to sign in and reach the dashboard or Django admin:
+
+```powershell
+docker compose exec web python app/manage.py createsuperuser
+```
+
+Baseline staff role groups (`Owner/Admin`, `Manager`, `Front Desk`,
+`Estimator`, `Technician`, `Read-only`) are created automatically by a data
+migration. Group names only for now; domain-specific permissions come with
+later slices.
+
+### One-time development database reset
+
+This slice introduces a custom user model (`AUTH_USER_MODEL = "accounts.User"`).
+If your local Postgres volume already holds Django auth/admin tables from the
+earlier scaffold, reset the development database volume **once** before
+validating:
+
+```powershell
+docker compose down -v
+```
+
+This is safe only because no real data exists yet. It is a one-time transition
+step, not a routine startup command.
