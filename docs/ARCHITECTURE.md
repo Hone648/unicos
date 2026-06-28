@@ -22,6 +22,8 @@ Architectural style:
   - Customer workspace (`/customers/`): shop-facing customer list, detail, create, and
     edit views; vehicle create-for-customer, detail, and edit under `/customers/<pk>/vehicles/new/`
     and `/vehicles/<pk>/`
+  - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice edit, and
+    payment create; invoice summary with payments table embedded in repair-order detail
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no frontend
   build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the

@@ -51,18 +51,7 @@
 </div>
 {% endif %}
 
-{% if invoice %}
-<div class="card">
-  <h2>Invoice</h2>
-  <dl>
-    <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
-    <dt>Status</dt><dd>{{ invoice.get_status_display }}</dd>
-    <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
-    <dt>Paid</dt><dd>${{ invoice.amount_paid }}</dd>
-    <dt>Balance due</dt><dd>${{ invoice.balance_due }}</dd>
-  </dl>
-</div>
-{% endif %}
+{% include "repair_orders/partials/_invoice_summary.html" %}
 
 {% include "repair_orders/partials/_status_history.html" %}
 {% endblock %}
