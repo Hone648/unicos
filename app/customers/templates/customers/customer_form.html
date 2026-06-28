@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Unicos{% endblock %}
+
+{% block content %}
+{% if mode == "edit" %}
+  <a class="back-link" href="{% url 'customers:detail' customer.pk %}">&larr; Back to {{ customer.display_name }}</a>
+{% else %}
+  <a class="back-link" href="{% url 'customers:list' %}">&larr; Back to Customers</a>
+{% endif %}
+
+<div class="page-header">
+  <h1>{{ title }}</h1>
+</div>
+
+{% if form.non_field_errors %}
+<div class="form-errors">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-section">
+      <h3 class="form-section__title">Identity</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="{{ form.customer_type.id_for_label }}">Customer type</label>
+          {{ form.customer_type }}
+          {% if form.customer_type.errors %}<ul class="field-errors">{% for e in form.customer_type.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field form-field--checkbox">
+          {{ form.is_active }}
+          <label for="{{ form.is_active.id_for_label }}">Active</label>
+          {% if form.is_active.errors %}<ul class="field-errors">{% for e in form.is_active.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.first_name.id_for_label }}">First name</label>
+          {{ form.first_name }}
+          {% if form.first_name.errors %}<ul class="field-errors">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.last_name.id_for_label }}">Last name</label>
+          {{ form.last_name }}
+          {% if form.last_name.errors %}<ul class="field-errors">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.business_name.id_for_label }}">Business name</label>
+          {{ form.business_name }}
+          {% if form.business_name.errors %}<ul class="field-errors">{% for e in form.business_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Contact</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="{{ form.phone_primary.id_for_label }}">Phone (primary)</label>
+          {{ form.phone_primary }}
+          {% if form.phone_primary.errors %}<ul class="field-errors">{% for e in form.phone_primary.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.phone_secondary.id_for_label }}">Phone (secondary)</label>
+          {{ form.phone_secondary }}
+          {% if form.phone_secondary.errors %}<ul class="field-errors">{% for e in form.phone_secondary.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.email.id_for_label }}">Email</label>
+          {{ form.email }}
+          {% if form.email.errors %}<ul class="field-errors">{% for e in form.email.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Address</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="{{ form.address_line_1.id_for_label }}">Address line 1</label>
+          {{ form.address_line_1 }}
+          {% if form.address_line_1.errors %}<ul class="field-errors">{% for e in form.address_line_1.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.address_line_2.id_for_label }}">Address line 2</label>
+          {{ form.address_line_2 }}
+          {% if form.address_line_2.errors %}<ul class="field-errors">{% for e in form.address_line_2.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.city.id_for_label }}">City</label>
+          {{ form.city }}
+          {% if form.city.errors %}<ul class="field-errors">{% for e in form.city.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.state.id_for_label }}">State</label>
+          {{ form.state }}
+          {% if form.state.errors %}<ul class="field-errors">{% for e in form.state.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.postal_code.id_for_label }}">Postal code</label>
+          {{ form.postal_code }}
+          {% if form.postal_code.errors %}<ul class="field-errors">{% for e in form.postal_code.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Notes</h3>
+      <div class="form-grid">
+        <div class="form-field form-field--full">
+          <label for="{{ form.notes.id_for_label }}">Notes</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}<ul class="field-errors">{% for e in form.notes.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      {% if mode == "edit" %}
+        <a class="button button-secondary" href="{% url 'customers:detail' customer.pk %}">Cancel</a>
+      {% else %}
+        <a class="button button-secondary" href="{% url 'customers:list' %}">Cancel</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+{% endblock %}

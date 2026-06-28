@@ -1,0 +1,130 @@
+{% extends "base.html" %}
+
+{% block title %}{{ customer.display_name }} - Unicos{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'customers:list' %}">&larr; Back to Customers</a>
+
+<div class="page-header">
+  <h1>{{ customer.display_name }}</h1>
+  <a class="button button-secondary" href="{% url 'customers:edit' customer.pk %}">Edit Customer</a>
+  <a class="button button-primary" href="{% url 'customers:vehicle_create' customer.pk %}">Add Vehicle</a>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <h2>Customer Info</h2>
+    <dl>
+      <dt>Type</dt>
+      <dd>{{ customer.get_customer_type_display }}</dd>
+      {% if customer.customer_type == "individual" %}
+        <dt>First name</dt>
+        <dd>{{ customer.first_name|default:"—" }}</dd>
+        <dt>Last name</dt>
+        <dd>{{ customer.last_name|default:"—" }}</dd>
+      {% else %}
+        <dt>Business name</dt>
+        <dd>{{ customer.business_name|default:"—" }}</dd>
+      {% endif %}
+      <dt>Active</dt>
+      <dd>{% if customer.is_active %}Yes{% else %}No{% endif %}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Contact</h2>
+    <dl>
+      <dt>Phone</dt>
+      <dd>{{ customer.phone_primary|default:"—" }}</dd>
+      {% if customer.phone_secondary %}
+        <dt>Phone (alt)</dt>
+        <dd>{{ customer.phone_secondary }}</dd>
+      {% endif %}
+      <dt>Email</dt>
+      <dd>{{ customer.email|default:"—" }}</dd>
+    </dl>
+  </div>
+
+  {% if customer.address_line_1 or customer.city or customer.state %}
+  <div class="card">
+    <h2>Address</h2>
+    {% if customer.address_line_1 %}<p>{{ customer.address_line_1 }}</p>{% endif %}
+    {% if customer.address_line_2 %}<p>{{ customer.address_line_2 }}</p>{% endif %}
+    {% if customer.city or customer.state or customer.postal_code %}
+      <p>
+        {{ customer.city }}{% if customer.city and customer.state %}, {% endif %}{{ customer.state }}{% if customer.postal_code %} {{ customer.postal_code }}{% endif %}
+      </p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+{% if customer.notes %}
+<div class="card">
+  <h2>Notes</h2>
+  <p>{{ customer.notes }}</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Vehicles</h2>
+  {% if vehicles %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Vehicle</th>
+            <th>License plate</th>
+            <th>Year</th>
+            <th>Active</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for vehicle in vehicles %}
+            <tr>
+              <td><a href="{% url 'vehicles:detail' vehicle.pk %}">{{ vehicle }}</a></td>
+              <td>{{ vehicle.license_plate|default:"—" }}</td>
+              <td>{{ vehicle.year|default:"—" }}</td>
+              <td>{% if vehicle.is_active %}Yes{% else %}No{% endif %}</td>
+              <td><a href="{% url 'vehicles:edit' vehicle.pk %}">Edit</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No vehicles on file. <a href="{% url 'customers:vehicle_create' customer.pk %}">Add one.</a></p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Repair Orders</h2>
+  {% if repair_orders %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>RO #</th>
+            <th>Status</th>
+            <th>Vehicle</th>
+            <th>Opened</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ro in repair_orders %}
+            <tr>
+              <td><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></td>
+              <td><span class="status-badge status-{{ ro.status|slugify }}">{{ ro.get_status_display }}</span></td>
+              <td>{{ ro.vehicle }}</td>
+              <td>{{ ro.opened_at|date:"Y-m-d" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No repair orders on file.</p>
+  {% endif %}
+</div>
+{% endblock %}
