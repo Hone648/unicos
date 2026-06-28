@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     "customers",
     "vehicles",
     "repair_orders",
+    "billing",
     "core",
 ]
 
