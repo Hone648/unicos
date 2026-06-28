@@ -1,35 +1,41 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Unicos{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/unicos.css' %}" />
   </head>
   <body>
-    <header>
-      <strong>Unicos</strong>
-      {% if user.is_authenticated %}
-        <nav>
-          <a href="{% url 'dashboard' %}">Dashboard</a>
-          &nbsp;|&nbsp;
-          <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
-        </nav>
-        <span>Signed in as {{ user.get_username }}</span>
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit">Log out</button>
-        </form>
-      {% endif %}
+    <header class="site-header">
+      <div class="site-header__inner">
+        <a class="brand" href="{% url 'dashboard' %}">Unicos</a>
+        {% if user.is_authenticated %}
+          <nav class="nav">
+            <a href="{% url 'dashboard' %}">Dashboard</a>
+            <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
+          </nav>
+          <div class="user-bar">
+            <span>{{ user.get_username }}</span>
+            <form class="logout-form" method="post" action="{% url 'logout' %}">
+              {% csrf_token %}
+              <button type="submit">Log out</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
     </header>
-    <hr />
+
     {% if messages %}
-      <ul>
+      <div class="messages">
         {% for message in messages %}
-          <li>{{ message }}</li>
+          <div class="message message-{{ message.tags }}">{{ message }}</div>
         {% endfor %}
-      </ul>
+      </div>
     {% endif %}
-    <main>
+
+    <main class="page">
       {% block content %}{% endblock %}
     </main>
   </body>

@@ -18,6 +18,8 @@ Architectural style:
   - Django admin: full back-office operations (customer, vehicle, repair order, billing)
   - Repair-order workspace (`/repair-orders/`): shop-facing list and detail views for
     viewing open repair orders, searching, and changing repair order status
+- UI styling: plain Django static CSS (`app/static/css/unicos.css`); no frontend
+  build tooling, no Tailwind, no HTMX yet
 
 Current domain models:
 

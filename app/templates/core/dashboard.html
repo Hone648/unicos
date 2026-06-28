@@ -3,9 +3,14 @@
 {% block title %}Dashboard - Unicos{% endblock %}
 
 {% block content %}
-  <h1>Dashboard</h1>
-  <p>Welcome, {{ user.get_username }}. You are signed in.</p>
-  <ul>
-    <li><a href="{% url 'repair_orders:list' %}">Repair Orders</a></li>
-  </ul>
+  <div class="page-header">
+    <h1>Dashboard</h1>
+  </div>
+  <p>Welcome back, <strong>{{ user.get_username }}</strong>.</p>
+  <div class="quick-links">
+    <a class="quick-link-card" href="{% url 'repair_orders:list' %}">
+      Repair Orders
+      <span class="qlc-label">View and manage open repair orders</span>
+    </a>
+  </div>
 {% endblock %}
