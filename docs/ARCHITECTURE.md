@@ -49,7 +49,9 @@ Current domain models:
   until line items exist, then calculated from line items; number is
   system-generated (`INV-YYYY-NNNNNN`) — staff do not type it manually;
   lifecycle transitions (draft→issued, any→void) are POST-only shop-facing
-  actions at `/billing/invoices/<pk>/issue/` and `/billing/invoices/<pk>/void/`
+  actions at `/billing/invoices/<pk>/issue/` and `/billing/invoices/<pk>/void/`;
+  void invoices are billing-read-only — invoice edit, line-item create/edit,
+  and payment create are all blocked with a redirect and error message
 - `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
   labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
   on save

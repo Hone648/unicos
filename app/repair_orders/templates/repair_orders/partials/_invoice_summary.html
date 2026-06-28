@@ -18,8 +18,10 @@
 
     <div class="action-row">
       <a class="button button-secondary" href="{% url 'billing:invoice_detail' pk=invoice.pk %}">View/Print Invoice</a>
-      <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
-      <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
+      {% if invoice.status != "void" %}
+        <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
+        <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
+      {% endif %}
       {% if invoice.status == "draft" %}
         <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
           {% csrf_token %}
@@ -59,7 +61,7 @@
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.unit_price }}</td>
                 <td>${{ item.line_total }}</td>
-                <td><a href="{% url 'billing:line_item_edit' pk=item.pk %}">Edit</a></td>
+                <td>{% if invoice.status != "void" %}<a href="{% url 'billing:line_item_edit' pk=item.pk %}">Edit</a>{% endif %}</td>
               </tr>
             {% endfor %}
           </tbody>

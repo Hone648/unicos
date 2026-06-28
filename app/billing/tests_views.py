@@ -1093,3 +1093,246 @@ class InvoiceLifecycleUITests(TestCase):
         self._void()
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertNotContains(response, payment_create_url(self.invoice.pk))
+
+
+# ---------------------------------------------------------------------------
+# Void invoice edit guards
+# ---------------------------------------------------------------------------
+
+class VoidInvoiceEditGuardTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="guard_edit_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-GUARD-EDIT")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-GUARD-EDIT",
+            subtotal=Decimal("200.00"),
+            tax_amount=Decimal("20.00"),
+        )
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    def _valid_data(self, **overrides):
+        data = {
+            "issued_at": "",
+            "due_date": "",
+            "subtotal": "200.00",
+            "tax_amount": "20.00",
+            "notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_get_redirects_to_invoice_detail(self):
+        response = self.client.get(invoice_edit_url(self.invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_redirects_to_invoice_detail(self):
+        response = self.client.post(
+            invoice_edit_url(self.invoice.pk), self._valid_data(subtotal="999.00")
+        )
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_does_not_update_invoice(self):
+        self.client.post(
+            invoice_edit_url(self.invoice.pk), self._valid_data(subtotal="999.00")
+        )
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("200.00"))
+
+    def test_non_void_invoice_edit_get_returns_200(self):
+        self.invoice.status = Invoice.Status.DRAFT
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.get(invoice_edit_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Void invoice line-item create guard
+# ---------------------------------------------------------------------------
+
+class VoidInvoiceLineItemCreateGuardTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="guard_li_create_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-GUARD-LIC")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-GUARD-LIC",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    def _valid_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.LABOR,
+            "description": "Should not be created",
+            "quantity": "1.00",
+            "unit_price": "75.00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_get_redirects_to_invoice_detail(self):
+        response = self.client.get(line_item_create_url(self.invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_redirects_to_invoice_detail(self):
+        response = self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_does_not_create_line_item(self):
+        self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        self.assertFalse(InvoiceLineItem.objects.filter(invoice=self.invoice).exists())
+
+    def test_non_void_invoice_line_item_create_get_returns_200(self):
+        self.invoice.status = Invoice.Status.DRAFT
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.get(line_item_create_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Void invoice line-item edit guard
+# ---------------------------------------------------------------------------
+
+class VoidInvoiceLineItemEditGuardTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="guard_li_edit_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-GUARD-LIE")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-GUARD-LIE",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        self.line_item = make_line_item(
+            self.invoice,
+            description="Original desc",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("80.00"),
+        )
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    def _valid_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.PARTS,
+            "description": "Should not update",
+            "quantity": "2.00",
+            "unit_price": "999.00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_get_redirects_to_invoice_detail(self):
+        response = self.client.get(line_item_edit_url(self.line_item.pk))
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_redirects_to_invoice_detail(self):
+        response = self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_does_not_update_line_item(self):
+        self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.line_item.refresh_from_db()
+        self.assertEqual(self.line_item.description, "Original desc")
+        self.assertEqual(self.line_item.unit_price, Decimal("80.00"))
+
+    def test_non_void_invoice_line_item_edit_get_returns_200(self):
+        self.invoice.status = Invoice.Status.DRAFT
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.get(line_item_edit_url(self.line_item.pk))
+        self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Void invoice UI rendering
+# ---------------------------------------------------------------------------
+
+class VoidInvoiceUIRenderingTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="void_ui_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin="5GAKRBED4BJ349493")
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-VOID-UI")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-VOID-UI",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("15.00"),
+        )
+        self.line_item = make_line_item(
+            self.invoice,
+            description="Void line item",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("120.00"),
+        )
+        make_payment(self.invoice, Decimal("50.00"))
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    # --- invoice detail ---
+
+    def test_void_invoice_detail_loads(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_void_invoice_detail_shows_invoice_number(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "INV-VOID-UI")
+
+    def test_void_invoice_detail_shows_line_items(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Void line item")
+
+    def test_void_invoice_detail_shows_totals(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "120.00")  # subtotal from line item
+        self.assertContains(response, "15.00")   # tax
+
+    def test_void_invoice_detail_hides_edit_invoice(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, invoice_edit_url(self.invoice.pk))
+
+    def test_void_invoice_detail_hides_add_line_item(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, line_item_create_url(self.invoice.pk))
+
+    # --- repair-order invoice summary ---
+
+    def test_void_ro_detail_still_shows_invoice(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "INV-VOID-UI")
+
+    def test_void_ro_summary_hides_edit_invoice(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, invoice_edit_url(self.invoice.pk))
+
+    def test_void_ro_summary_hides_add_line_item(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, line_item_create_url(self.invoice.pk))
+
+    def test_void_ro_summary_hides_edit_line_item(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, line_item_edit_url(self.line_item.pk))
+
+    def test_void_ro_summary_shows_line_item_rows(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "Void line item")
+
+    def test_void_ro_summary_shows_payment_rows(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "50.00")

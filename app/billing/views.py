@@ -89,6 +89,10 @@ def invoice_edit(request, pk):
     )
     ro = invoice.repair_order
 
+    if invoice.status == Invoice.Status.VOID:
+        messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if request.method == "POST":
         form = InvoiceEditForm(request.POST, instance=invoice)
         if form.is_valid():
@@ -213,6 +217,10 @@ def line_item_create(request, invoice_pk):
     )
     ro = invoice.repair_order
 
+    if invoice.status == Invoice.Status.VOID:
+        messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if request.method == "POST":
         form = InvoiceLineItemForm(request.POST, invoice=invoice)
         if form.is_valid():
@@ -252,6 +260,10 @@ def line_item_edit(request, pk):
     )
     invoice = line_item.invoice
     ro = invoice.repair_order
+
+    if invoice.status == Invoice.Status.VOID:
+        messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
+        return redirect("billing:invoice_detail", pk=invoice.pk)
 
     if request.method == "POST":
         form = InvoiceLineItemForm(request.POST, instance=line_item)
