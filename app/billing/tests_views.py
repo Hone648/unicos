@@ -101,6 +101,14 @@ def line_item_edit_url(pk):
     return reverse("billing:line_item_edit", kwargs={"pk": pk})
 
 
+def invoice_issue_url(pk):
+    return reverse("billing:invoice_issue", kwargs={"pk": pk})
+
+
+def invoice_void_url(pk):
+    return reverse("billing:invoice_void", kwargs={"pk": pk})
+
+
 def ro_detail_url(pk):
     return reverse("repair_orders:detail", kwargs={"pk": pk})
 
@@ -390,8 +398,14 @@ class PaymentCreateTests(TestCase):
         response = self.client.post(
             payment_create_url(self.invoice.pk), self._valid_data()
         )
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
         self.assertFalse(Payment.objects.filter(invoice=self.invoice).exists())
+
+    def test_get_for_void_invoice_redirects_to_ro_detail(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.get(payment_create_url(self.invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
 
 
 # ---------------------------------------------------------------------------
@@ -850,3 +864,232 @@ class InvoiceDetailScopeTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.invoice.refresh_from_db()
         self.assertEqual(self.invoice.invoice_number, "INV-SCOPE-01")
+
+
+# ---------------------------------------------------------------------------
+# Invoice issue action
+# ---------------------------------------------------------------------------
+
+class InvoiceIssueAuthTests(TestCase):
+    def setUp(self):
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle, number="RO-ISS-AUTH")
+        self.invoice = make_invoice(ro, number="INV-ISS-AUTH")
+
+    def test_login_required(self):
+        url = invoice_issue_url(self.invoice.pk)
+        response = self.client.post(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class InvoiceIssueTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="iss_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-ISS-01")
+        self.invoice = make_invoice(self.ro, number="INV-ISS-01")
+
+    def test_get_redirects_to_invoice_detail(self):
+        response = self.client.get(invoice_issue_url(self.invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_draft_sets_status_to_issued(self):
+        self.client.post(invoice_issue_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.ISSUED)
+
+    def test_post_draft_sets_issued_at_when_blank(self):
+        self.assertIsNone(self.invoice.issued_at)
+        self.client.post(invoice_issue_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertIsNotNone(self.invoice.issued_at)
+
+    def test_post_draft_preserves_issued_at_when_set(self):
+        original_date = date(2025, 3, 15)
+        self.invoice.issued_at = original_date
+        self.invoice.save(update_fields=["issued_at", "updated_at"])
+        self.client.post(invoice_issue_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.issued_at, original_date)
+
+    def test_post_draft_sets_updated_by(self):
+        self.client.post(invoice_issue_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.updated_by, self.user)
+
+    def test_post_draft_redirects_to_ro_detail(self):
+        response = self.client.post(invoice_issue_url(self.invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+
+    def test_post_non_draft_does_not_change_status(self):
+        self.invoice.status = Invoice.Status.ISSUED
+        self.invoice.save(update_fields=["status", "updated_at"])
+        self.client.post(invoice_issue_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.ISSUED)
+
+    def test_post_non_draft_redirects_to_ro_detail(self):
+        self.invoice.status = Invoice.Status.ISSUED
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.post(invoice_issue_url(self.invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+
+
+# ---------------------------------------------------------------------------
+# Invoice void action
+# ---------------------------------------------------------------------------
+
+class InvoiceVoidAuthTests(TestCase):
+    def setUp(self):
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle, number="RO-VOID-AUTH")
+        self.invoice = make_invoice(ro, number="INV-VOID-AUTH")
+
+    def test_login_required(self):
+        url = invoice_void_url(self.invoice.pk)
+        response = self.client.post(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class InvoiceVoidTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="void_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-VOID-01")
+        self.invoice = make_invoice(self.ro, number="INV-VOID-01")
+
+    def test_get_redirects_to_invoice_detail(self):
+        response = self.client.get(invoice_void_url(self.invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
+
+    def test_post_sets_status_to_void(self):
+        self.client.post(invoice_void_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.VOID)
+
+    def test_post_sets_updated_by(self):
+        self.client.post(invoice_void_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.updated_by, self.user)
+
+    def test_post_redirects_to_ro_detail(self):
+        response = self.client.post(invoice_void_url(self.invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+
+    def test_post_already_void_is_non_destructive(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        self.client.post(invoice_void_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.VOID)
+
+    def test_void_invoice_still_visible_on_ro_detail(self):
+        self.client.post(invoice_void_url(self.invoice.pk))
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "INV-VOID-01")
+
+    def test_void_invoice_detail_still_loads(self):
+        self.client.post(invoice_void_url(self.invoice.pk))
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "INV-VOID-01")
+
+    def test_void_paid_invoice_does_not_revive_payment_status(self):
+        make_payment(self.invoice, Decimal("500.00"))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.client.post(invoice_void_url(self.invoice.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.VOID)
+
+
+# ---------------------------------------------------------------------------
+# Invoice lifecycle UI rendering
+# ---------------------------------------------------------------------------
+
+class InvoiceLifecycleUITests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="ui_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin="4T1BF3EK8AU155890")
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-UI-LC-01")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-UI-LC-01",
+            subtotal=Decimal("100.00"),
+            tax_amount=Decimal("10.00"),
+        )
+
+    def _issue(self):
+        self.invoice.status = Invoice.Status.ISSUED
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    def _void(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+
+    # --- invoice detail ---
+
+    def test_draft_invoice_detail_shows_issue_button(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Issue Invoice")
+
+    def test_issued_invoice_detail_does_not_show_issue_button(self):
+        self._issue()
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, "Issue Invoice")
+
+    def test_non_void_invoice_detail_shows_void_button(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Void Invoice")
+
+    def test_void_invoice_detail_does_not_show_void_button(self):
+        self._void()
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, "Void Invoice")
+
+    def test_void_invoice_detail_does_not_show_record_payment(self):
+        self._void()
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, payment_create_url(self.invoice.pk))
+
+    def test_invoice_detail_issue_form_posts_to_correct_url(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, invoice_issue_url(self.invoice.pk))
+
+    def test_invoice_detail_void_form_posts_to_correct_url(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, invoice_void_url(self.invoice.pk))
+
+    # --- repair-order invoice summary ---
+
+    def test_draft_ro_summary_shows_issue_button(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "Issue Invoice")
+
+    def test_issued_ro_summary_does_not_show_issue_button(self):
+        self._issue()
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, "Issue Invoice")
+
+    def test_non_void_ro_summary_shows_void_button(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "Void Invoice")
+
+    def test_void_ro_summary_does_not_show_void_button(self):
+        self._void()
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, "Void Invoice")
+
+    def test_void_ro_summary_hides_record_payment(self):
+        self._void()
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, payment_create_url(self.invoice.pk))

@@ -47,7 +47,9 @@ Current domain models:
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
   payment status (draft/issued/partially paid/paid/void); subtotal is manual
   until line items exist, then calculated from line items; number is
-  system-generated (`INV-YYYY-NNNNNN`) — staff do not type it manually
+  system-generated (`INV-YYYY-NNNNNN`) — staff do not type it manually;
+  lifecycle transitions (draft→issued, any→void) are POST-only shop-facing
+  actions at `/billing/invoices/<pk>/issue/` and `/billing/invoices/<pk>/void/`
 - `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
   labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
   on save

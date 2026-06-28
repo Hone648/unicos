@@ -2,6 +2,7 @@ from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
 
 from core.document_numbers import generate_invoice_number
 from repair_orders.models import RepairOrder
@@ -110,6 +111,50 @@ def invoice_edit(request, pk):
 
 
 @login_required
+def invoice_issue(request, pk):
+    if request.method != "POST":
+        return redirect("billing:invoice_detail", pk=pk)
+
+    invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
+    ro = invoice.repair_order
+
+    if invoice.status != Invoice.Status.DRAFT:
+        messages.info(
+            request,
+            f"Invoice {invoice.invoice_number} is already "
+            f"{invoice.get_status_display().lower()} — no change made.",
+        )
+        return redirect("repair_orders:detail", pk=ro.pk)
+
+    invoice.status = Invoice.Status.ISSUED
+    if not invoice.issued_at:
+        invoice.issued_at = timezone.localdate()
+    invoice.updated_by = request.user
+    invoice.save(update_fields=["status", "issued_at", "updated_by", "updated_at"])
+    messages.success(request, f"Invoice {invoice.invoice_number} issued.")
+    return redirect("repair_orders:detail", pk=ro.pk)
+
+
+@login_required
+def invoice_void(request, pk):
+    if request.method != "POST":
+        return redirect("billing:invoice_detail", pk=pk)
+
+    invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
+    ro = invoice.repair_order
+
+    if invoice.status == Invoice.Status.VOID:
+        messages.info(request, f"Invoice {invoice.invoice_number} is already void.")
+        return redirect("repair_orders:detail", pk=ro.pk)
+
+    invoice.status = Invoice.Status.VOID
+    invoice.updated_by = request.user
+    invoice.save(update_fields=["status", "updated_by", "updated_at"])
+    messages.success(request, f"Invoice {invoice.invoice_number} voided.")
+    return redirect("repair_orders:detail", pk=ro.pk)
+
+
+@login_required
 def payment_create(request, invoice_pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -120,6 +165,13 @@ def payment_create(request, invoice_pk):
         pk=invoice_pk,
     )
     ro = invoice.repair_order
+
+    if invoice.status == Invoice.Status.VOID:
+        messages.error(
+            request,
+            f"Invoice {invoice.invoice_number} is void and cannot accept payments.",
+        )
+        return redirect("repair_orders:detail", pk=ro.pk)
 
     if request.method == "POST":
         form = PaymentForm(request.POST)

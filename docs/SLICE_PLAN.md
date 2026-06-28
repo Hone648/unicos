@@ -18,6 +18,7 @@ Planned slices:
 14. Slice 13: invoice line items foundation (InvoiceLineItem, subtotal recalculation, line-item create/edit, invoice summary line-item table)
 15. Slice 14: printable invoice view (read-only invoice detail/print page, browser-print CSS, View/Print Invoice link from repair-order summary)
 16. Slice 15: generated document numbers (system-generated RO-YYYY-NNNNNN and INV-YYYY-NNNNNN; DocumentNumberSequence model in core; staff no longer type numbers manually)
+17. Slice 16: invoice lifecycle actions (Issue Invoice POST action sets status=issued and issued_at; Void Invoice POST action sets status=void; payments blocked for void invoices; lifecycle buttons on invoice detail and RO summary)
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
