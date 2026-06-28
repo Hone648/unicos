@@ -17,14 +17,19 @@ def _repair_order_detail_context(ro):
     """Build context shared by the full detail view and HTMX partial responses."""
     history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
     invoice = None
+    payments = []
     try:
         invoice = ro.invoice
+        payments = list(
+            invoice.payments.select_related("received_by").order_by("-payment_date", "-created_at")
+        )
     except RepairOrder.invoice.RelatedObjectDoesNotExist:
         pass
     return {
         "ro": ro,
         "history": history,
         "invoice": invoice,
+        "payments": payments,
         "status_choices": RepairOrder.Status.choices,
     }
 

@@ -699,3 +699,21 @@ tbody tr:hover { background: #f7fafc; }
   font-size: 0.875rem;
   margin: 0;
 }
+
+/* --------------------------------------------------------------------------
+   Billing amount utilities
+   -------------------------------------------------------------------------- */
+
+.amount-paid { color: #276749; font-weight: 600; }
+.amount-due  { color: #c05621; font-weight: 600; }
+
+/* Row of action buttons inside a card (invoice actions) */
+.action-row {
+  display: flex;
+  gap: 0.625rem;
+  flex-wrap: wrap;
+  align-items: center;
+  margin-top: 1rem;
+  padding-top: 0.875rem;
+  border-top: 1px solid #e2e8f0;
+}
