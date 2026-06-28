@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Repair Orders - Unicos{% endblock %}
+
+{% block content %}
+<h1>Repair Orders</h1>
+
+<form method="get" action="">
+  <input
+    type="search"
+    name="q"
+    value="{{ q }}"
+    placeholder="Search by RO#, customer, VIN, plate…"
+    aria-label="Search repair orders"
+  />
+  {% if status_filter and status_filter != "" %}
+    <input type="hidden" name="status" value="{{ status_filter }}" />
+  {% endif %}
+  <button type="submit">Search</button>
+  {% if q %}
+    <a href="?{% if status_filter %}status={{ status_filter }}{% endif %}">Clear search</a>
+  {% endif %}
+</form>
+
+<nav aria-label="Status filter">
+  <a href="?{% if q %}q={{ q }}{% endif %}">Open</a>
+  &nbsp;|&nbsp;
+  <a href="?status=all{% if q %}&amp;q={{ q }}{% endif %}">All</a>
+  &nbsp;|&nbsp;
+  <a href="?status=closed{% if q %}&amp;q={{ q }}{% endif %}">Closed</a>
+  &nbsp;|&nbsp;
+  <a href="?status=canceled{% if q %}&amp;q={{ q }}{% endif %}">Canceled</a>
+</nav>
+
+{% if repair_orders %}
+  <table>
+    <thead>
+      <tr>
+        <th>RO #</th>
+        <th>Status</th>
+        <th>Customer</th>
+        <th>Vehicle</th>
+        <th>Assigned To</th>
+        <th>Opened</th>
+        <th>Promised</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for ro in repair_orders %}
+        <tr>
+          <td><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></td>
+          <td>{{ ro.get_status_display }}</td>
+          <td>{{ ro.customer }}</td>
+          <td>{{ ro.vehicle }}</td>
+          <td>{% if ro.assigned_to %}{{ ro.assigned_to.get_username }}{% else %}—{% endif %}</td>
+          <td>{{ ro.opened_at|date:"Y-m-d" }}</td>
+          <td>{% if ro.promised_date %}{{ ro.promised_date|date:"Y-m-d" }}{% else %}—{% endif %}</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+{% else %}
+  <p>No repair orders found.</p>
+{% endif %}
+{% endblock %}
