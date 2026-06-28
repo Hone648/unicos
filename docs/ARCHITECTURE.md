@@ -14,9 +14,10 @@ Architectural style:
 - PostgreSQL relational database
 - Custom user model (`accounts.User`) for staff authentication
 - Browser-based access
-- Current operational interface: Django admin, with improved workflows for
-  customer lookup, vehicle lookup, repair order management, and status history
-  review. Custom UI is planned for a later slice.
+- Current operational interfaces:
+  - Django admin: full back-office operations (customer, vehicle, repair order, billing)
+  - Repair-order workspace (`/repair-orders/`): shop-facing list and detail views for
+    viewing open repair orders, searching, and changing repair order status
 
 Current domain models:
 

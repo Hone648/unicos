@@ -1,0 +1,116 @@
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+
+from .models import RepairOrder
+
+# Status values that count as "closed" for default list filtering
+_CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
+
+# All valid status values for quick lookup
+_VALID_STATUSES = set(RepairOrder.Status.values)
+
+
+@login_required
+def repair_order_list(request):
+    qs = (
+        RepairOrder.objects.select_related("customer", "vehicle", "assigned_to")
+        .order_by("-opened_at", "-id")
+    )
+
+    status_filter = request.GET.get("status", "")
+    q = request.GET.get("q", "").strip()
+
+    if status_filter == "all":
+        pass  # no status filtering
+    elif status_filter == "closed":
+        qs = qs.filter(status=RepairOrder.Status.CLOSED)
+    elif status_filter == "canceled":
+        qs = qs.filter(status=RepairOrder.Status.CANCELED)
+    elif status_filter in _VALID_STATUSES:
+        qs = qs.filter(status=status_filter)
+    else:
+        # Default: exclude closed and canceled
+        qs = qs.exclude(status__in=_CLOSED_STATUSES)
+
+    if q:
+        qs = qs.filter(
+            Q(repair_order_number__icontains=q)
+            | Q(customer__first_name__icontains=q)
+            | Q(customer__last_name__icontains=q)
+            | Q(customer__business_name__icontains=q)
+            | Q(vehicle__vin__icontains=q)
+            | Q(vehicle__make__icontains=q)
+            | Q(vehicle__model__icontains=q)
+            | Q(vehicle__license_plate__icontains=q)
+        )
+
+    return render(
+        request,
+        "repair_orders/repair_order_list.html",
+        {
+            "repair_orders": qs,
+            "q": q,
+            "status_filter": status_filter,
+            "status_choices": RepairOrder.Status.choices,
+        },
+    )
+
+
+@login_required
+def repair_order_detail(request, pk):
+    ro = get_object_or_404(
+        RepairOrder.objects.select_related(
+            "customer",
+            "vehicle",
+            "assigned_to",
+            "created_by",
+            "updated_by",
+        ),
+        pk=pk,
+    )
+    history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
+
+    invoice = None
+    try:
+        invoice = ro.invoice
+    except RepairOrder.invoice.RelatedObjectDoesNotExist:
+        pass
+
+    return render(
+        request,
+        "repair_orders/repair_order_detail.html",
+        {
+            "ro": ro,
+            "history": history,
+            "invoice": invoice,
+            "status_choices": RepairOrder.Status.choices,
+        },
+    )
+
+
+@login_required
+def repair_order_status_update(request, pk):
+    if request.method != "POST":
+        return redirect("repair_orders:detail", pk=pk)
+
+    ro = get_object_or_404(RepairOrder, pk=pk)
+    new_status = request.POST.get("new_status", "").strip()
+    note = request.POST.get("note", "").strip()
+
+    if new_status not in _VALID_STATUSES:
+        messages.error(request, f"'{new_status}' is not a valid repair order status.")
+        return redirect("repair_orders:detail", pk=pk)
+
+    if new_status == ro.status:
+        messages.info(request, "Status is already set to that value — no change made.")
+        return redirect("repair_orders:detail", pk=pk)
+
+    if not note:
+        note = "Status changed from repair order workspace."
+
+    ro.set_status(new_status, changed_by=request.user, note=note)
+    label = dict(RepairOrder.Status.choices).get(new_status, new_status)
+    messages.success(request, f"Status updated to \"{label}\".")
+    return redirect("repair_orders:detail", pk=pk)

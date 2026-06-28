@@ -5,4 +5,7 @@
 {% block content %}
   <h1>Dashboard</h1>
   <p>Welcome, {{ user.get_username }}. You are signed in.</p>
+  <ul>
+    <li><a href="{% url 'repair_orders:list' %}">Repair Orders</a></li>
+  </ul>
 {% endblock %}

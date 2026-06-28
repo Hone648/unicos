@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+
+{% block title %}RO {{ ro.repair_order_number }} - Unicos{% endblock %}
+
+{% block content %}
+<p><a href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a></p>
+
+<h1>RO {{ ro.repair_order_number }}</h1>
+<p><strong>Status:</strong> {{ ro.get_status_display }}</p>
+
+<section>
+  <h2>Change Status</h2>
+  <form method="post" action="{% url 'repair_orders:status_update' ro.pk %}">
+    {% csrf_token %}
+    <label for="new_status">New status:</label>
+    <select id="new_status" name="new_status">
+      {% for value, label in status_choices %}
+        <option value="{{ value }}" {% if value == ro.status %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+    <label for="note">Note (optional):</label>
+    <input type="text" id="note" name="note" maxlength="500" />
+    <button type="submit">Update Status</button>
+  </form>
+</section>
+
+<section>
+  <h2>Customer &amp; Vehicle</h2>
+  <dl>
+    <dt>Customer</dt><dd>{{ ro.customer }}</dd>
+    <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
+    {% if ro.assigned_to %}
+      <dt>Assigned to</dt><dd>{{ ro.assigned_to.get_username }}</dd>
+    {% endif %}
+  </dl>
+</section>
+
+<section>
+  <h2>Dates</h2>
+  <dl>
+    <dt>Opened</dt><dd>{{ ro.opened_at|date:"Y-m-d H:i" }}</dd>
+    <dt>Promised date</dt><dd>{% if ro.promised_date %}{{ ro.promised_date|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
+    <dt>Closed</dt><dd>{% if ro.closed_at %}{{ ro.closed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd>
+  </dl>
+</section>
+
+{% if ro.reported_problem or ro.internal_notes %}
+<section>
+  <h2>Notes</h2>
+  {% if ro.reported_problem %}
+    <h3>Reported problem</h3>
+    <p>{{ ro.reported_problem }}</p>
+  {% endif %}
+  {% if ro.internal_notes %}
+    <h3>Internal notes</h3>
+    <p>{{ ro.internal_notes }}</p>
+  {% endif %}
+</section>
+{% endif %}
+
+{% if invoice %}
+<section>
+  <h2>Invoice</h2>
+  <dl>
+    <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
+    <dt>Status</dt><dd>{{ invoice.get_status_display }}</dd>
+    <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
+    <dt>Paid</dt><dd>${{ invoice.amount_paid }}</dd>
+    <dt>Balance due</dt><dd>${{ invoice.balance_due }}</dd>
+  </dl>
+</section>
+{% endif %}
+
+<section>
+  <h2>Status History</h2>
+  {% if history %}
+    <table>
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>From</th>
+          <th>To</th>
+          <th>Changed by</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for entry in history %}
+          <tr>
+            <td>{{ entry.changed_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if entry.previous_status %}{{ entry.get_previous_status_display }}{% else %}—{% endif %}</td>
+            <td>{{ entry.get_new_status_display }}</td>
+            <td>{% if entry.changed_by %}{{ entry.changed_by.get_username }}{% else %}—{% endif %}</td>
+            <td>{{ entry.note }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  {% else %}
+    <p>No status history.</p>
+  {% endif %}
+</section>
+{% endblock %}
