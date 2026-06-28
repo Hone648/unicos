@@ -20,31 +20,39 @@ class CustomerAdmin(admin.ModelAdmin):
         "customer_type",
         "phone_primary",
         "email",
+        "city",
+        "state",
         "is_active",
+        "vehicle_count",
+        "repair_order_count",
         "created_at",
     )
-    list_filter = ("customer_type", "is_active")
+    list_filter = ("customer_type", "is_active", "state", "created_at")
     search_fields = (
         "first_name",
         "last_name",
         "business_name",
         "phone_primary",
+        "phone_secondary",
         "email",
+        "vehicles__vin",
+        "vehicles__license_plate",
+        "repair_orders__repair_order_number",
     )
-    readonly_fields = ("created_at", "updated_at")
+    readonly_fields = ("created_at", "updated_at", "vehicle_count", "repair_order_count")
     inlines = [VehicleInline]
     fieldsets = (
         (
-            "Customer Type",
-            {"fields": ("customer_type", "is_active")},
-        ),
-        (
-            "Individual",
-            {"fields": ("first_name", "last_name")},
-        ),
-        (
-            "Business",
-            {"fields": ("business_name",)},
+            "Identity",
+            {
+                "fields": (
+                    "customer_type",
+                    "is_active",
+                    "first_name",
+                    "last_name",
+                    "business_name",
+                )
+            },
         ),
         (
             "Contact",
@@ -63,6 +71,13 @@ class CustomerAdmin(admin.ModelAdmin):
             },
         ),
         (
+            "Operational",
+            {
+                "fields": ("vehicle_count", "repair_order_count"),
+                "description": "Summary counts — read only.",
+            },
+        ),
+        (
             "Notes",
             {"fields": ("notes",)},
         ),
@@ -71,3 +86,11 @@ class CustomerAdmin(admin.ModelAdmin):
             {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
         ),
     )
+
+    @admin.display(description="Vehicles")
+    def vehicle_count(self, obj):
+        return obj.vehicles.count()
+
+    @admin.display(description="Repair orders")
+    def repair_order_count(self, obj):
+        return obj.repair_orders.count()

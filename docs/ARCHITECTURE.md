@@ -14,6 +14,9 @@ Architectural style:
 - PostgreSQL relational database
 - Custom user model (`accounts.User`) for staff authentication
 - Browser-based access
+- Current operational interface: Django admin, with improved workflows for
+  customer lookup, vehicle lookup, repair order management, and status history
+  review. Custom UI is planned for a later slice.
 
 Current domain models:
 
