@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from billing.models import Invoice
+from billing.models import Invoice, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
 from vehicles.models import Vehicle
@@ -56,6 +56,12 @@ def make_invoice(repair_order, number="INV-001", **kwargs):
     return Invoice.objects.create(
         repair_order=repair_order, invoice_number=number, **defaults
     )
+
+
+def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
+    defaults = {"payment_date": date.today(), "method": Payment.Method.CASH}
+    defaults.update(kwargs)
+    return Payment.objects.create(invoice=invoice, amount=amount, **defaults)
 
 
 def detail_url(pk):
@@ -622,3 +628,164 @@ class RepairOrderNavigationTests(TestCase):
     def test_detail_page_contains_edit_link(self):
         response = self.client.get(detail_url(self.ro.pk))
         self.assertContains(response, edit_url(self.ro.pk))
+
+
+# ---------------------------------------------------------------------------
+# Closure rule tests (non-HTMX)
+# ---------------------------------------------------------------------------
+
+class RepairOrderClosureRuleTests(TestCase):
+    """Final-status transitions are blocked when a non-void invoice has balance due."""
+
+    def setUp(self):
+        self.user = make_user(username="closure_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_3)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-CLOSURE-01")
+        # Draft invoice, total = 440, nothing paid → balance_due = 440
+        self.invoice = make_invoice(self.ro, number="INV-CLOSURE-01")
+
+    def _post_status(self, new_status, note=""):
+        return self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": new_status, "note": note},
+        )
+
+    # --- blocking behavior ---
+
+    def test_cannot_transition_to_delivered_with_balance_due(self):
+        response = self._post_status("delivered")
+        self.ro.refresh_from_db()
+        self.assertNotEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+    def test_cannot_transition_to_closed_with_balance_due(self):
+        self._post_status("closed")
+        self.ro.refresh_from_db()
+        self.assertNotEqual(self.ro.status, RepairOrder.Status.CLOSED)
+
+    def test_cannot_transition_to_canceled_with_balance_due(self):
+        self._post_status("canceled")
+        self.ro.refresh_from_db()
+        self.assertNotEqual(self.ro.status, RepairOrder.Status.CANCELED)
+
+    def test_blocked_transition_leaves_status_unchanged(self):
+        original_status = self.ro.status
+        self._post_status("delivered")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, original_status)
+
+    def test_blocked_transition_does_not_create_history(self):
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self._post_status("delivered")
+        count_after = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.assertEqual(count_before, count_after)
+
+    def test_blocked_transition_redirects_to_detail(self):
+        response = self._post_status("delivered")
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_partially_paid_invoice_with_balance_blocks_final_status(self):
+        # Pay half the invoice — balance_due is still > 0
+        make_payment(self.invoice, Decimal("100.00"))
+        self._post_status("delivered")
+        self.ro.refresh_from_db()
+        self.assertNotEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+    # --- allowed behavior ---
+
+    def test_can_transition_to_delivered_with_no_invoice(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-NO-INV")
+        self.client.post(status_url(ro.pk), {"new_status": "delivered"})
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.DELIVERED)
+
+    def test_can_transition_to_delivered_with_void_invoice(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        self._post_status("delivered")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+    def test_can_transition_to_delivered_with_fully_paid_invoice(self):
+        # Invoice total = 440; pay full amount
+        make_payment(self.invoice, Decimal("440.00"))
+        self._post_status("delivered")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+    def test_can_transition_to_non_final_status_with_balance_due(self):
+        self._post_status("in_repair")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.IN_REPAIR)
+
+    def test_non_final_transition_still_creates_history(self):
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self._post_status("in_repair")
+        count_after = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.assertEqual(count_after, count_before + 1)
+
+
+# ---------------------------------------------------------------------------
+# Closure rule HTMX tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderClosureRuleHTMXTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="closure_htmx_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-CLOSURE-HX")
+        # Draft invoice with balance due
+        self.invoice = make_invoice(self.ro, number="INV-CLOSURE-HX")
+
+    def _htmx_post(self, new_status):
+        return self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": new_status},
+            HTTP_HX_REQUEST="true",
+        )
+
+    def test_htmx_blocked_transition_returns_200(self):
+        response = self._htmx_post("delivered")
+        self.assertEqual(response.status_code, 200)
+
+    def test_htmx_blocked_transition_includes_error_message(self):
+        response = self._htmx_post("delivered")
+        self.assertContains(response, "balance due")
+
+    def test_htmx_blocked_transition_leaves_status_unchanged(self):
+        original_status = self.ro.status
+        self._htmx_post("delivered")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, original_status)
+
+    def test_htmx_blocked_transition_does_not_create_history(self):
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self._htmx_post("delivered")
+        count_after = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.assertEqual(count_before, count_after)
+
+    def test_htmx_allowed_transition_still_updates_status(self):
+        self._htmx_post("in_repair")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.IN_REPAIR)
+
+    def test_htmx_paid_invoice_allows_final_status(self):
+        make_payment(self.invoice, Decimal("440.00"))
+        self._htmx_post("delivered")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
