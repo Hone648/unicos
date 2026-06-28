@@ -1,0 +1,21 @@
+<div id="status-update-card" class="card">
+  <h2>Change Status</h2>
+  <form method="post"
+        action="{% url 'repair_orders:status_update' ro.pk %}"
+        hx-post="{% url 'repair_orders:status_update' ro.pk %}"
+        hx-target="#status-update-card"
+        hx-swap="outerHTML">
+    {% csrf_token %}
+    <div class="form-row">
+      <label for="new_status">New status</label>
+      <select id="new_status" name="new_status">
+        {% for value, label in status_choices %}
+          <option value="{{ value }}" {% if value == ro.status %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <label for="note">Note</label>
+      <input type="text" id="note" name="note" maxlength="500" placeholder="Optional note…" />
+      <button type="submit">Update Status</button>
+    </div>
+  </form>
+</div>

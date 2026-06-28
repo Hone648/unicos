@@ -1,0 +1,7 @@
+<div id="messages" class="messages" hx-swap-oob="true">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="message message-{{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+</div>

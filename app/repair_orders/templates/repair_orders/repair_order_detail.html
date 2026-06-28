@@ -7,7 +7,7 @@
 
 <div class="page-header">
   <h1>RO {{ ro.repair_order_number }}</h1>
-  <span class="status-badge status-{{ ro.status|slugify }}">{{ ro.get_status_display }}</span>
+  {% include "repair_orders/partials/_status_badge.html" %}
 </div>
 
 <div class="card-grid">
@@ -34,23 +34,7 @@
 
 </div>
 
-<div class="card">
-  <h2>Change Status</h2>
-  <form method="post" action="{% url 'repair_orders:status_update' ro.pk %}">
-    {% csrf_token %}
-    <div class="form-row">
-      <label for="new_status">New status</label>
-      <select id="new_status" name="new_status">
-        {% for value, label in status_choices %}
-          <option value="{{ value }}" {% if value == ro.status %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <label for="note">Note</label>
-      <input type="text" id="note" name="note" maxlength="500" placeholder="Optional note…" />
-      <button type="submit">Update Status</button>
-    </div>
-  </form>
-</div>
+{% include "repair_orders/partials/_status_form.html" %}
 
 {% if ro.reported_problem or ro.internal_notes %}
 <div class="card">
@@ -79,35 +63,5 @@
 </div>
 {% endif %}
 
-<div class="card">
-  <h2>Status History</h2>
-  {% if history %}
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>From</th>
-            <th>To</th>
-            <th>Changed by</th>
-            <th>Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for entry in history %}
-            <tr>
-              <td>{{ entry.changed_at|date:"Y-m-d H:i" }}</td>
-              <td>{% if entry.previous_status %}{{ entry.get_previous_status_display }}{% else %}—{% endif %}</td>
-              <td>{{ entry.get_new_status_display }}</td>
-              <td>{% if entry.changed_by %}{{ entry.changed_by.get_username }}{% else %}—{% endif %}</td>
-              <td>{{ entry.note }}</td>
-            </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  {% else %}
-    <p>No status history.</p>
-  {% endif %}
-</div>
+{% include "repair_orders/partials/_status_history.html" %}
 {% endblock %}
