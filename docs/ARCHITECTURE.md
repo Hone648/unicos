@@ -43,7 +43,10 @@ Current domain models:
   configurable DB table); FKs to customer and vehicle use `PROTECT`; number is
   system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually;
   final-status transitions (delivered, closed, canceled) are blocked by the
-  shop-facing status-update view when a non-void invoice has a balance due
+  shop-facing status-update view when a non-void invoice has a balance due;
+  ordinary repair-order field edits are blocked once the order is delivered,
+  closed, or canceled, while detail, history, billing summary, and allowed
+  status movement remain visible/available
 - `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
   changes on a repair order; cascades with the repair order
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
