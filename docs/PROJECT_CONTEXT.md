@@ -1,10 +1,11 @@
 # Project Context
 
-Unicos is a local-first body shop repair order management app.
+Unicos is a web-based body shop repair order management app.
 
 The app is intended to help a shop track repair work from intake through
-completion and payment, starting with reliable browser access on the local
-network.
+completion and payment. The intended shop has internet access, so the app is
+expected to become internet-accessible / hosted in the future. Local Docker
+remains the current development runtime.
 
 Primary business needs:
 
@@ -13,8 +14,8 @@ Primary business needs:
 - Work intake
 - Work-in-progress tracking
 - Owed/paid payment tracking
-- Local network deployment first
-- Future web or private remote access path
+- Web-based browser access for shop staff
+- Future internet-accessible hosted deployment
 
-Current implementation scope is foundational only. Domain models, auth, billing,
-and shop workflows belong in later slices.
+Current implementation scope is foundational. The accounts/auth baseline exists;
+domain models, billing, and shop workflows belong in later slices.

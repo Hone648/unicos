@@ -1,5 +1,12 @@
+from django.contrib.auth.decorators import login_required
 from django.db import connections
 from django.http import JsonResponse
+from django.shortcuts import render
+
+
+@login_required
+def dashboard(request):
+    return render(request, "core/dashboard.html")
 
 
 def healthz(request):
