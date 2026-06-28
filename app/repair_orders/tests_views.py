@@ -428,9 +428,8 @@ class RepairOrderCreateTests(TestCase):
         self.other_customer = make_customer(first_name="Other", last_name="Person")
         self.other_vehicle = make_vehicle(self.other_customer, vin=VALID_VIN_3)
 
-    def _valid_post_data(self, number="RO-CREATE-01", **overrides):
+    def _valid_post_data(self, **overrides):
         data = {
-            "repair_order_number": number,
             "customer": self.customer.pk,
             "vehicle": self.vehicle.pk,
         }
@@ -443,7 +442,7 @@ class RepairOrderCreateTests(TestCase):
 
     def test_create_page_contains_form_fields(self):
         response = self.client.get(CREATE_URL)
-        self.assertContains(response, 'name="repair_order_number"')
+        self.assertNotContains(response, 'name="repair_order_number"')
         self.assertContains(response, 'name="customer"')
         self.assertContains(response, 'name="vehicle"')
 
@@ -452,34 +451,41 @@ class RepairOrderCreateTests(TestCase):
         self.assertNotContains(response, 'name="status"')
 
     def test_valid_post_creates_repair_order(self):
+        count_before = RepairOrder.objects.count()
         self.client.post(CREATE_URL, self._valid_post_data())
-        self.assertTrue(RepairOrder.objects.filter(repair_order_number="RO-CREATE-01").exists())
+        self.assertEqual(RepairOrder.objects.count(), count_before + 1)
+
+    def test_valid_post_auto_generates_repair_order_number(self):
+        self.client.post(CREATE_URL, self._valid_post_data())
+        ro = RepairOrder.objects.get(customer=self.customer)
+        self.assertRegex(ro.repair_order_number, r"^RO-\d{4}-\d{6}$")
 
     def test_valid_post_redirects_to_detail(self):
         response = self.client.post(CREATE_URL, self._valid_post_data())
-        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        ro = RepairOrder.objects.get(customer=self.customer)
         self.assertRedirects(response, detail_url(ro.pk))
 
     def test_valid_post_sets_created_by(self):
         self.client.post(CREATE_URL, self._valid_post_data())
-        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        ro = RepairOrder.objects.get(customer=self.customer)
         self.assertEqual(ro.created_by, self.user)
 
     def test_valid_post_sets_updated_by(self):
         self.client.post(CREATE_URL, self._valid_post_data())
-        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        ro = RepairOrder.objects.get(customer=self.customer)
         self.assertEqual(ro.updated_by, self.user)
 
     def test_created_repair_order_starts_with_default_status(self):
         self.client.post(CREATE_URL, self._valid_post_data())
-        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        ro = RepairOrder.objects.get(customer=self.customer)
         self.assertEqual(ro.status, RepairOrder.Status.INTAKE)
 
     def test_customer_vehicle_mismatch_does_not_create_repair_order(self):
+        count_before = RepairOrder.objects.count()
         self.client.post(CREATE_URL, self._valid_post_data(
             vehicle=self.other_vehicle.pk,
         ))
-        self.assertFalse(RepairOrder.objects.filter(repair_order_number="RO-CREATE-01").exists())
+        self.assertEqual(RepairOrder.objects.count(), count_before)
 
     def test_customer_vehicle_mismatch_displays_form_error(self):
         response = self.client.post(CREATE_URL, self._valid_post_data(
@@ -522,7 +528,6 @@ class RepairOrderEditTests(TestCase):
 
     def _valid_post_data(self, **overrides):
         data = {
-            "repair_order_number": self.ro.repair_order_number,
             "customer": self.customer.pk,
             "vehicle": self.vehicle.pk,
             "reported_problem": "Updated problem",
@@ -580,6 +585,16 @@ class RepairOrderEditTests(TestCase):
         ))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "does not belong to the selected customer")
+
+    def test_edit_form_does_not_expose_editable_ro_number(self):
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertNotContains(response, 'name="repair_order_number"')
+
+    def test_edit_preserves_existing_repair_order_number(self):
+        original_number = self.ro.repair_order_number
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.repair_order_number, original_number)
 
 
 # ---------------------------------------------------------------------------

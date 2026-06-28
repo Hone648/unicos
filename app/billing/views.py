@@ -3,9 +3,10 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.shortcuts import get_object_or_404, redirect, render
 
+from core.document_numbers import generate_invoice_number
 from repair_orders.models import RepairOrder
 
-from .forms import InvoiceForm, InvoiceLineItemForm, PaymentForm
+from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
 from .models import Invoice, InvoiceLineItem, Payment
 
 
@@ -52,9 +53,10 @@ def invoice_create_for_repair_order(request, repair_order_pk):
         pass
 
     if request.method == "POST":
-        form = InvoiceForm(request.POST)
+        form = InvoiceCreateForm(request.POST)
         if form.is_valid():
             invoice = form.save(commit=False)
+            invoice.invoice_number = generate_invoice_number()
             invoice.repair_order = ro
             invoice.created_by = request.user
             invoice.updated_by = request.user
@@ -62,7 +64,7 @@ def invoice_create_for_repair_order(request, repair_order_pk):
             messages.success(request, f"Invoice {invoice.invoice_number} created.")
             return redirect("repair_orders:detail", pk=ro.pk)
     else:
-        form = InvoiceForm()
+        form = InvoiceCreateForm()
 
     return render(request, "billing/invoice_form.html", {
         "form": form,
@@ -87,7 +89,7 @@ def invoice_edit(request, pk):
     ro = invoice.repair_order
 
     if request.method == "POST":
-        form = InvoiceForm(request.POST, instance=invoice)
+        form = InvoiceEditForm(request.POST, instance=invoice)
         if form.is_valid():
             updated = form.save(commit=False)
             updated.updated_by = request.user
@@ -95,7 +97,7 @@ def invoice_edit(request, pk):
             messages.success(request, f"Invoice {invoice.invoice_number} updated.")
             return redirect("repair_orders:detail", pk=ro.pk)
     else:
-        form = InvoiceForm(instance=invoice)
+        form = InvoiceEditForm(instance=invoice)
 
     return render(request, "billing/invoice_form.html", {
         "form": form,

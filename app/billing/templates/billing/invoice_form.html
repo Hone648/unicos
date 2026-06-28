@@ -30,9 +30,12 @@
     <div class="form-grid">
 
       <div class="form-field">
-        <label for="{{ form.invoice_number.id_for_label }}">Invoice number</label>
-        {{ form.invoice_number }}
-        {% if form.invoice_number.errors %}<ul class="field-errors">{% for e in form.invoice_number.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        <label>Invoice number</label>
+        {% if mode == "edit" %}
+          <p class="form-field-readonly">{{ invoice.invoice_number }}</p>
+        {% else %}
+          <p class="muted-text">Generated automatically on save.</p>
+        {% endif %}
       </div>
 
       <div class="form-field">

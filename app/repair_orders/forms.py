@@ -4,11 +4,10 @@ from django.contrib.auth import get_user_model
 from .models import RepairOrder
 
 
-class RepairOrderForm(forms.ModelForm):
+class _RepairOrderBaseForm(forms.ModelForm):
     class Meta:
         model = RepairOrder
         fields = [
-            "repair_order_number",
             "customer",
             "vehicle",
             "assigned_to",
@@ -32,3 +31,11 @@ class RepairOrderForm(forms.ModelForm):
 
     # Vehicle/customer cross-validation is handled by RepairOrder.clean(), which
     # Django's ModelForm calls automatically via _post_clean() → instance.full_clean().
+
+
+class RepairOrderCreateForm(_RepairOrderBaseForm):
+    pass
+
+
+class RepairOrderEditForm(_RepairOrderBaseForm):
+    pass

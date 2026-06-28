@@ -28,12 +28,11 @@
     <div class="form-grid">
 
       <div class="form-field">
-        <label for="{{ form.repair_order_number.id_for_label }}">RO Number</label>
-        {{ form.repair_order_number }}
-        {% if form.repair_order_number.errors %}
-          <ul class="field-errors">
-            {% for error in form.repair_order_number.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
+        <label>RO Number</label>
+        {% if mode == "edit" %}
+          <p class="form-field-readonly">{{ repair_order.repair_order_number }}</p>
+        {% else %}
+          <p class="muted-text">Generated automatically on save.</p>
         {% endif %}
       </div>
 

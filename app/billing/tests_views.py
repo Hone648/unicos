@@ -131,7 +131,6 @@ class InvoiceCreateTests(TestCase):
 
     def _valid_data(self, **overrides):
         data = {
-            "invoice_number": "INV-CREATE-01",
             "issued_at": "",
             "due_date": "",
             "subtotal": "500.00",
@@ -153,11 +152,20 @@ class InvoiceCreateTests(TestCase):
         response = self.client.get(invoice_create_url(self.ro.pk))
         self.assertNotContains(response, 'name="status"')
 
+    def test_form_does_not_expose_invoice_number_field(self):
+        response = self.client.get(invoice_create_url(self.ro.pk))
+        self.assertNotContains(response, 'name="invoice_number"')
+
     def test_valid_post_creates_invoice_for_repair_order(self):
         self.client.post(invoice_create_url(self.ro.pk), self._valid_data())
-        self.assertTrue(Invoice.objects.filter(invoice_number="INV-CREATE-01").exists())
-        inv = Invoice.objects.get(invoice_number="INV-CREATE-01")
+        self.assertTrue(Invoice.objects.filter(repair_order=self.ro).exists())
+        inv = Invoice.objects.get(repair_order=self.ro)
         self.assertEqual(inv.repair_order, self.ro)
+
+    def test_valid_post_auto_generates_invoice_number(self):
+        self.client.post(invoice_create_url(self.ro.pk), self._valid_data())
+        inv = Invoice.objects.get(repair_order=self.ro)
+        self.assertRegex(inv.invoice_number, r"^INV-\d{4}-\d{6}$")
 
     def test_valid_post_redirects_to_repair_order_detail(self):
         response = self.client.post(invoice_create_url(self.ro.pk), self._valid_data())
@@ -165,12 +173,12 @@ class InvoiceCreateTests(TestCase):
 
     def test_valid_post_sets_created_by(self):
         self.client.post(invoice_create_url(self.ro.pk), self._valid_data())
-        inv = Invoice.objects.get(invoice_number="INV-CREATE-01")
+        inv = Invoice.objects.get(repair_order=self.ro)
         self.assertEqual(inv.created_by, self.user)
 
     def test_valid_post_sets_updated_by(self):
         self.client.post(invoice_create_url(self.ro.pk), self._valid_data())
-        inv = Invoice.objects.get(invoice_number="INV-CREATE-01")
+        inv = Invoice.objects.get(repair_order=self.ro)
         self.assertEqual(inv.updated_by, self.user)
 
     def test_duplicate_invoice_does_not_create_second_invoice(self):
@@ -217,7 +225,6 @@ class InvoiceEditTests(TestCase):
 
     def _valid_data(self, **overrides):
         data = {
-            "invoice_number": self.invoice.invoice_number,
             "issued_at": "",
             "due_date": "",
             "subtotal": "300.00",
@@ -272,6 +279,16 @@ class InvoiceEditTests(TestCase):
         self.client.post(invoice_edit_url(self.invoice.pk), self._valid_data())
         self.invoice.refresh_from_db()
         self.assertEqual(self.invoice.status, original_status)
+
+    def test_edit_form_does_not_expose_editable_invoice_number(self):
+        response = self.client.get(invoice_edit_url(self.invoice.pk))
+        self.assertNotContains(response, 'name="invoice_number"')
+
+    def test_edit_preserves_existing_invoice_number(self):
+        original_number = self.invoice.invoice_number
+        self.client.post(invoice_edit_url(self.invoice.pk), self._valid_data())
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.invoice_number, original_number)
 
 
 # ---------------------------------------------------------------------------
