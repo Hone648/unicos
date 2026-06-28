@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Unicos{% endblock %}
+
+{% block content %}
+{% if mode == "edit" %}
+  <a class="back-link" href="{% url 'repair_orders:detail' repair_order.pk %}">&larr; Back to RO {{ repair_order.repair_order_number }}</a>
+{% else %}
+  <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
+{% endif %}
+
+<div class="page-header">
+  <h1>{{ title }}</h1>
+</div>
+
+{% if form.non_field_errors %}
+<div class="form-errors">
+  {% for error in form.non_field_errors %}
+    <p>{{ error }}</p>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-grid">
+
+      <div class="form-field">
+        <label for="{{ form.repair_order_number.id_for_label }}">RO Number</label>
+        {{ form.repair_order_number }}
+        {% if form.repair_order_number.errors %}
+          <ul class="field-errors">
+            {% for error in form.repair_order_number.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.customer.id_for_label }}">Customer</label>
+        {{ form.customer }}
+        {% if form.customer.errors %}
+          <ul class="field-errors">
+            {% for error in form.customer.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.vehicle.id_for_label }}">Vehicle</label>
+        {{ form.vehicle }}
+        {% if form.vehicle.errors %}
+          <ul class="field-errors">
+            {% for error in form.vehicle.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.assigned_to.id_for_label }}">Assigned to</label>
+        {{ form.assigned_to }}
+        {% if form.assigned_to.errors %}
+          <ul class="field-errors">
+            {% for error in form.assigned_to.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.promised_date.id_for_label }}">Promised date</label>
+        {{ form.promised_date }}
+        {% if form.promised_date.errors %}
+          <ul class="field-errors">
+            {% for error in form.promised_date.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field form-field--full">
+        <label for="{{ form.reported_problem.id_for_label }}">Reported problem</label>
+        {{ form.reported_problem }}
+        {% if form.reported_problem.errors %}
+          <ul class="field-errors">
+            {% for error in form.reported_problem.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+      <div class="form-field form-field--full">
+        <label for="{{ form.internal_notes.id_for_label }}">Internal notes</label>
+        {{ form.internal_notes }}
+        {% if form.internal_notes.errors %}
+          <ul class="field-errors">
+            {% for error in form.internal_notes.errors %}<li>{{ error }}</li>{% endfor %}
+          </ul>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      {% if mode == "edit" %}
+        <a class="button button-secondary" href="{% url 'repair_orders:detail' repair_order.pk %}">Cancel</a>
+      {% else %}
+        <a class="button button-secondary" href="{% url 'repair_orders:list' %}">Cancel</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+{% endblock %}

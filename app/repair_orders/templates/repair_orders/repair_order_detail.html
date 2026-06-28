@@ -8,6 +8,7 @@
 <div class="page-header">
   <h1>RO {{ ro.repair_order_number }}</h1>
   {% include "repair_orders/partials/_status_badge.html" %}
+  <a class="button button-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
 </div>
 
 <div class="card-grid">

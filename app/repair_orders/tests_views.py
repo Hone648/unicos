@@ -12,8 +12,10 @@ from vehicles.models import Vehicle
 
 VALID_VIN = "1HGBH41JXMN109186"
 VALID_VIN_2 = "2T1BURHE0JC043821"
+VALID_VIN_3 = "5NPE24AF6FH002401"
 
 LIST_URL = reverse("repair_orders:list")
+CREATE_URL = reverse("repair_orders:create")
 
 
 # ---------------------------------------------------------------------------
@@ -62,6 +64,10 @@ def detail_url(pk):
 
 def status_url(pk):
     return reverse("repair_orders:status_update", kwargs={"pk": pk})
+
+
+def edit_url(pk):
+    return reverse("repair_orders:edit", kwargs={"pk": pk})
 
 
 # ---------------------------------------------------------------------------
@@ -396,3 +402,202 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
         self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
+
+
+# ---------------------------------------------------------------------------
+# Create view tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderCreateAuthTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+
+    def test_unauthenticated_redirects_to_login(self):
+        response = self.client.get(CREATE_URL)
+        self.assertRedirects(response, f"/accounts/login/?next={CREATE_URL}")
+
+
+class RepairOrderCreateTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="create_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN)
+        # Second customer + vehicle for mismatch tests
+        self.other_customer = make_customer(first_name="Other", last_name="Person")
+        self.other_vehicle = make_vehicle(self.other_customer, vin=VALID_VIN_3)
+
+    def _valid_post_data(self, number="RO-CREATE-01", **overrides):
+        data = {
+            "repair_order_number": number,
+            "customer": self.customer.pk,
+            "vehicle": self.vehicle.pk,
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_get_returns_200(self):
+        response = self.client.get(CREATE_URL)
+        self.assertEqual(response.status_code, 200)
+
+    def test_create_page_contains_form_fields(self):
+        response = self.client.get(CREATE_URL)
+        self.assertContains(response, 'name="repair_order_number"')
+        self.assertContains(response, 'name="customer"')
+        self.assertContains(response, 'name="vehicle"')
+
+    def test_create_form_does_not_expose_status_field(self):
+        response = self.client.get(CREATE_URL)
+        self.assertNotContains(response, 'name="status"')
+
+    def test_valid_post_creates_repair_order(self):
+        self.client.post(CREATE_URL, self._valid_post_data())
+        self.assertTrue(RepairOrder.objects.filter(repair_order_number="RO-CREATE-01").exists())
+
+    def test_valid_post_redirects_to_detail(self):
+        response = self.client.post(CREATE_URL, self._valid_post_data())
+        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        self.assertRedirects(response, detail_url(ro.pk))
+
+    def test_valid_post_sets_created_by(self):
+        self.client.post(CREATE_URL, self._valid_post_data())
+        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        self.assertEqual(ro.created_by, self.user)
+
+    def test_valid_post_sets_updated_by(self):
+        self.client.post(CREATE_URL, self._valid_post_data())
+        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        self.assertEqual(ro.updated_by, self.user)
+
+    def test_created_repair_order_starts_with_default_status(self):
+        self.client.post(CREATE_URL, self._valid_post_data())
+        ro = RepairOrder.objects.get(repair_order_number="RO-CREATE-01")
+        self.assertEqual(ro.status, RepairOrder.Status.INTAKE)
+
+    def test_customer_vehicle_mismatch_does_not_create_repair_order(self):
+        self.client.post(CREATE_URL, self._valid_post_data(
+            vehicle=self.other_vehicle.pk,
+        ))
+        self.assertFalse(RepairOrder.objects.filter(repair_order_number="RO-CREATE-01").exists())
+
+    def test_customer_vehicle_mismatch_displays_form_error(self):
+        response = self.client.post(CREATE_URL, self._valid_post_data(
+            vehicle=self.other_vehicle.pk,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not belong to the selected customer")
+
+
+# ---------------------------------------------------------------------------
+# Edit view tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderEditAuthTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-EDIT-AUTH")
+
+    def test_unauthenticated_redirects_to_login(self):
+        url = edit_url(self.ro.pk)
+        response = self.client.get(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class RepairOrderEditTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="edit_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN)
+        self.ro = make_repair_order(
+            self.customer, self.vehicle,
+            number="RO-EDIT-01",
+            reported_problem="Original problem",
+        )
+        # Second customer + vehicle for mismatch tests
+        self.other_customer = make_customer(first_name="Other", last_name="Person")
+        self.other_vehicle = make_vehicle(self.other_customer, vin=VALID_VIN_3)
+
+    def _valid_post_data(self, **overrides):
+        data = {
+            "repair_order_number": self.ro.repair_order_number,
+            "customer": self.customer.pk,
+            "vehicle": self.vehicle.pk,
+            "reported_problem": "Updated problem",
+        }
+        data.update(overrides)
+        return data
+
+    def test_edit_get_returns_200(self):
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_edit_page_contains_existing_values(self):
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertContains(response, "RO-EDIT-01")
+        self.assertContains(response, "Original problem")
+
+    def test_edit_form_does_not_expose_status_field(self):
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertNotContains(response, 'name="status"')
+
+    def test_valid_edit_post_updates_fields(self):
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.reported_problem, "Updated problem")
+
+    def test_valid_edit_post_redirects_to_detail(self):
+        response = self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_valid_edit_post_sets_updated_by(self):
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.updated_by, self.user)
+
+    def test_edit_does_not_create_status_history_for_basic_field_changes(self):
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        count_after = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.assertEqual(count_before, count_after)
+
+    def test_customer_vehicle_mismatch_does_not_update_repair_order(self):
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data(
+            vehicle=self.other_vehicle.pk,
+        ))
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.reported_problem, "Original problem")
+
+    def test_customer_vehicle_mismatch_displays_form_error(self):
+        response = self.client.post(edit_url(self.ro.pk), self._valid_post_data(
+            vehicle=self.other_vehicle.pk,
+        ))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "does not belong to the selected customer")
+
+
+# ---------------------------------------------------------------------------
+# Navigation link tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderNavigationTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="nav_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-NAV-01")
+
+    def test_list_page_contains_create_link(self):
+        response = self.client.get(LIST_URL)
+        self.assertContains(response, CREATE_URL)
+
+    def test_detail_page_contains_edit_link(self):
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, edit_url(self.ro.pk))
