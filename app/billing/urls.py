@@ -10,6 +10,7 @@ urlpatterns = [
         views.invoice_create_for_repair_order,
         name="invoice_create",
     ),
+    path("invoices/<int:pk>/", views.invoice_detail, name="invoice_detail"),
     path("invoices/<int:pk>/edit/", views.invoice_edit, name="invoice_edit"),
     path(
         "invoices/<int:invoice_pk>/payments/new/",

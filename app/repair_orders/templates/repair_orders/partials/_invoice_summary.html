@@ -17,6 +17,7 @@
     {% endif %}
 
     <div class="action-row">
+      <a class="button button-secondary" href="{% url 'billing:invoice_detail' pk=invoice.pk %}">View/Print Invoice</a>
       <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
       <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
       {% if invoice.balance_due and invoice.status != "void" %}

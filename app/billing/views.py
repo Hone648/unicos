@@ -6,7 +6,30 @@ from django.shortcuts import get_object_or_404, redirect, render
 from repair_orders.models import RepairOrder
 
 from .forms import InvoiceForm, InvoiceLineItemForm, PaymentForm
-from .models import Invoice, InvoiceLineItem
+from .models import Invoice, InvoiceLineItem, Payment
+
+
+@login_required
+def invoice_detail(request, pk):
+    invoice = get_object_or_404(
+        Invoice.objects.select_related(
+            "repair_order",
+            "repair_order__customer",
+            "repair_order__vehicle",
+        ),
+        pk=pk,
+    )
+    ro = invoice.repair_order
+    line_items = list(invoice.line_items.all())
+    payments = list(
+        invoice.payments.select_related("received_by").order_by("-payment_date", "-created_at")
+    )
+    return render(request, "billing/invoice_detail.html", {
+        "invoice": invoice,
+        "ro": ro,
+        "line_items": line_items,
+        "payments": payments,
+    })
 
 
 @login_required
