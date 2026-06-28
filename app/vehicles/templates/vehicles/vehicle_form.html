@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Unicos{% endblock %}
+
+{% block content %}
+{% if mode == "edit" %}
+  <a class="back-link" href="{% url 'vehicles:detail' vehicle.pk %}">&larr; Back to {{ vehicle }}</a>
+{% else %}
+  <a class="back-link" href="{% url 'customers:detail' customer.pk %}">&larr; Back to {{ customer.display_name }}</a>
+{% endif %}
+
+<div class="page-header">
+  <h1>{{ title }}</h1>
+</div>
+
+{% if form.non_field_errors %}
+<div class="form-errors">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-section">
+      <h3 class="form-section__title">Vehicle Identity</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="{{ form.vin.id_for_label }}">VIN</label>
+          {{ form.vin }}
+          {% if form.vin.errors %}<ul class="field-errors">{% for e in form.vin.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.year.id_for_label }}">Year</label>
+          {{ form.year }}
+          {% if form.year.errors %}<ul class="field-errors">{% for e in form.year.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.make.id_for_label }}">Make</label>
+          {{ form.make }}
+          {% if form.make.errors %}<ul class="field-errors">{% for e in form.make.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.model.id_for_label }}">Model</label>
+          {{ form.model }}
+          {% if form.model.errors %}<ul class="field-errors">{% for e in form.model.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.trim.id_for_label }}">Trim</label>
+          {{ form.trim }}
+          {% if form.trim.errors %}<ul class="field-errors">{% for e in form.trim.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.color.id_for_label }}">Color</label>
+          {{ form.color }}
+          {% if form.color.errors %}<ul class="field-errors">{% for e in form.color.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field form-field--checkbox">
+          {{ form.is_active }}
+          <label for="{{ form.is_active.id_for_label }}">Active</label>
+          {% if form.is_active.errors %}<ul class="field-errors">{% for e in form.is_active.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Registration &amp; Condition</h3>
+      <div class="form-grid">
+        <div class="form-field">
+          <label for="{{ form.license_plate.id_for_label }}">License plate</label>
+          {{ form.license_plate }}
+          {% if form.license_plate.errors %}<ul class="field-errors">{% for e in form.license_plate.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.license_state.id_for_label }}">License state</label>
+          {{ form.license_state }}
+          {% if form.license_state.errors %}<ul class="field-errors">{% for e in form.license_state.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+        <div class="form-field">
+          <label for="{{ form.odometer.id_for_label }}">Odometer</label>
+          {{ form.odometer }}
+          {% if form.odometer.errors %}<ul class="field-errors">{% for e in form.odometer.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="form-section__title">Notes</h3>
+      <div class="form-grid">
+        <div class="form-field form-field--full">
+          <label for="{{ form.notes.id_for_label }}">Notes</label>
+          {{ form.notes }}
+          {% if form.notes.errors %}<ul class="field-errors">{% for e in form.notes.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      {% if mode == "edit" %}
+        <a class="button button-secondary" href="{% url 'vehicles:detail' vehicle.pk %}">Cancel</a>
+      {% else %}
+        <a class="button button-secondary" href="{% url 'customers:detail' customer.pk %}">Cancel</a>
+      {% endif %}
+    </div>
+
+  </form>
+</div>
+{% endblock %}

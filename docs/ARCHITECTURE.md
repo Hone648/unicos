@@ -19,6 +19,9 @@ Architectural style:
   - Repair-order workspace (`/repair-orders/`): shop-facing list, detail, create, and
     edit views; staff can search, filter, view, create, edit, and change repair order
     status without using Django admin
+  - Customer workspace (`/customers/`): shop-facing customer list, detail, create, and
+    edit views; vehicle create-for-customer, detail, and edit under `/customers/<pk>/vehicles/new/`
+    and `/vehicles/<pk>/`
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no frontend
   build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
