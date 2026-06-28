@@ -2,11 +2,15 @@ from billing.models import Invoice
 
 from .models import RepairOrder
 
-_FINAL_STATUSES = frozenset({
+FINAL_REPAIR_ORDER_STATUSES = frozenset({
     RepairOrder.Status.DELIVERED,
     RepairOrder.Status.CLOSED,
     RepairOrder.Status.CANCELED,
 })
+
+
+def is_final_repair_order_status(status):
+    return status in FINAL_REPAIR_ORDER_STATUSES
 
 
 def closure_blocked_by_invoice(repair_order, new_status):
@@ -15,7 +19,7 @@ def closure_blocked_by_invoice(repair_order, new_status):
     Blocked when: new_status is a final status AND the repair order has a non-void
     invoice with balance_due > 0.  No invoice, or a void invoice, never blocks.
     """
-    if new_status not in _FINAL_STATUSES:
+    if not is_final_repair_order_status(new_status):
         return None
     try:
         invoice = repair_order.invoice

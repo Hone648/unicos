@@ -5,7 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from core.document_numbers import generate_repair_order_number
 
-from .business_rules import closure_blocked_by_invoice
+from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
 from .models import RepairOrder
 
@@ -34,6 +34,7 @@ def _repair_order_detail_context(ro):
         "ro": ro,
         "history": history,
         "invoice": invoice,
+        "is_final_repair_order": is_final_repair_order_status(ro.status),
         "line_items": line_items,
         "payments": payments,
         "status_choices": RepairOrder.Status.choices,
@@ -180,6 +181,13 @@ def repair_order_create(request):
 @login_required
 def repair_order_edit(request, pk):
     ro = get_object_or_404(RepairOrder, pk=pk)
+    if is_final_repair_order_status(ro.status):
+        messages.error(
+            request,
+            f"Repair order {ro.repair_order_number} is final and cannot be edited.",
+        )
+        return redirect("repair_orders:detail", pk=ro.pk)
+
     if request.method == "POST":
         form = RepairOrderEditForm(request.POST, instance=ro)
         if form.is_valid():

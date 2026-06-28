@@ -21,6 +21,7 @@ Planned slices:
 17. Slice 16: invoice lifecycle actions (Issue Invoice POST action sets status=issued and issued_at; Void Invoice POST action sets status=void; payments blocked for void invoices; lifecycle buttons on invoice detail and RO summary)
 18. Slice 17: void invoice edit guards (void invoices become billing-read-only; invoice edit, line-item create/edit, and payment create blocked with redirect; UI actions hidden for void invoices; no model changes)
 19. Slice 18: repair-order closure rules (final-status transitions blocked when non-void invoice has balance due; void invoices and no invoice allow closure; helper in business_rules.py; HTMX and non-HTMX both guarded)
+20. Slice 19: final repair-order edit guards (delivered, closed, and canceled repair orders remain visible but block ordinary repair-order field edits; Delivered -> Closed remains allowed)
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

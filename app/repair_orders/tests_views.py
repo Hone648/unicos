@@ -242,6 +242,60 @@ class RepairOrderDetailContentTests(TestCase):
         self.assertEqual(response.status_code, 404)
 
 
+class FinalRepairOrderDetailTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="final_detail_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-FINAL-DETAIL",
+            reported_problem="Final order remains visible",
+        )
+
+    def _set_status(self, status):
+        self.ro.set_status(status, changed_by=self.user, note="Final status for test")
+        self.ro.refresh_from_db()
+
+    def test_delivered_detail_does_not_show_edit_repair_order_link(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, edit_url(self.ro.pk))
+        self.assertNotContains(response, "Edit Repair Order")
+
+    def test_closed_detail_does_not_show_edit_repair_order_link(self):
+        self._set_status(RepairOrder.Status.CLOSED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, edit_url(self.ro.pk))
+        self.assertNotContains(response, "Edit Repair Order")
+
+    def test_canceled_detail_does_not_show_edit_repair_order_link(self):
+        self._set_status(RepairOrder.Status.CANCELED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, edit_url(self.ro.pk))
+        self.assertNotContains(response, "Edit Repair Order")
+
+    def test_final_detail_still_shows_repair_order_number(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, "RO-FINAL-DETAIL")
+
+    def test_final_detail_still_shows_status_history(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, "Status History")
+        self.assertContains(response, "Delivered")
+
+    def test_final_detail_still_shows_invoice_summary_when_invoice_exists(self):
+        make_invoice(self.ro, number="INV-FINAL-DETAIL")
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, "Invoice")
+        self.assertContains(response, "INV-FINAL-DETAIL")
+
+
 # ---------------------------------------------------------------------------
 # Status update view tests
 # ---------------------------------------------------------------------------
@@ -609,6 +663,98 @@ class RepairOrderEditTests(TestCase):
         self.assertEqual(self.ro.repair_order_number, original_number)
 
 
+class FinalRepairOrderEditGuardTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="final_edit_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-FINAL-EDIT",
+            reported_problem="Original final problem",
+            internal_notes="Original final notes",
+        )
+
+    def _valid_post_data(self, **overrides):
+        data = {
+            "customer": self.customer.pk,
+            "vehicle": self.vehicle.pk,
+            "reported_problem": "Changed final problem",
+            "internal_notes": "Changed final notes",
+        }
+        data.update(overrides)
+        return data
+
+    def _set_status(self, status):
+        self.ro.set_status(status, changed_by=self.user, note="Final status for test")
+        self.ro.refresh_from_db()
+
+    def test_delivered_repair_order_edit_get_redirects_to_detail(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_delivered_repair_order_edit_get_shows_error_message(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.get(edit_url(self.ro.pk), follow=True)
+        self.assertContains(
+            response,
+            "Repair order RO-FINAL-EDIT is final and cannot be edited.",
+        )
+
+    def test_delivered_repair_order_edit_post_redirects_to_detail(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        response = self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_delivered_repair_order_edit_post_does_not_change_fields(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.reported_problem, "Original final problem")
+        self.assertEqual(self.ro.internal_notes, "Original final notes")
+
+    def test_delivered_repair_order_edit_post_does_not_create_status_history_row(self):
+        self._set_status(RepairOrder.Status.DELIVERED)
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        count_after = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self.assertEqual(count_before, count_after)
+
+    def test_closed_repair_order_edit_get_redirects_to_detail(self):
+        self._set_status(RepairOrder.Status.CLOSED)
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_canceled_repair_order_edit_get_redirects_to_detail(self):
+        self._set_status(RepairOrder.Status.CANCELED)
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_non_final_repair_order_edit_get_still_returns_200(self):
+        self._set_status(RepairOrder.Status.QUALITY_CHECK)
+        response = self.client.get(edit_url(self.ro.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_final_repair_order_edit_post_still_updates_fields(self):
+        self._set_status(RepairOrder.Status.QUALITY_CHECK)
+        self.client.post(edit_url(self.ro.pk), self._valid_post_data())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.reported_problem, "Changed final problem")
+
+    def test_non_final_repair_order_detail_still_shows_edit_link(self):
+        self._set_status(RepairOrder.Status.QUALITY_CHECK)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, edit_url(self.ro.pk))
+        self.assertContains(response, "Edit Repair Order")
+
+
 # ---------------------------------------------------------------------------
 # Navigation link tests
 # ---------------------------------------------------------------------------
@@ -732,6 +878,21 @@ class RepairOrderClosureRuleTests(TestCase):
             repair_order=self.ro
         ).count()
         self.assertEqual(count_after, count_before + 1)
+
+    def test_delivered_to_closed_still_succeeds_when_invoice_rule_allows_it(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-DELIV-CLOSE")
+        ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        response = self.client.post(status_url(ro.pk), {"new_status": "closed"})
+        self.assertRedirects(response, detail_url(ro.pk))
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.CLOSED)
+
+    def test_final_repair_order_status_history_remains_visible(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-FINAL-HISTORY")
+        ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        response = self.client.get(detail_url(ro.pk))
+        self.assertContains(response, "Status History")
+        self.assertContains(response, "Delivered")
 
 
 # ---------------------------------------------------------------------------
