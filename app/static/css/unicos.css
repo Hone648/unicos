@@ -693,6 +693,15 @@ tbody tr:hover { background: #f7fafc; }
   margin: 0;
 }
 
+/* Read-only field value shown in place of an input (e.g. generated document number) */
+.form-field-readonly {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #2d3748;
+  margin: 0;
+  padding: 0.125rem 0;
+}
+
 /* Muted body text (empty state within cards) */
 .muted-text {
   color: #718096;

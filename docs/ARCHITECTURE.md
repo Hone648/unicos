@@ -40,17 +40,22 @@ Current domain models:
   `PROTECT` to preserve history
 - `repair_orders.RepairOrder`: central shop workflow record linking customer,
   vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a
-  configurable DB table); FKs to customer and vehicle use `PROTECT`
+  configurable DB table); FKs to customer and vehicle use `PROTECT`; number is
+  system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually
 - `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
   changes on a repair order; cascades with the repair order
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
   payment status (draft/issued/partially paid/paid/void); subtotal is manual
-  until line items exist, then calculated from line items
+  until line items exist, then calculated from line items; number is
+  system-generated (`INV-YYYY-NNNNNN`) — staff do not type it manually
 - `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
   labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
   on save
 - `billing.Payment`: individual payment linked to an invoice; updates invoice
   payment status automatically on save/delete
+- `core.DocumentNumberSequence`: tracks the last-used sequence value per
+  `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN` and
+  `INV-YYYY-NNNNNN` generators in `core/document_numbers.py`
 
 Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No
 configurable status table exists yet.
