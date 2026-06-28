@@ -15,6 +15,11 @@ Architectural style:
 - Custom user model (`accounts.User`) for staff authentication
 - Browser-based access
 
+Current domain models:
+
+- `customers.Customer` — individual or business customer; one-to-many with vehicles
+- `vehicles.Vehicle` — VIN-keyed vehicle belonging to one customer; FK uses `PROTECT` to preserve history
+
 Deployment:
 
 - Development now runs on local Docker Compose (app + PostgreSQL).
