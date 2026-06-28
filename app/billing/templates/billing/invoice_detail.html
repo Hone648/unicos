@@ -15,6 +15,18 @@
   <div class="action-row" style="margin-bottom: 1.25rem; padding-top: 0; border-top: none; margin-top: 0;">
     <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
     <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
+    {% if invoice.status == "draft" %}
+      <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="button button-primary">Issue Invoice</button>
+      </form>
+    {% endif %}
+    {% if invoice.status != "void" %}
+      <form method="post" action="{% url 'billing:invoice_void' pk=invoice.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="button button-secondary">Void Invoice</button>
+      </form>
+    {% endif %}
     {% if invoice.balance_due and invoice.status != "void" %}
       <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
     {% endif %}
