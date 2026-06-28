@@ -19,7 +19,9 @@ Architectural style:
   - Repair-order workspace (`/repair-orders/`): shop-facing list and detail views for
     viewing open repair orders, searching, and changing repair order status
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no frontend
-  build tooling, no Tailwind, no HTMX yet
+  build tooling, no Tailwind
+- HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
+  repair-order status update form; normal POST/redirect fallback preserved
 
 Current domain models:
 

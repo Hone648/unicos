@@ -12,6 +12,22 @@ _CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
 _VALID_STATUSES = set(RepairOrder.Status.values)
 
 
+def _repair_order_detail_context(ro):
+    """Build context shared by the full detail view and HTMX partial responses."""
+    history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
+    invoice = None
+    try:
+        invoice = ro.invoice
+    except RepairOrder.invoice.RelatedObjectDoesNotExist:
+        pass
+    return {
+        "ro": ro,
+        "history": history,
+        "invoice": invoice,
+        "status_choices": RepairOrder.Status.choices,
+    }
+
+
 @login_required
 def repair_order_list(request):
     qs = (
@@ -70,24 +86,8 @@ def repair_order_detail(request, pk):
         ),
         pk=pk,
     )
-    history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
-
-    invoice = None
-    try:
-        invoice = ro.invoice
-    except RepairOrder.invoice.RelatedObjectDoesNotExist:
-        pass
-
-    return render(
-        request,
-        "repair_orders/repair_order_detail.html",
-        {
-            "ro": ro,
-            "history": history,
-            "invoice": invoice,
-            "status_choices": RepairOrder.Status.choices,
-        },
-    )
+    return render(request, "repair_orders/repair_order_detail.html",
+                  _repair_order_detail_context(ro))
 
 
 @login_required
@@ -95,17 +95,25 @@ def repair_order_status_update(request, pk):
     if request.method != "POST":
         return redirect("repair_orders:detail", pk=pk)
 
+    is_htmx = request.headers.get("HX-Request") == "true"
+
     ro = get_object_or_404(RepairOrder, pk=pk)
     new_status = request.POST.get("new_status", "").strip()
     note = request.POST.get("note", "").strip()
 
     if new_status not in _VALID_STATUSES:
         messages.error(request, f"'{new_status}' is not a valid repair order status.")
-        return redirect("repair_orders:detail", pk=pk)
+        if not is_htmx:
+            return redirect("repair_orders:detail", pk=pk)
+        return render(request, "repair_orders/partials/_status_update_response.html",
+                      _repair_order_detail_context(ro))
 
     if new_status == ro.status:
         messages.info(request, "Status is already set to that value — no change made.")
-        return redirect("repair_orders:detail", pk=pk)
+        if not is_htmx:
+            return redirect("repair_orders:detail", pk=pk)
+        return render(request, "repair_orders/partials/_status_update_response.html",
+                      _repair_order_detail_context(ro))
 
     if not note:
         note = "Status changed from repair order workspace."
@@ -113,4 +121,9 @@ def repair_order_status_update(request, pk):
     ro.set_status(new_status, changed_by=request.user, note=note)
     label = dict(RepairOrder.Status.choices).get(new_status, new_status)
     messages.success(request, f"Status updated to \"{label}\".")
-    return redirect("repair_orders:detail", pk=pk)
+
+    if not is_htmx:
+        return redirect("repair_orders:detail", pk=pk)
+
+    return render(request, "repair_orders/partials/_status_update_response.html",
+                  _repair_order_detail_context(ro))

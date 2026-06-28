@@ -315,3 +315,84 @@ class RepairOrderStatusUpdateTests(TestCase):
             repair_order=self.ro
         ).order_by("-changed_at").first()
         self.assertEqual(latest.note, "Customer approved estimate")
+
+
+# ---------------------------------------------------------------------------
+# HTMX status update tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderStatusUpdateHTMXTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="htmx_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-HTMX-01")
+
+    def _htmx_post(self, data):
+        return self.client.post(
+            status_url(self.ro.pk),
+            data,
+            HTTP_HX_REQUEST="true",
+        )
+
+    def test_htmx_post_valid_status_returns_200_not_redirect(self):
+        response = self._htmx_post({"new_status": "estimating"})
+        self.assertEqual(response.status_code, 200)
+
+    def test_htmx_post_valid_status_mutates_repair_order(self):
+        self._htmx_post({"new_status": "estimating"})
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
+
+    def test_htmx_post_valid_status_creates_history_with_changed_by(self):
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self._htmx_post({"new_status": "estimating"})
+        entries = RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
+        self.assertEqual(entries.count(), count_before + 1)
+        latest = entries.order_by("-changed_at").first()
+        self.assertEqual(latest.changed_by, self.user)
+        self.assertEqual(latest.new_status, RepairOrder.Status.ESTIMATING)
+
+    def test_htmx_post_response_contains_updated_status_text(self):
+        response = self._htmx_post({"new_status": "estimating"})
+        self.assertContains(response, "Estimating")
+
+    def test_htmx_post_response_contains_status_history_section(self):
+        response = self._htmx_post({"new_status": "estimating"})
+        self.assertContains(response, "Status History")
+
+    def test_htmx_post_same_status_does_not_create_duplicate_history(self):
+        # RO starts at INTAKE — posting INTAKE again is a no-op
+        count_before = RepairOrderStatusHistory.objects.filter(
+            repair_order=self.ro
+        ).count()
+        self._htmx_post({"new_status": "intake"})
+        self.assertEqual(
+            RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count(),
+            count_before,
+        )
+
+    def test_htmx_post_invalid_status_does_not_mutate_repair_order(self):
+        original_status = self.ro.status
+        self._htmx_post({"new_status": "not_a_real_status"})
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, original_status)
+
+    def test_htmx_post_invalid_status_returns_response_with_error_message(self):
+        response = self._htmx_post({"new_status": "not_a_real_status"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "not a valid repair order status")
+
+    def test_non_htmx_post_still_redirects(self):
+        response = self.client.post(
+            status_url(self.ro.pk), {"new_status": "estimating"}
+        )
+        self.assertRedirects(response, detail_url(self.ro.pk))
+
+    def test_non_htmx_post_still_updates_status(self):
+        self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)

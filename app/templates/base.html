@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Unicos{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'css/unicos.css' %}" />
+    <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -27,13 +28,13 @@
       </div>
     </header>
 
-    {% if messages %}
-      <div class="messages">
+    <div id="messages" class="messages">
+      {% if messages %}
         {% for message in messages %}
           <div class="message message-{{ message.tags }}">{{ message }}</div>
         {% endfor %}
-      </div>
-    {% endif %}
+      {% endif %}
+    </div>
 
     <main class="page">
       {% block content %}{% endblock %}
