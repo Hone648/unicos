@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
 from django.db import models
 
 
@@ -103,8 +104,84 @@ class Invoice(models.Model):
             self.status = new_status
             self.save(update_fields=["status", "updated_at"])
 
+    def recalculate_subtotal_from_line_items(self):
+        total = sum(
+            (line_item.line_total for line_item in self.line_items.all()),
+            Decimal("0.00"),
+        )
+        self.subtotal = total.quantize(Decimal("0.01"))
+        if self.amount_paid > self.total_amount:
+            raise ValidationError(
+                "Invoice line items cannot total less than the amount already paid."
+            )
+        self.save(update_fields=["subtotal", "updated_at"])
+        self.sync_payment_status()
+
     def __str__(self):
         return f"Invoice {self.invoice_number}"
+
+
+class InvoiceLineItem(models.Model):
+    class ItemType(models.TextChoices):
+        LABOR = "labor", "Labor"
+        PARTS = "parts", "Parts"
+        MATERIALS = "materials", "Materials"
+        SUBLET = "sublet", "Sublet"
+        MISC = "misc", "Misc"
+
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.PROTECT,
+        related_name="line_items",
+    )
+    item_type = models.CharField(max_length=20, choices=ItemType.choices)
+    description = models.CharField(max_length=255)
+    quantity = models.DecimalField(
+        max_digits=8,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.01"))],
+    )
+    unit_price = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["id"]
+
+    @property
+    def line_total(self):
+        total = (self.quantity or Decimal("0.00")) * (self.unit_price or Decimal("0.00"))
+        return total.quantize(Decimal("0.01"))
+
+    def clean(self):
+        if not self.invoice_id:
+            return
+
+        existing_total = sum(
+            (
+                line_item.line_total
+                for line_item in self.invoice.line_items.exclude(pk=self.pk)
+            ),
+            Decimal("0.00"),
+        )
+        projected_total = existing_total + self.line_total + (self.invoice.tax_amount or Decimal("0.00"))
+        if self.invoice.amount_paid > projected_total:
+            raise ValidationError(
+                "Line item changes cannot make the invoice total less than "
+                "the amount already paid."
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        self.invoice.recalculate_subtotal_from_line_items()
+
+    def __str__(self):
+        return f"{self.get_item_type_display()}: {self.description}"
 
 
 class Payment(models.Model):

@@ -4,7 +4,7 @@ from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.utils import timezone
 
-from billing.models import Invoice, Payment
+from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -51,6 +51,23 @@ def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
     defaults = {"payment_date": date.today(), "method": Payment.Method.CASH}
     defaults.update(kwargs)
     return Payment.objects.create(invoice=invoice, amount=amount, **defaults)
+
+
+def make_line_item(
+    invoice,
+    description="Labor",
+    quantity=Decimal("1.00"),
+    unit_price=Decimal("100.00"),
+    **kwargs,
+):
+    defaults = {
+        "item_type": InvoiceLineItem.ItemType.LABOR,
+        "description": description,
+        "quantity": quantity,
+        "unit_price": unit_price,
+    }
+    defaults.update(kwargs)
+    return InvoiceLineItem.objects.create(invoice=invoice, **defaults)
 
 
 # ---------------------------------------------------------------------------
@@ -136,6 +153,108 @@ class InvoiceModelTests(TestCase):
         )
         with self.assertRaises(ValidationError):
             inv.full_clean()
+
+
+# ---------------------------------------------------------------------------
+# Invoice line item model tests
+# ---------------------------------------------------------------------------
+
+class InvoiceLineItemModelTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.invoice = make_invoice(
+            self.ro,
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+
+    def test_line_total_equals_quantity_times_unit_price(self):
+        item = InvoiceLineItem(
+            invoice=self.invoice,
+            item_type=InvoiceLineItem.ItemType.LABOR,
+            description="Frame labor",
+            quantity=Decimal("2.50"),
+            unit_price=Decimal("80.00"),
+        )
+        self.assertEqual(item.line_total, Decimal("200.00"))
+
+    def test_saving_line_item_recalculates_invoice_subtotal(self):
+        make_line_item(
+            self.invoice,
+            description="Labor",
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("75.00"),
+        )
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
+
+    def test_editing_line_item_recalculates_invoice_subtotal(self):
+        item = make_line_item(
+            self.invoice,
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+        )
+        item.quantity = Decimal("3.00")
+        item.unit_price = Decimal("50.00")
+        item.save()
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
+
+    def test_multiple_line_items_sum_into_invoice_subtotal(self):
+        make_line_item(
+            self.invoice,
+            description="Labor",
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("100.00"),
+        )
+        make_line_item(
+            self.invoice,
+            description="Parts",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("75.00"),
+            item_type=InvoiceLineItem.ItemType.PARTS,
+        )
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("275.00"))
+
+    def test_quantity_must_be_positive(self):
+        item = InvoiceLineItem(
+            invoice=self.invoice,
+            item_type=InvoiceLineItem.ItemType.LABOR,
+            description="Labor",
+            quantity=Decimal("0.00"),
+            unit_price=Decimal("100.00"),
+        )
+        with self.assertRaises(ValidationError):
+            item.full_clean()
+
+    def test_unit_price_must_be_nonnegative(self):
+        item = InvoiceLineItem(
+            invoice=self.invoice,
+            item_type=InvoiceLineItem.ItemType.LABOR,
+            description="Labor",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("-1.00"),
+        )
+        with self.assertRaises(ValidationError):
+            item.full_clean()
+
+    def test_lowering_line_items_below_amount_paid_is_rejected(self):
+        item = make_line_item(
+            self.invoice,
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("200.00"),
+        )
+        make_payment(self.invoice, Decimal("150.00"))
+
+        item.unit_price = Decimal("100.00")
+
+        with self.assertRaises(ValidationError):
+            item.save()
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("200.00"))
 
 
 # ---------------------------------------------------------------------------

@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Unicos{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to RO {{ ro.repair_order_number }}</a>
+
+<div class="page-header">
+  <h1>{{ title }}</h1>
+</div>
+
+<div class="card-grid">
+  <div class="card">
+    <h2>Invoice</h2>
+    <dl>
+      <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
+      <dt>Repair order</dt><dd>{{ ro.repair_order_number }}</dd>
+      <dt>Customer</dt><dd>{{ ro.customer }}</dd>
+      <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <h2>Current Totals</h2>
+    <dl>
+      <dt>Subtotal</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd>
+      <dt>Tax</dt><dd>${{ invoice.tax_amount }}</dd>
+      <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
+      <dt>Paid</dt><dd class="amount-paid">${{ invoice.amount_paid }}</dd>
+      <dt>Balance due</dt><dd {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</dd>
+    </dl>
+  </div>
+</div>
+
+{% if form.non_field_errors %}
+<div class="form-errors">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-grid">
+
+      <div class="form-field">
+        <label for="{{ form.item_type.id_for_label }}">Type</label>
+        {{ form.item_type }}
+        {% if form.item_type.errors %}<ul class="field-errors">{% for e in form.item_type.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.quantity.id_for_label }}">Quantity</label>
+        {{ form.quantity }}
+        {% if form.quantity.errors %}<ul class="field-errors">{% for e in form.quantity.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.unit_price.id_for_label }}">Unit price ($)</label>
+        {{ form.unit_price }}
+        {% if form.unit_price.errors %}<ul class="field-errors">{% for e in form.unit_price.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field form-field--full">
+        <label for="{{ form.description.id_for_label }}">Description</label>
+        {{ form.description }}
+        {% if form.description.errors %}<ul class="field-errors">{% for e in form.description.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}

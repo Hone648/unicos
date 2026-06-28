@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
-from billing.models import Invoice, Payment
+from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -60,6 +60,23 @@ def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
     return Payment.objects.create(invoice=invoice, amount=amount, **defaults)
 
 
+def make_line_item(
+    invoice,
+    description="Labor",
+    quantity=Decimal("1.00"),
+    unit_price=Decimal("100.00"),
+    **kwargs,
+):
+    defaults = {
+        "item_type": InvoiceLineItem.ItemType.LABOR,
+        "description": description,
+        "quantity": quantity,
+        "unit_price": unit_price,
+    }
+    defaults.update(kwargs)
+    return InvoiceLineItem.objects.create(invoice=invoice, **defaults)
+
+
 def invoice_create_url(repair_order_pk):
     return reverse("billing:invoice_create", kwargs={"repair_order_pk": repair_order_pk})
 
@@ -70,6 +87,14 @@ def invoice_edit_url(pk):
 
 def payment_create_url(invoice_pk):
     return reverse("billing:payment_create", kwargs={"invoice_pk": invoice_pk})
+
+
+def line_item_create_url(invoice_pk):
+    return reverse("billing:line_item_create", kwargs={"invoice_pk": invoice_pk})
+
+
+def line_item_edit_url(pk):
+    return reverse("billing:line_item_edit", kwargs={"pk": pk})
 
 
 def ro_detail_url(pk):
@@ -349,6 +374,182 @@ class PaymentCreateTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Invoice line item create
+# ---------------------------------------------------------------------------
+
+class LineItemCreateAuthTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.invoice = make_invoice(self.ro)
+
+    def test_login_required(self):
+        url = line_item_create_url(self.invoice.pk)
+        response = self.client.get(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class LineItemCreateTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-LI-CREATE")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-LI-CREATE",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("10.00"),
+        )
+
+    def _valid_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.LABOR,
+            "description": "Refinish labor",
+            "quantity": "2.00",
+            "unit_price": "75.00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_get_returns_200(self):
+        response = self.client.get(line_item_create_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_form_does_not_expose_invoice(self):
+        response = self.client.get(line_item_create_url(self.invoice.pk))
+        self.assertNotContains(response, 'name="invoice"')
+
+    def test_valid_post_creates_line_item(self):
+        self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        self.assertEqual(InvoiceLineItem.objects.filter(invoice=self.invoice).count(), 1)
+
+    def test_valid_post_redirects_to_repair_order_detail(self):
+        response = self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+
+    def test_valid_post_recalculates_invoice_subtotal(self):
+        self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
+        self.assertEqual(self.invoice.total_amount, Decimal("160.00"))
+
+    def test_line_item_is_tied_to_invoice_from_url(self):
+        self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
+        line_item = InvoiceLineItem.objects.get()
+        self.assertEqual(line_item.invoice, self.invoice)
+
+    def test_invalid_post_re_renders_form_with_errors(self):
+        response = self.client.post(
+            line_item_create_url(self.invoice.pk),
+            self._valid_data(quantity="0.00"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ensure this value is greater than or equal to 0.01")
+        self.assertFalse(InvoiceLineItem.objects.filter(invoice=self.invoice).exists())
+
+
+# ---------------------------------------------------------------------------
+# Invoice line item edit
+# ---------------------------------------------------------------------------
+
+class LineItemEditAuthTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.invoice = make_invoice(self.ro, subtotal=Decimal("0.00"), tax_amount=Decimal("0.00"))
+        self.line_item = make_line_item(self.invoice)
+
+    def test_login_required(self):
+        url = line_item_edit_url(self.line_item.pk)
+        response = self.client.get(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class LineItemEditTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-LI-EDIT")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-LI-EDIT",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        self.line_item = make_line_item(
+            self.invoice,
+            description="Original labor",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+        )
+
+    def _valid_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.PARTS,
+            "description": "Updated part",
+            "quantity": "3.00",
+            "unit_price": "50.00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_get_returns_200(self):
+        response = self.client.get(line_item_edit_url(self.line_item.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_form_shows_existing_values(self):
+        response = self.client.get(line_item_edit_url(self.line_item.pk))
+        self.assertContains(response, "Original labor")
+        self.assertContains(response, "100.00")
+
+    def test_form_does_not_expose_invoice(self):
+        response = self.client.get(line_item_edit_url(self.line_item.pk))
+        self.assertNotContains(response, 'name="invoice"')
+
+    def test_valid_post_updates_line_item(self):
+        self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.line_item.refresh_from_db()
+        self.assertEqual(self.line_item.description, "Updated part")
+        self.assertEqual(self.line_item.item_type, InvoiceLineItem.ItemType.PARTS)
+
+    def test_valid_post_redirects_to_repair_order_detail(self):
+        response = self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+
+    def test_valid_post_recalculates_invoice_subtotal(self):
+        self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
+
+    def test_edit_preserves_invoice(self):
+        self.client.post(line_item_edit_url(self.line_item.pk), self._valid_data())
+        self.line_item.refresh_from_db()
+        self.assertEqual(self.line_item.invoice, self.invoice)
+
+    def test_invalid_edit_that_would_make_total_less_than_paid_is_rejected(self):
+        make_payment(self.invoice, Decimal("90.00"))
+        response = self.client.post(
+            line_item_edit_url(self.line_item.pk),
+            self._valid_data(quantity="1.00", unit_price="50.00"),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            "Line item changes cannot make the invoice total less than the amount already paid.",
+        )
+        self.line_item.refresh_from_db()
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.line_item.unit_price, Decimal("100.00"))
+        self.assertEqual(self.invoice.subtotal, Decimal("100.00"))
+
+
+# ---------------------------------------------------------------------------
 # Repair-order detail billing display
 # ---------------------------------------------------------------------------
 
@@ -368,6 +569,11 @@ class RepairOrderDetailBillingDisplayTests(TestCase):
         invoice = make_invoice(self.ro, number="INV-BILL-01")
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, invoice_edit_url(invoice.pk))
+
+    def test_detail_with_invoice_shows_add_line_item_link(self):
+        invoice = make_invoice(self.ro, number="INV-BILL-LI")
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, line_item_create_url(invoice.pk))
 
     def test_detail_with_invoice_and_balance_shows_record_payment_link(self):
         invoice = make_invoice(
@@ -400,6 +606,47 @@ class RepairOrderDetailBillingDisplayTests(TestCase):
         make_payment(invoice, Decimal("150.00"))
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "150.00")
+
+    def test_detail_with_line_items_shows_line_item_rows(self):
+        invoice = make_invoice(
+            self.ro,
+            number="INV-BILL-05",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("25.00"),
+        )
+        make_line_item(
+            invoice,
+            description="Bumper cover",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("250.00"),
+            item_type=InvoiceLineItem.ItemType.PARTS,
+        )
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "Bumper cover")
+        self.assertContains(response, "Parts")
+        self.assertContains(response, "250.00")
+
+    def test_detail_with_line_items_shows_edit_line_item_link(self):
+        invoice = make_invoice(self.ro, number="INV-BILL-06", subtotal=Decimal("0.00"))
+        line_item = make_line_item(invoice)
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, line_item_edit_url(line_item.pk))
+
+    def test_detail_subtotal_reflects_line_item_subtotal(self):
+        invoice = make_invoice(
+            self.ro,
+            number="INV-BILL-07",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("10.00"),
+        )
+        make_line_item(
+            invoice,
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("80.00"),
+        )
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, "160.00")
+        self.assertContains(response, "170.00")
 
     def test_detail_without_invoice_does_not_show_edit_or_payment_links(self):
         response = self.client.get(ro_detail_url(self.ro.pk))

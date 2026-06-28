@@ -50,6 +50,7 @@
       <div class="form-field">
         <label for="{{ form.subtotal.id_for_label }}">Subtotal ($)</label>
         {{ form.subtotal }}
+        {% if form.subtotal.help_text %}<p class="form-field-hint">{{ form.subtotal.help_text }}</p>{% endif %}
         {% if form.subtotal.errors %}<ul class="field-errors">{% for e in form.subtotal.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 

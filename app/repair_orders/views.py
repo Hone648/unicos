@@ -18,8 +18,10 @@ def _repair_order_detail_context(ro):
     history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
     invoice = None
     payments = []
+    line_items = []
     try:
         invoice = ro.invoice
+        line_items = list(invoice.line_items.order_by("id"))
         payments = list(
             invoice.payments.select_related("received_by").order_by("-payment_date", "-created_at")
         )
@@ -29,6 +31,7 @@ def _repair_order_detail_context(ro):
         "ro": ro,
         "history": history,
         "invoice": invoice,
+        "line_items": line_items,
         "payments": payments,
         "status_choices": RepairOrder.Status.choices,
     }

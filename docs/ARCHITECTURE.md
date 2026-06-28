@@ -15,30 +15,44 @@ Architectural style:
 - Custom user model (`accounts.User`) for staff authentication
 - Browser-based access
 - Current operational interfaces:
-  - Django admin: full back-office operations (customer, vehicle, repair order, billing)
-  - Repair-order workspace (`/repair-orders/`): shop-facing list, detail, create, and
-    edit views; staff can search, filter, view, create, edit, and change repair order
-    status without using Django admin
-  - Customer workspace (`/customers/`): shop-facing customer list, detail, create, and
-    edit views; vehicle create-for-customer, detail, and edit under `/customers/<pk>/vehicles/new/`
-    and `/vehicles/<pk>/`
-  - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice edit, and
-    payment create; invoice summary with payments table embedded in repair-order detail
-- UI styling: plain Django static CSS (`app/static/css/unicos.css`); no frontend
-  build tooling, no Tailwind
+  - Django admin: full back-office operations for customer, vehicle, repair
+    order, and billing records
+  - Repair-order workspace (`/repair-orders/`): shop-facing list, detail,
+    create, and edit views; staff can search, filter, view, create, edit, and
+    change repair order status without using Django admin
+  - Customer workspace (`/customers/`): shop-facing customer list, detail,
+    create, and edit views; vehicle create-for-customer, detail, and edit under
+    `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`
+  - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice
+    edit, invoice line-item create/edit, and payment create; invoice summary
+    with line items and payments embedded in repair-order detail
+- UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
+  frontend build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
   repair-order status update form; normal POST/redirect fallback preserved
 
 Current domain models:
 
-- `customers.Customer` — individual or business customer; one-to-many with vehicles
-- `vehicles.Vehicle` — VIN-keyed vehicle belonging to one customer; FK uses `PROTECT` to preserve history
-- `repair_orders.RepairOrder` — central shop workflow record linking customer, vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a configurable DB table); FKs to customer and vehicle use `PROTECT`
-- `repair_orders.RepairOrderStatusHistory` — append-only audit trail of status changes on a repair order; cascades with the repair order
-- `billing.Invoice` — one-to-one with RepairOrder; tracks subtotal, tax, and payment status (draft/issued/partially paid/paid/void); invoice totals are manual fields until line items exist
-- `billing.Payment` — individual payment linked to an invoice; updates invoice payment status automatically on save/delete
+- `customers.Customer`: individual or business customer; one-to-many with
+  vehicles
+- `vehicles.Vehicle`: VIN-keyed vehicle belonging to one customer; FK uses
+  `PROTECT` to preserve history
+- `repair_orders.RepairOrder`: central shop workflow record linking customer,
+  vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a
+  configurable DB table); FKs to customer and vehicle use `PROTECT`
+- `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
+  changes on a repair order; cascades with the repair order
+- `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
+  payment status (draft/issued/partially paid/paid/void); subtotal is manual
+  until line items exist, then calculated from line items
+- `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
+  labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
+  on save
+- `billing.Payment`: individual payment linked to an invoice; updates invoice
+  payment status automatically on save/delete
 
-Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No configurable status table exists yet.
+Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No
+configurable status table exists yet.
 
 Deployment:
 
@@ -53,8 +67,9 @@ Deployment:
 Future domain spine:
 
 ```text
-Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Payment
+Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Invoice Line Item -> Payment
 ```
 
-Customer, Vehicle, Repair Order (with status history), Invoice, and Payment now exist.
-Line items, estimates, and payment processor integration are planned for later slices.
+Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
+and Payment now exist. Estimates and payment processor integration are planned
+for later slices.
