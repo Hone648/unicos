@@ -8,7 +8,7 @@ Planned slices:
 4. Slice 3: customer and vehicle models (customers app, vehicles app, VIN validation, admin)
 5. Slice 4: repair order/status/status history (RepairOrder, RepairOrderStatusHistory, controlled TextChoices status, admin)
 6. Slice 5: admin operational usability pass for customer, vehicle, repair order, and status history admin screens (display methods, actions, filters, select_related, read-only history)
-7. Slice 6: billing foundation
+7. Slice 6: billing foundation (billing app, Invoice one-to-one with RepairOrder, Payment linked to Invoice, admin, payment status sync)
 8. Slice 7: first custom UI
 
 Slice order can change after review. Each slice should stay narrow, validate its
