@@ -3,6 +3,7 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from .forms import RepairOrderForm
 from .models import RepairOrder
 
 # Status values that count as "closed" for default list filtering
@@ -127,3 +128,47 @@ def repair_order_status_update(request, pk):
 
     return render(request, "repair_orders/partials/_status_update_response.html",
                   _repair_order_detail_context(ro))
+
+
+@login_required
+def repair_order_create(request):
+    if request.method == "POST":
+        form = RepairOrderForm(request.POST)
+        if form.is_valid():
+            ro = form.save(commit=False)
+            ro.created_by = request.user
+            ro.updated_by = request.user
+            ro.save()
+            messages.success(request, f"Repair order {ro.repair_order_number} created.")
+            return redirect("repair_orders:detail", pk=ro.pk)
+    else:
+        form = RepairOrderForm()
+    return render(request, "repair_orders/repair_order_form.html", {
+        "form": form,
+        "mode": "create",
+        "title": "New Repair Order",
+        "submit_label": "Create Repair Order",
+        "repair_order": None,
+    })
+
+
+@login_required
+def repair_order_edit(request, pk):
+    ro = get_object_or_404(RepairOrder, pk=pk)
+    if request.method == "POST":
+        form = RepairOrderForm(request.POST, instance=ro)
+        if form.is_valid():
+            updated = form.save(commit=False)
+            updated.updated_by = request.user
+            updated.save()
+            messages.success(request, f"Repair order {ro.repair_order_number} updated.")
+            return redirect("repair_orders:detail", pk=ro.pk)
+    else:
+        form = RepairOrderForm(instance=ro)
+    return render(request, "repair_orders/repair_order_form.html", {
+        "form": form,
+        "mode": "edit",
+        "title": f"Edit RO {ro.repair_order_number}",
+        "submit_label": "Save Changes",
+        "repair_order": ro,
+    })
