@@ -5,6 +5,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from core.document_numbers import generate_repair_order_number
 
+from .business_rules import closure_blocked_by_invoice
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
 from .models import RepairOrder
 
@@ -121,6 +122,19 @@ def repair_order_status_update(request, pk):
 
     if new_status == ro.status:
         messages.info(request, "Status is already set to that value — no change made.")
+        if not is_htmx:
+            return redirect("repair_orders:detail", pk=pk)
+        return render(request, "repair_orders/partials/_status_update_response.html",
+                      _repair_order_detail_context(ro))
+
+    blocking_invoice = closure_blocked_by_invoice(ro, new_status)
+    if blocking_invoice:
+        label = dict(RepairOrder.Status.choices).get(new_status, new_status)
+        messages.error(
+            request,
+            f"Repair order cannot be marked {label.lower()} because "
+            f"invoice {blocking_invoice.invoice_number} has a balance due.",
+        )
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
         return render(request, "repair_orders/partials/_status_update_response.html",

@@ -41,7 +41,9 @@ Current domain models:
 - `repair_orders.RepairOrder`: central shop workflow record linking customer,
   vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a
   configurable DB table); FKs to customer and vehicle use `PROTECT`; number is
-  system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually
+  system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually;
+  final-status transitions (delivered, closed, canceled) are blocked by the
+  shop-facing status-update view when a non-void invoice has a balance due
 - `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
   changes on a repair order; cascades with the repair order
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
