@@ -89,6 +89,10 @@ def payment_create_url(invoice_pk):
     return reverse("billing:payment_create", kwargs={"invoice_pk": invoice_pk})
 
 
+def invoice_detail_url(pk):
+    return reverse("billing:invoice_detail", kwargs={"pk": pk})
+
+
 def line_item_create_url(invoice_pk):
     return reverse("billing:line_item_create", kwargs={"invoice_pk": invoice_pk})
 
@@ -652,3 +656,180 @@ class RepairOrderDetailBillingDisplayTests(TestCase):
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertNotContains(response, "Edit Invoice")
         self.assertNotContains(response, "Record Payment")
+
+
+# ---------------------------------------------------------------------------
+# Invoice detail / print view
+# ---------------------------------------------------------------------------
+
+class InvoiceDetailAuthTests(TestCase):
+    def setUp(self):
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle, number="RO-AUTH-DET")
+        self.invoice = make_invoice(ro, number="INV-AUTH-DET")
+
+    def test_login_required(self):
+        url = invoice_detail_url(self.invoice.pk)
+        response = self.client.get(url)
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class InvoiceDetailDisplayTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="det_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-DET-INV")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-DET-01",
+            subtotal=Decimal("400.00"),
+            tax_amount=Decimal("40.00"),
+        )
+
+    def test_get_returns_200(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_page_shows_invoice_number(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "INV-DET-01")
+
+    def test_page_shows_repair_order_number(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "RO-DET-INV")
+
+    def test_page_shows_customer(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Jane")  # customer first name
+
+    def test_page_shows_vehicle(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Honda")  # vehicle make
+
+    def test_page_shows_status(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, self.invoice.get_status_display())
+
+    def test_page_shows_subtotal(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "400.00")
+
+    def test_page_shows_tax(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "40.00")
+
+    def test_page_shows_total(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "440.00")
+
+    def test_page_shows_paid(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "0.00")  # no payments yet
+
+    def test_page_shows_balance_due(self):
+        make_payment(self.invoice, Decimal("100.00"))
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "340.00")  # 440 - 100
+
+    def test_page_shows_line_item_rows_when_present(self):
+        make_line_item(self.invoice, description="Paint labor")
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "Paint labor")
+
+    def test_page_shows_no_line_items_message_when_none(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "No line items on this invoice.")
+
+    def test_page_shows_payment_rows_when_present(self):
+        make_payment(self.invoice, Decimal("75.00"))
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "75.00")
+
+    def test_page_shows_no_payments_message_when_none(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, "No payments recorded.")
+
+
+class InvoiceDetailActionTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="act_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-ACT-INV")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-ACT-01",
+            subtotal=Decimal("200.00"),
+            tax_amount=Decimal("20.00"),
+        )
+
+    def test_page_links_back_to_repair_order(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, ro_detail_url(self.ro.pk))
+
+    def test_page_links_to_edit_invoice(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, invoice_edit_url(self.invoice.pk))
+
+    def test_page_links_to_add_line_item(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, line_item_create_url(self.invoice.pk))
+
+    def test_page_shows_record_payment_when_balance_remains(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertContains(response, payment_create_url(self.invoice.pk))
+
+    def test_page_hides_record_payment_when_fully_paid(self):
+        make_payment(self.invoice, Decimal("220.00"))
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, payment_create_url(self.invoice.pk))
+
+    def test_page_hides_record_payment_when_void(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, payment_create_url(self.invoice.pk))
+
+
+class RepairOrderDetailViewPrintLinkTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="vp_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin="3VWFE21C04M000001")
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-VP-01")
+
+    def test_invoice_summary_shows_view_print_link_when_invoice_exists(self):
+        invoice = make_invoice(self.ro, number="INV-VP-01")
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertContains(response, invoice_detail_url(invoice.pk))
+
+    def test_invoice_summary_does_not_show_view_print_link_when_no_invoice(self):
+        response = self.client.get(ro_detail_url(self.ro.pk))
+        self.assertNotContains(response, "View/Print Invoice")
+
+
+class InvoiceDetailScopeTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="scope_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-SCOPE-INV")
+        self.invoice = make_invoice(self.ro, number="INV-SCOPE-01")
+
+    def test_invoice_detail_does_not_expose_mutation_form_fields(self):
+        response = self.client.get(invoice_detail_url(self.invoice.pk))
+        self.assertNotContains(response, 'name="invoice_number"')
+        self.assertNotContains(response, 'name="subtotal"')
+        self.assertNotContains(response, 'name="status"')
+
+    def test_invoice_detail_post_is_safe_and_read_only(self):
+        response = self.client.post(invoice_detail_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.invoice_number, "INV-SCOPE-01")

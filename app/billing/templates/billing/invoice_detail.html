@@ -1,0 +1,176 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice {{ invoice.invoice_number }} - Unicos{% endblock %}
+
+{% block content %}
+
+<div class="screen-only">
+  <a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to RO {{ ro.repair_order_number }}</a>
+
+  <div class="page-header">
+    <h1>Invoice {{ invoice.invoice_number }}</h1>
+    <span class="status-badge">{{ invoice.get_status_display }}</span>
+  </div>
+
+  <div class="action-row" style="margin-bottom: 1.25rem; padding-top: 0; border-top: none; margin-top: 0;">
+    <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
+    <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
+    {% if invoice.balance_due and invoice.status != "void" %}
+      <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
+    {% endif %}
+    <span class="print-hint">Use <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) to print or save as PDF.</span>
+  </div>
+</div>
+
+<div class="invoice-document">
+
+  <div class="invoice-header">
+    <div>
+      <div class="invoice-header__label">Invoice</div>
+      <div class="invoice-header__number">{{ invoice.invoice_number }}</div>
+    </div>
+    <div>
+      <span class="status-badge">{{ invoice.get_status_display }}</span>
+    </div>
+  </div>
+
+  <div class="invoice-meta">
+    <dl>
+      <dt>Issued</dt>
+      <dd>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</dd>
+      <dt>Due date</dt>
+      <dd>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</dd>
+    </dl>
+    <dl>
+      <dt>Repair order</dt>
+      <dd>{{ ro.repair_order_number }}</dd>
+      <dt>RO opened</dt>
+      <dd>{{ ro.opened_at|date:"Y-m-d" }}</dd>
+    </dl>
+  </div>
+
+  <div class="invoice-parties">
+    <div>
+      <h3>Customer</h3>
+      <p><strong>{{ ro.customer.display_name }}</strong></p>
+      {% if ro.customer.phone_primary %}<p>{{ ro.customer.phone_primary }}</p>{% endif %}
+      {% if ro.customer.email %}<p>{{ ro.customer.email }}</p>{% endif %}
+      {% if ro.customer.address_line_1 %}
+        <p>
+          {{ ro.customer.address_line_1 }}
+          {% if ro.customer.address_line_2 %}, {{ ro.customer.address_line_2 }}{% endif %}
+        </p>
+      {% endif %}
+      {% if ro.customer.city or ro.customer.state or ro.customer.postal_code %}
+        <p>{{ ro.customer.city }}{% if ro.customer.city and ro.customer.state %}, {% endif %}{{ ro.customer.state }} {{ ro.customer.postal_code }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>Vehicle</h3>
+      <p><strong>{% if ro.vehicle.year %}{{ ro.vehicle.year }} {% endif %}{{ ro.vehicle.make }} {{ ro.vehicle.model }}</strong></p>
+      <p class="muted-text">VIN: {{ ro.vehicle.vin }}</p>
+      {% if ro.vehicle.license_plate %}
+        <p class="muted-text">License: {{ ro.vehicle.license_plate }}{% if ro.vehicle.license_state %} ({{ ro.vehicle.license_state }}){% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="invoice-line-items">
+    <h3>Line Items</h3>
+    {% if line_items %}
+      <div class="table-wrap">
+        <table class="line-item-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Qty</th>
+              <th>Unit price</th>
+              <th>Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in line_items %}
+              <tr>
+                <td>{{ item.get_item_type_display }}</td>
+                <td>{{ item.description }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ item.unit_price }}</td>
+                <td>${{ item.line_total }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted-text">No line items on this invoice.</p>
+    {% endif %}
+  </div>
+
+  <div class="invoice-totals">
+    <table>
+      <tbody>
+        <tr>
+          <th scope="row">Subtotal</th>
+          <td>${{ invoice.subtotal }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Tax</th>
+          <td>${{ invoice.tax_amount }}</td>
+        </tr>
+        <tr class="invoice-totals__total">
+          <th scope="row">Total</th>
+          <td>${{ invoice.total_amount }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Paid</th>
+          <td class="amount-paid">${{ invoice.amount_paid }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Balance due</th>
+          <td {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if invoice.notes %}
+    <div class="invoice-notes">
+      <h3>Notes</h3>
+      <p>{{ invoice.notes }}</p>
+    </div>
+  {% endif %}
+
+  <div class="invoice-payments">
+    <h3>Payments</h3>
+    {% if payments %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Amount</th>
+              <th>Method</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for payment in payments %}
+              <tr>
+                <td>{{ payment.payment_date|date:"Y-m-d" }}</td>
+                <td>${{ payment.amount }}</td>
+                <td>{{ payment.get_method_display }}</td>
+                <td>{{ payment.reference|default:"&mdash;" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted-text">No payments recorded.</p>
+    {% endif %}
+  </div>
+
+</div>
+
+{% endblock %}

@@ -24,8 +24,9 @@ Architectural style:
     create, and edit views; vehicle create-for-customer, detail, and edit under
     `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`
   - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice
-    edit, invoice line-item create/edit, and payment create; invoice summary
-    with line items and payments embedded in repair-order detail
+    edit, invoice detail/print view, invoice line-item create/edit, and payment
+    create; invoice summary with line items and payments embedded in
+    repair-order detail
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
   frontend build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
