@@ -179,7 +179,7 @@ def repair_order_edit(request, pk):
     return render(request, "repair_orders/repair_order_form.html", {
         "form": form,
         "mode": "edit",
-        "title": f"Edit RO {ro.repair_order_number}",
+        "title": f"Edit Repair Order {ro.repair_order_number}",
         "submit_label": "Save Changes",
         "repair_order": ro,
     })
