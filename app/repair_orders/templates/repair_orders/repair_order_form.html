@@ -4,7 +4,7 @@
 
 {% block content %}
 {% if mode == "edit" %}
-  <a class="back-link" href="{% url 'repair_orders:detail' repair_order.pk %}">&larr; Back to RO {{ repair_order.repair_order_number }}</a>
+  <a class="back-link" href="{% url 'repair_orders:detail' repair_order.pk %}">&larr; Back to Repair Order {{ repair_order.repair_order_number }}</a>
 {% else %}
   <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
 {% endif %}

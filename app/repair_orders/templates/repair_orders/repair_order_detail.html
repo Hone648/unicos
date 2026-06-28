@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 
-{% block title %}RO {{ ro.repair_order_number }} - Unicos{% endblock %}
+{% block title %}Repair Order {{ ro.repair_order_number }} - Unicos{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
 
 <div class="page-header">
-  <h1>RO {{ ro.repair_order_number }}</h1>
+  <h1>Repair Order {{ ro.repair_order_number }}</h1>
   {% include "repair_orders/partials/_status_badge.html" %}
   <a class="button button-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
 </div>

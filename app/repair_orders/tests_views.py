@@ -206,6 +206,12 @@ class RepairOrderDetailContentTests(TestCase):
         response = self.client.get(detail_url(self.ro.pk))
         self.assertContains(response, "RO-DETAIL-01")
 
+    def test_detail_heading_has_no_duplicated_ro_prefix(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-2099-000001")
+        response = self.client.get(detail_url(ro.pk))
+        self.assertContains(response, "Repair Order RO-2099-000001")
+        self.assertNotContains(response, "RO RO-2099-000001")
+
     def test_detail_shows_customer_name(self):
         response = self.client.get(detail_url(self.ro.pk))
         self.assertContains(response, "Bob")
