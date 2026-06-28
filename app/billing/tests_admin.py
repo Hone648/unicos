@@ -6,8 +6,8 @@ from django.contrib.messages.storage.fallback import FallbackStorage
 from django.contrib.auth import get_user_model
 from django.test import RequestFactory, TestCase
 
-from billing.admin import InvoiceAdmin, PaymentAdmin
-from billing.models import Invoice, Payment
+from billing.admin import InvoiceAdmin, InvoiceLineItemAdmin, InvoiceLineItemInline, PaymentAdmin
+from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -97,6 +97,9 @@ class InvoiceAdminSaveModelTests(TestCase):
         inv.refresh_from_db()
         self.assertEqual(inv.updated_by, updater)
 
+    def test_invoice_admin_includes_line_item_inline(self):
+        self.assertIn(InvoiceLineItemInline, self.admin_instance.inlines)
+
 
 class InvoiceAdminDisplayMethodTests(TestCase):
     def setUp(self):
@@ -137,6 +140,39 @@ class InvoiceAdminDisplayMethodTests(TestCase):
             payment_date=date.today(),
         )
         self.assertTrue(self.admin_instance.is_paid_display(self.invoice))
+
+
+# ---------------------------------------------------------------------------
+# InvoiceLineItemAdmin tests
+# ---------------------------------------------------------------------------
+
+class InvoiceLineItemAdminTests(TestCase):
+    def setUp(self):
+        self.admin_instance = InvoiceLineItemAdmin(InvoiceLineItem, admin.site)
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle)
+        self.invoice = make_invoice(ro, subtotal=Decimal("0.00"), tax_amount=Decimal("0.00"))
+        self.line_item = InvoiceLineItem.objects.create(
+            invoice=self.invoice,
+            item_type=InvoiceLineItem.ItemType.PARTS,
+            description="Bumper cover",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("250.00"),
+        )
+
+    def test_line_item_admin_is_registered(self):
+        self.assertIs(admin.site._registry[InvoiceLineItem].__class__, InvoiceLineItemAdmin)
+
+    def test_line_total_display(self):
+        self.assertEqual(
+            self.admin_instance.line_total_display(self.line_item),
+            Decimal("250.00"),
+        )
+
+    def test_line_item_admin_disables_delete(self):
+        request = make_request(make_user())
+        self.assertFalse(self.admin_instance.has_delete_permission(request, self.line_item))
 
 
 # ---------------------------------------------------------------------------

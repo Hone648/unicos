@@ -5,8 +5,8 @@ from django.shortcuts import get_object_or_404, redirect, render
 
 from repair_orders.models import RepairOrder
 
-from .forms import InvoiceForm, PaymentForm
-from .models import Invoice
+from .forms import InvoiceForm, InvoiceLineItemForm, PaymentForm
+from .models import Invoice, InvoiceLineItem
 
 
 @login_required
@@ -121,4 +121,80 @@ def payment_create(request, invoice_pk):
         "ro": ro,
         "title": f"Record Payment for Invoice {invoice.invoice_number}",
         "submit_label": "Record Payment",
+    })
+
+
+@login_required
+def line_item_create(request, invoice_pk):
+    invoice = get_object_or_404(
+        Invoice.objects.select_related(
+            "repair_order",
+            "repair_order__customer",
+            "repair_order__vehicle",
+        ),
+        pk=invoice_pk,
+    )
+    ro = invoice.repair_order
+
+    if request.method == "POST":
+        form = InvoiceLineItemForm(request.POST, invoice=invoice)
+        if form.is_valid():
+            line_item = form.save(commit=False)
+            line_item.invoice = invoice
+            try:
+                line_item.save()
+            except ValidationError as e:
+                form.add_error(None, e)
+            else:
+                messages.success(request, "Invoice line item added.")
+                return redirect("repair_orders:detail", pk=ro.pk)
+    else:
+        form = InvoiceLineItemForm(invoice=invoice)
+
+    return render(request, "billing/line_item_form.html", {
+        "form": form,
+        "invoice": invoice,
+        "line_item": None,
+        "ro": ro,
+        "mode": "create",
+        "title": f"Add Line Item to Invoice {invoice.invoice_number}",
+        "submit_label": "Add Line Item",
+    })
+
+
+@login_required
+def line_item_edit(request, pk):
+    line_item = get_object_or_404(
+        InvoiceLineItem.objects.select_related(
+            "invoice",
+            "invoice__repair_order",
+            "invoice__repair_order__customer",
+            "invoice__repair_order__vehicle",
+        ),
+        pk=pk,
+    )
+    invoice = line_item.invoice
+    ro = invoice.repair_order
+
+    if request.method == "POST":
+        form = InvoiceLineItemForm(request.POST, instance=line_item)
+        if form.is_valid():
+            try:
+                form.save()
+            except ValidationError as e:
+                form.add_error(None, e)
+            else:
+                messages.success(request, "Invoice line item updated.")
+                return redirect("repair_orders:detail", pk=ro.pk)
+    else:
+        form = InvoiceLineItemForm(instance=line_item)
+
+    return render(request, "billing/line_item_form.html", {
+        "form": form,
+        "invoice": invoice,
+        "line_item": line_item,
+        "ro": ro,
+        "mode": "edit",
+        "title": f"Edit Line Item for Invoice {invoice.invoice_number}",
+        "submit_label": "Save Changes",
     })

@@ -4,8 +4,10 @@
     <dl>
       <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
       <dt>Status</dt><dd>{{ invoice.get_status_display }}</dd>
-      <dt>Issued</dt><dd>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
-      <dt>Due date</dt><dd>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
+      <dt>Issued</dt><dd>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
+      <dt>Due date</dt><dd>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
+      <dt>Subtotal</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd>
+      <dt>Tax</dt><dd>${{ invoice.tax_amount }}</dd>
       <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
       <dt>Paid</dt><dd class="amount-paid">${{ invoice.amount_paid }}</dd>
       <dt>Balance due</dt><dd {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</dd>
@@ -16,10 +18,41 @@
 
     <div class="action-row">
       <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
+      <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
       {% if invoice.balance_due and invoice.status != "void" %}
         <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
       {% endif %}
     </div>
+
+    {% if line_items %}
+      <h3 style="margin-top: 1.25rem;">Line Items</h3>
+      <div class="table-wrap">
+        <table class="line-item-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Quantity</th>
+              <th>Unit price</th>
+              <th>Line total</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in line_items %}
+              <tr>
+                <td>{{ item.get_item_type_display }}</td>
+                <td>{{ item.description }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ item.unit_price }}</td>
+                <td>${{ item.line_total }}</td>
+                <td><a href="{% url 'billing:line_item_edit' pk=item.pk %}">Edit</a></td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
 
     {% if payments %}
       <h3 style="margin-top: 1.25rem;">Payments</h3>
@@ -40,8 +73,8 @@
                 <td>{{ payment.payment_date|date:"Y-m-d" }}</td>
                 <td>${{ payment.amount }}</td>
                 <td>{{ payment.get_method_display }}</td>
-                <td>{{ payment.reference|default:"—" }}</td>
-                <td>{{ payment.received_by.get_username|default:"—" }}</td>
+                <td>{{ payment.reference|default:"-" }}</td>
+                <td>{{ payment.received_by.get_username|default:"-" }}</td>
               </tr>
             {% endfor %}
           </tbody>

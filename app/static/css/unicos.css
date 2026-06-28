@@ -705,7 +705,14 @@ tbody tr:hover { background: #f7fafc; }
    -------------------------------------------------------------------------- */
 
 .amount-paid { color: #276749; font-weight: 600; }
+.amount-subtotal { color: #2d3748; font-weight: 600; }
 .amount-due  { color: #c05621; font-weight: 600; }
+
+.line-item-table td:nth-child(3),
+.line-item-table td:nth-child(4),
+.line-item-table td:nth-child(5) {
+  white-space: nowrap;
+}
 
 /* Row of action buttons inside a card (invoice actions) */
 .action-row {

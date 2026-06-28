@@ -1,6 +1,24 @@
 from django.contrib import admin
 
-from .models import Invoice, Payment
+from .models import Invoice, InvoiceLineItem, Payment
+
+
+class InvoiceLineItemInline(admin.TabularInline):
+    model = InvoiceLineItem
+    fields = ("item_type", "description", "quantity", "unit_price", "line_total_display")
+    readonly_fields = ("line_total_display",)
+    extra = 0
+    show_change_link = True
+    can_delete = False
+
+    @admin.display(description="Line total")
+    def line_total_display(self, obj):
+        if not obj.pk:
+            return None
+        return obj.line_total
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 class PaymentInline(admin.TabularInline):
@@ -54,7 +72,7 @@ class InvoiceAdmin(admin.ModelAdmin):
         "balance_due_display",
         "is_paid_display",
     )
-    inlines = [PaymentInline]
+    inlines = [InvoiceLineItemInline, PaymentInline]
     fieldsets = (
         (
             "Invoice",
@@ -115,6 +133,45 @@ class InvoiceAdmin(admin.ModelAdmin):
             obj.created_by = request.user
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
+
+
+@admin.register(InvoiceLineItem)
+class InvoiceLineItemAdmin(admin.ModelAdmin):
+    list_display = (
+        "invoice",
+        "item_type",
+        "description",
+        "quantity",
+        "unit_price",
+        "line_total_display",
+        "created_at",
+    )
+    list_filter = ("item_type", "created_at")
+    search_fields = ("invoice__invoice_number", "description")
+    list_select_related = ("invoice", "invoice__repair_order")
+    raw_id_fields = ("invoice",)
+    readonly_fields = ("created_at", "updated_at", "line_total_display")
+    fieldsets = (
+        (
+            "Line item",
+            {"fields": ("invoice", "item_type", "description", "quantity", "unit_price")},
+        ),
+        (
+            "Calculated",
+            {"fields": ("line_total_display",)},
+        ),
+        (
+            "Timestamps",
+            {"fields": ("created_at", "updated_at"), "classes": ("collapse",)},
+        ),
+    )
+
+    @admin.display(description="Line total")
+    def line_total_display(self, obj):
+        return obj.line_total
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Payment)

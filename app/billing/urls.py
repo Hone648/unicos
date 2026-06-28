@@ -16,4 +16,14 @@ urlpatterns = [
         views.payment_create,
         name="payment_create",
     ),
+    path(
+        "invoices/<int:invoice_pk>/line-items/new/",
+        views.line_item_create,
+        name="line_item_create",
+    ),
+    path(
+        "line-items/<int:pk>/edit/",
+        views.line_item_edit,
+        name="line_item_edit",
+    ),
 ]
