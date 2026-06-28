@@ -18,6 +18,11 @@ Create a local environment file:
 Copy-Item .env.example .env
 ```
 
+`.env` is for local secrets and environment-specific configuration. Do not
+commit it. `.dockerignore` keeps local secrets, caches, virtual environments,
+media, and generated files out of the Docker build context. The safe
+`.env.example` template is intentionally allowed in the build context.
+
 Start the app and database:
 
 ```powershell
