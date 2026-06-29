@@ -39,6 +39,26 @@ def estimate_detail(request, pk):
     })
 
 
+@app_permission_required(PERM_REPAIR_ORDERS_VIEW)
+def estimate_print(request, pk):
+    estimate = get_object_or_404(
+        Estimate.objects.select_related(
+            "repair_order",
+            "repair_order__customer",
+            "repair_order__vehicle",
+            "parent_estimate",
+        ),
+        pk=pk,
+    )
+    line_items = list(estimate.line_items.all())
+    return render(request, "estimates/estimate_print.html", {
+        "estimate": estimate,
+        "ro": estimate.repair_order,
+        "line_items": line_items,
+        "has_line_items": bool(line_items),
+    })
+
+
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
 def estimate_create(request, repair_order_pk):
     ro = get_object_or_404(

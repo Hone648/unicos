@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+
+{% block title %}Estimate {{ estimate.estimate_number }} - Unicos{% endblock %}
+
+{% block content %}
+
+<div class="screen-only">
+  <a class="back-link" href="{% url 'estimates:detail' estimate.pk %}">&larr; Back to Estimate {{ estimate.estimate_number }}</a>
+
+  <div class="page-header">
+    <h1>Estimate {{ estimate.estimate_number }}</h1>
+    <span class="status-badge">{{ estimate.get_status_display }}</span>
+  </div>
+
+  <div class="action-row print-action-row">
+    <span class="print-hint">Use <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) to print or save as PDF.</span>
+  </div>
+</div>
+
+<div class="estimate-document">
+
+  <div class="estimate-header">
+    <div>
+      <div class="estimate-header__label">Estimate</div>
+      <div class="estimate-header__number">{{ estimate.estimate_number }}</div>
+    </div>
+    <div>
+      <span class="status-badge">{{ estimate.get_status_display }}</span>
+    </div>
+  </div>
+
+  <div class="estimate-meta">
+    <dl>
+      <dt>Kind</dt>
+      <dd>{{ estimate.get_kind_display }}</dd>
+      {% if estimate.is_supplement and estimate.parent_estimate %}
+        <dt>Supplement of</dt>
+        <dd><a href="{% url 'estimates:detail' estimate.parent_estimate.pk %}">{{ estimate.parent_estimate.estimate_number }}</a></dd>
+      {% endif %}
+      <dt>Repair order</dt>
+      <dd>{{ ro.repair_order_number }}</dd>
+    </dl>
+    <dl>
+      <dt>Insurance company</dt>
+      <dd>{% if estimate.insurance_company %}{{ estimate.insurance_company }}{% else %}&mdash;{% endif %}</dd>
+      <dt>Claim number</dt>
+      <dd>{% if estimate.claim_number %}{{ estimate.claim_number }}{% else %}&mdash;{% endif %}</dd>
+      <dt>Deductible</dt>
+      <dd>${{ estimate.deductible }}</dd>
+    </dl>
+  </div>
+
+  <div class="estimate-parties">
+    <div>
+      <h3>Customer</h3>
+      <p><strong>{{ ro.customer.display_name }}</strong></p>
+      {% if ro.customer.phone_primary %}<p>{{ ro.customer.phone_primary }}</p>{% endif %}
+      {% if ro.customer.email %}<p>{{ ro.customer.email }}</p>{% endif %}
+      {% if ro.customer.address_line_1 %}
+        <p>
+          {{ ro.customer.address_line_1 }}
+          {% if ro.customer.address_line_2 %}, {{ ro.customer.address_line_2 }}{% endif %}
+        </p>
+      {% endif %}
+      {% if ro.customer.city or ro.customer.state or ro.customer.postal_code %}
+        <p>{{ ro.customer.city }}{% if ro.customer.city and ro.customer.state %}, {% endif %}{{ ro.customer.state }} {{ ro.customer.postal_code }}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>Vehicle</h3>
+      <p><strong>{% if ro.vehicle.year %}{{ ro.vehicle.year }} {% endif %}{{ ro.vehicle.make }} {{ ro.vehicle.model }}</strong></p>
+      <p class="muted-text">VIN: {{ ro.vehicle.vin }}</p>
+      {% if ro.vehicle.license_plate %}
+        <p class="muted-text">License: {{ ro.vehicle.license_plate }}{% if ro.vehicle.license_state %} ({{ ro.vehicle.license_state }}){% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="estimate-line-items">
+    <h3>Line Items</h3>
+    {% if line_items %}
+      <div class="table-wrap">
+        <table class="line-item-table">
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Qty</th>
+              <th>Unit price</th>
+              <th>Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for item in line_items %}
+              <tr>
+                <td>{{ item.get_item_type_display }}</td>
+                <td>{{ item.description }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>${{ item.unit_price }}</td>
+                <td>${{ item.line_total }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted-text">No estimate line items are present. Showing manual estimated total.</p>
+    {% endif %}
+  </div>
+
+  <div class="estimate-totals">
+    <table>
+      <tbody>
+        <tr class="estimate-totals__total">
+          <th scope="row">Estimated total</th>
+          <td>${{ estimate.estimated_total }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {% if estimate.notes %}
+    <div class="estimate-notes">
+      <h3>Notes</h3>
+      <p>{{ estimate.notes }}</p>
+    </div>
+  {% endif %}
+
+</div>
+
+{% endblock %}

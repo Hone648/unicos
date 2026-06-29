@@ -72,6 +72,10 @@ def detail_url(pk):
     return reverse("estimates:detail", kwargs={"pk": pk})
 
 
+def print_url(pk):
+    return reverse("estimates:print", kwargs={"pk": pk})
+
+
 def edit_url(pk):
     return reverse("estimates:edit", kwargs={"pk": pk})
 
@@ -127,6 +131,10 @@ class EstimateAuthTests(TestCase):
         url = detail_url(self.estimate.pk)
         self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
 
+    def test_print_requires_login(self):
+        url = print_url(self.estimate.pk)
+        self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
+
     def test_edit_requires_login(self):
         url = edit_url(self.estimate.pk)
         self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
@@ -147,9 +155,17 @@ class EstimatePermissionTests(TestCase):
         self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
         self.assertEqual(self.client.get(detail_url(self.estimate.pk)).status_code, 200)
 
+    def test_view_permission_can_view_print_page(self):
+        self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.get(print_url(self.estimate.pk)).status_code, 200)
+
     def test_no_role_user_forbidden_for_detail(self):
         self.client.force_login(make_user("no-role", role_name=None))
         self.assertEqual(self.client.get(detail_url(self.estimate.pk)).status_code, 403)
+
+    def test_no_role_user_forbidden_for_print_page(self):
+        self.client.force_login(make_user("no-role", role_name=None))
+        self.assertEqual(self.client.get(print_url(self.estimate.pk)).status_code, 403)
 
     def test_view_only_user_forbidden_for_create(self):
         self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
@@ -289,11 +305,100 @@ class EstimateDetailTests(TestCase):
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertContains(response, edit_url(self.estimate.pk))
 
+    def test_detail_shows_print_link(self):
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, print_url(self.estimate.pk))
+
     def test_detail_hides_edit_link_without_manage_permission(self):
         self.client.logout()
         self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertNotContains(response, edit_url(self.estimate.pk))
+
+
+# ---------------------------------------------------------------------------
+# Print
+# ---------------------------------------------------------------------------
+
+class EstimatePrintTests(TestCase):
+    def setUp(self):
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        self.customer = make_customer(
+            first_name="Avery",
+            last_name="Reed",
+            phone_primary="555-0101",
+            email="avery@example.test",
+        )
+        self.vehicle = make_vehicle(
+            self.customer,
+            make="Toyota",
+            model="Camry",
+            year=2020,
+        )
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-PRINT-001",
+        )
+        self.estimate = make_estimate(
+            self.ro,
+            number="EST-PRINT-001",
+            insurance_company="Acme Insurance",
+            claim_number="CLM-PRINT",
+            deductible=Decimal("500.00"),
+            estimated_total=Decimal("0.00"),
+            notes="Customer approved printed estimate.",
+        )
+
+    def test_print_page_shows_estimate_context_and_line_items(self):
+        make_line_item(
+            self.estimate,
+            description="Refinish quarter panel",
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("125.00"),
+        )
+        self.estimate.refresh_from_db()
+
+        response = self.client.get(print_url(self.estimate.pk))
+
+        self.assertContains(response, "Estimate")
+        self.assertContains(response, "EST-PRINT-001")
+        self.assertContains(response, "RO-PRINT-001")
+        self.assertContains(response, "Avery Reed")
+        self.assertContains(response, "Toyota Camry")
+        self.assertContains(response, VALID_VIN)
+        self.assertContains(response, "Acme Insurance")
+        self.assertContains(response, "CLM-PRINT")
+        self.assertContains(response, "500.00")
+        self.assertContains(response, "Refinish quarter panel")
+        self.assertContains(response, "250.00")
+        self.assertContains(response, "Customer approved printed estimate.")
+
+    def test_print_page_uses_manual_total_when_no_line_items(self):
+        self.estimate.estimated_total = Decimal("875.00")
+        self.estimate.save()
+
+        response = self.client.get(print_url(self.estimate.pk))
+
+        self.assertContains(response, "No estimate line items are present.")
+        self.assertContains(response, "Showing manual estimated total.")
+        self.assertContains(response, "875.00")
+
+    def test_print_page_shows_supplement_parent_context(self):
+        supplement = make_estimate(
+            self.ro,
+            number="EST-SUP-001",
+            kind=Estimate.Kind.SUPPLEMENT,
+            parent_estimate=self.estimate,
+            estimated_total=Decimal("300.00"),
+        )
+
+        response = self.client.get(print_url(supplement.pk))
+
+        self.assertContains(response, "Supplement")
+        self.assertContains(response, "Supplement of")
+        self.assertContains(response, "EST-PRINT-001")
+        self.assertContains(response, detail_url(self.estimate.pk))
 
 
 # ---------------------------------------------------------------------------
