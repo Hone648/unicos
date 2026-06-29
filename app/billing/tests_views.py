@@ -1,9 +1,10 @@
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
@@ -35,9 +36,9 @@ def make_customer(**kwargs):
 
 
 def make_vehicle(customer, vin=VALID_VIN, **kwargs):
-    return Vehicle.objects.create(
-        customer=customer, vin=vin, make="Honda", model="Civic", year=2021, **kwargs
-    )
+    defaults = {"make": "Honda", "model": "Civic", "year": 2021}
+    defaults.update(kwargs)
+    return Vehicle.objects.create(customer=customer, vin=vin, **defaults)
 
 
 def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
@@ -81,6 +82,10 @@ def invoice_create_url(repair_order_pk):
     return reverse("billing:invoice_create", kwargs={"repair_order_pk": repair_order_pk})
 
 
+def invoice_list_url():
+    return reverse("billing:invoice_list")
+
+
 def invoice_edit_url(pk):
     return reverse("billing:invoice_edit", kwargs={"pk": pk})
 
@@ -111,6 +116,220 @@ def invoice_void_url(pk):
 
 def ro_detail_url(pk):
     return reverse("repair_orders:detail", kwargs={"pk": pk})
+
+
+# ---------------------------------------------------------------------------
+# Invoice list
+# ---------------------------------------------------------------------------
+
+class InvoiceListAuthTests(TestCase):
+    def test_login_required(self):
+        response = self.client.get(invoice_list_url())
+        self.assertRedirects(
+            response, f"/accounts/login/?next={invoice_list_url()}"
+        )
+
+    def test_authenticated_user_can_load_list(self):
+        self.client.force_login(make_user())
+        response = self.client.get(invoice_list_url())
+        self.assertEqual(response.status_code, 200)
+
+
+class InvoiceListTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+
+    def _repair_order(self, number, customer=None, vehicle=None):
+        customer = customer or self.customer
+        vehicle = vehicle or self.vehicle
+        return make_repair_order(customer, vehicle, number=number)
+
+    def _invoice(self, number, ro_number="RO-LIST-001", **kwargs):
+        ro = self._repair_order(ro_number)
+        return make_invoice(ro, number=number, **kwargs)
+
+    def test_list_renders_invoice_queue_columns_and_links(self):
+        invoice = self._invoice("INV-LIST-001", subtotal=Decimal("200.00"))
+        make_payment(invoice, amount=Decimal("50.00"))
+
+        response = self.client.get(invoice_list_url())
+
+        self.assertContains(response, "Invoice Queue")
+        self.assertContains(response, "INV-LIST-001")
+        self.assertContains(response, invoice_detail_url(invoice.pk))
+        self.assertContains(response, "RO-LIST-001")
+        self.assertContains(response, ro_detail_url(invoice.repair_order.pk))
+        self.assertContains(response, self.customer.display_name)
+        self.assertContains(response, self.vehicle.make)
+        self.assertContains(response, "$250.00")
+        self.assertContains(response, "$50.00")
+        self.assertContains(response, "$200.00")
+
+    def test_newest_invoices_appear_first(self):
+        older = self._invoice("INV-OLDER", ro_number="RO-OLDER")
+        newer = self._invoice("INV-NEWER", ro_number="RO-NEWER")
+        now = timezone.now()
+        Invoice.objects.filter(pk=older.pk).update(updated_at=now)
+        Invoice.objects.filter(pk=newer.pk).update(
+            updated_at=now + timedelta(minutes=1)
+        )
+
+        response = self.client.get(invoice_list_url())
+
+        invoices = list(response.context["invoices"])
+        self.assertEqual(
+            [invoice.invoice_number for invoice in invoices],
+            ["INV-NEWER", "INV-OLDER"],
+        )
+
+    def test_status_filters_show_matching_invoices(self):
+        draft = self._invoice("INV-DRAFT", ro_number="RO-DRAFT")
+        issued = self._invoice(
+            "INV-ISSUED",
+            ro_number="RO-ISSUED",
+            status=Invoice.Status.ISSUED,
+        )
+        partial = self._invoice("INV-PARTIAL", ro_number="RO-PARTIAL")
+        make_payment(partial, amount=Decimal("100.00"))
+        paid = self._invoice("INV-PAID", ro_number="RO-PAID")
+        make_payment(paid, amount=Decimal("550.00"))
+        void = self._invoice(
+            "INV-VOID",
+            ro_number="RO-VOID",
+            status=Invoice.Status.VOID,
+        )
+
+        expected = {
+            Invoice.Status.DRAFT: draft,
+            Invoice.Status.ISSUED: issued,
+            Invoice.Status.PARTIALLY_PAID: partial,
+            Invoice.Status.PAID: paid,
+            Invoice.Status.VOID: void,
+        }
+        for status, invoice in expected.items():
+            with self.subTest(status=status):
+                response = self.client.get(invoice_list_url(), {"status": status})
+                invoices = list(response.context["invoices"])
+                self.assertEqual(invoices, [invoice])
+                self.assertContains(response, invoice.invoice_number)
+
+    def test_invalid_status_filter_falls_back_safely(self):
+        invoice = self._invoice("INV-INVALID-STATUS")
+
+        response = self.client.get(invoice_list_url(), {"status": "not-a-status"})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["status_filter"], "")
+        self.assertContains(response, invoice.invoice_number)
+
+    def test_search_by_invoice_number(self):
+        invoice = self._invoice("INV-SEARCH-001")
+        self._invoice("INV-OTHER", ro_number="RO-OTHER")
+
+        response = self.client.get(invoice_list_url(), {"q": "SEARCH-001"})
+
+        self.assertEqual(list(response.context["invoices"]), [invoice])
+        self.assertContains(response, "INV-SEARCH-001")
+        self.assertNotContains(response, "INV-OTHER")
+
+    def test_search_by_repair_order_number(self):
+        invoice = self._invoice("INV-RO-MATCH", ro_number="RO-MATCH-001")
+        self._invoice("INV-NOMATCH", ro_number="RO-NOMATCH")
+
+        response = self.client.get(invoice_list_url(), {"q": "RO-MATCH-001"})
+
+        self.assertEqual(list(response.context["invoices"]), [invoice])
+        self.assertContains(response, "INV-RO-MATCH")
+
+    def test_search_by_customer_name_and_business_name(self):
+        individual_invoice = self._invoice("INV-JANE", ro_number="RO-JANE")
+        business = make_customer(
+            customer_type=Customer.CustomerType.BUSINESS,
+            first_name="",
+            last_name="",
+            business_name="Precision Fleet",
+        )
+        business_vehicle = make_vehicle(
+            business,
+            vin=VALID_VIN_2,
+            make="Ford",
+            model="Transit",
+        )
+        business_invoice = make_invoice(
+            make_repair_order(business, business_vehicle, number="RO-FLEET"),
+            number="INV-FLEET",
+        )
+
+        individual_response = self.client.get(invoice_list_url(), {"q": "Jane"})
+        self.assertEqual(
+            list(individual_response.context["invoices"]),
+            [individual_invoice],
+        )
+
+        business_response = self.client.get(invoice_list_url(), {"q": "Precision"})
+        self.assertEqual(
+            list(business_response.context["invoices"]),
+            [business_invoice],
+        )
+
+    def test_search_by_vehicle_fields(self):
+        vehicle = make_vehicle(
+            self.customer,
+            vin=VALID_VIN_2,
+            make="Toyota",
+            model="Camry",
+            license_plate="SHOP123",
+        )
+        invoice = make_invoice(
+            make_repair_order(self.customer, vehicle, number="RO-VEHICLE"),
+            number="INV-VEHICLE",
+        )
+
+        for query in ["Toyota", "Camry", VALID_VIN_2, "SHOP123"]:
+            with self.subTest(query=query):
+                response = self.client.get(invoice_list_url(), {"q": query})
+                self.assertEqual(list(response.context["invoices"]), [invoice])
+
+    def test_empty_states(self):
+        response = self.client.get(invoice_list_url())
+        self.assertContains(response, "No invoices found.")
+
+        self._invoice("INV-EMPTY", status=Invoice.Status.DRAFT)
+        filter_response = self.client.get(
+            invoice_list_url(), {"status": Invoice.Status.VOID}
+        )
+        self.assertContains(filter_response, "No invoices match this filter.")
+
+        search_response = self.client.get(invoice_list_url(), {"q": "missing"})
+        self.assertContains(search_response, "No invoices match this search.")
+
+    def test_existing_billing_routes_still_resolve(self):
+        invoice = self._invoice("INV-ROUTES")
+        line_item = make_line_item(invoice)
+
+        self.assertEqual(
+            self.client.get(invoice_detail_url(invoice.pk)).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(invoice_edit_url(invoice.pk)).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(payment_create_url(invoice.pk)).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(line_item_create_url(invoice.pk)).status_code,
+            200,
+        )
+        self.assertEqual(
+            self.client.get(line_item_edit_url(line_item.pk)).status_code,
+            200,
+        )
 
 
 # ---------------------------------------------------------------------------

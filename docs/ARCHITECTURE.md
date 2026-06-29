@@ -24,9 +24,9 @@ Architectural style:
     create, and edit views; vehicle create-for-customer, detail, and edit under
     `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`
   - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice
-    edit, invoice detail/print view, invoice line-item create/edit, and payment
-    create; invoice summary with line items and payments embedded in
-    repair-order detail
+    queue/list, invoice edit, invoice detail/print view, invoice line-item
+    create/edit, and payment create; invoice summary with line items and
+    payments embedded in repair-order detail
   - Dashboard (`/`): read-only workflow overview for active repair orders,
     ready-for-pickup work, unpaid invoices, closure blockers, and recently
     updated repair orders

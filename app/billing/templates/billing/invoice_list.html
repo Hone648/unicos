@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+
+{% block title %}Invoice Queue - Unicos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Invoice Queue</h1>
+</div>
+
+<form class="toolbar" method="get" action="">
+  <input
+    type="search"
+    name="q"
+    value="{{ q }}"
+    placeholder="Search by invoice, RO, customer, vehicle..."
+    aria-label="Search invoices"
+  />
+  {% if status_filter %}
+    <input type="hidden" name="status" value="{{ status_filter }}" />
+  {% endif %}
+  <button type="submit">Search</button>
+  {% if q %}
+    <a class="button" href="{{ clear_search_href }}">Clear</a>
+  {% endif %}
+</form>
+
+<div class="filter-tabs">
+  {% for filter in status_filters %}
+    <a class="filter-tab {% if filter.active %}active{% endif %}"
+       href="{{ filter.href }}">{{ filter.label }}</a>
+  {% endfor %}
+</div>
+
+{% if invoices %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Invoice Number</th>
+          <th>Repair Order</th>
+          <th>Customer</th>
+          <th>Vehicle</th>
+          <th>Status</th>
+          <th>Total</th>
+          <th>Paid</th>
+          <th>Balance Due</th>
+          <th>Issued</th>
+          <th>Due</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for invoice in invoices %}
+          <tr>
+            <td>
+              <a href="{% url 'billing:invoice_detail' invoice.pk %}">
+                {{ invoice.invoice_number }}
+              </a>
+            </td>
+            <td>
+              <a href="{% url 'repair_orders:detail' invoice.repair_order.pk %}">
+                {{ invoice.repair_order.repair_order_number }}
+              </a>
+            </td>
+            <td>{{ invoice.repair_order.customer.display_name }}</td>
+            <td>{{ invoice.repair_order.vehicle }}</td>
+            <td>
+              <span class="status-badge status-{{ invoice.status|slugify }}">
+                {{ invoice.get_status_display }}
+              </span>
+            </td>
+            <td>${{ invoice.total_amount }}</td>
+            <td class="amount-paid">${{ invoice.amount_paid }}</td>
+            <td {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</td>
+            <td>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</td>
+            <td>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}&mdash;{% endif %}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  <div class="empty-state">
+    <p>{{ empty_state_message }}</p>
+  </div>
+{% endif %}
+{% endblock %}

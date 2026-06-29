@@ -17,6 +17,7 @@
             <a href="{% url 'dashboard' %}">Dashboard</a>
             <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
             <a href="{% url 'customers:list' %}">Customers</a>
+            <a href="{% url 'billing:invoice_list' %}">Billing</a>
           </nav>
           <div class="user-bar">
             <span>{{ user.get_username }}</span>

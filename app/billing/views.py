@@ -1,6 +1,9 @@
+from urllib.parse import urlencode
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
+from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
@@ -10,6 +13,9 @@ from repair_orders.models import RepairOrder
 
 from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
 from .models import Invoice, InvoiceLineItem, Payment
+
+
+_VALID_INVOICE_STATUSES = set(Invoice.Status.values)
 
 
 def _repair_order_is_final(ro):
@@ -24,6 +30,91 @@ def _final_invoice_message(invoice):
     return (
         f"Invoice {invoice.invoice_number} belongs to a final repair order "
         "and cannot be changed."
+    )
+
+
+def _invoice_status_filters(q, status_filter):
+    base_params = {}
+    if q:
+        base_params["q"] = q
+
+    filters = [
+        {
+            "label": "All",
+            "value": "",
+            "href": f"?{urlencode(base_params)}" if base_params else "?",
+            "active": not status_filter,
+        }
+    ]
+
+    for value, label in Invoice.Status.choices:
+        params = {"status": value, **base_params}
+        filters.append(
+            {
+                "label": label,
+                "value": value,
+                "href": f"?{urlencode(params)}",
+                "active": status_filter == value,
+            }
+        )
+    return filters
+
+
+@login_required
+def invoice_list(request):
+    q = request.GET.get("q", "").strip()
+    status_filter = request.GET.get("status", "").strip()
+    if status_filter not in _VALID_INVOICE_STATUSES:
+        status_filter = ""
+
+    invoices = (
+        Invoice.objects.select_related(
+            "repair_order",
+            "repair_order__customer",
+            "repair_order__vehicle",
+        )
+        .order_by("-updated_at", "-id")
+    )
+
+    if status_filter:
+        invoices = invoices.filter(status=status_filter)
+
+    if q:
+        invoices = invoices.filter(
+            Q(invoice_number__icontains=q)
+            | Q(repair_order__repair_order_number__icontains=q)
+            | Q(repair_order__customer__first_name__icontains=q)
+            | Q(repair_order__customer__last_name__icontains=q)
+            | Q(repair_order__customer__business_name__icontains=q)
+            | Q(repair_order__vehicle__vin__icontains=q)
+            | Q(repair_order__vehicle__make__icontains=q)
+            | Q(repair_order__vehicle__model__icontains=q)
+            | Q(repair_order__vehicle__license_plate__icontains=q)
+        )
+
+    if q:
+        empty_state_message = "No invoices match this search."
+    elif status_filter:
+        empty_state_message = "No invoices match this filter."
+    else:
+        empty_state_message = "No invoices found."
+
+    clear_search_href = "?"
+    if status_filter:
+        clear_search_href = f"?status={status_filter}"
+
+    return render(
+        request,
+        "billing/invoice_list.html",
+        {
+            "invoices": invoices,
+            "q": q,
+            "status_filter": status_filter,
+            "status_choices": Invoice.Status.choices,
+            "status_filters": _invoice_status_filters(q, status_filter),
+            "clear_search_href": clear_search_href,
+            "empty_state_message": empty_state_message,
+        },
     )
 
 
