@@ -87,7 +87,20 @@ jobs:
         run: docker compose exec -T web python app/manage.py migrate --noinput
 
       - name: Smoke test health endpoint
-        run: curl --fail --retry 10 --retry-delay 3 http://localhost:8000/healthz/
+        run: |
+          for i in {1..30}; do
+            if curl --fail --silent --show-error http://localhost:8000/healthz/; then
+              exit 0
+            fi
+            echo "Waiting for web health endpoint... attempt ${i}/30"
+            docker compose ps
+            sleep 2
+          done
+          echo "Web health endpoint did not become ready."
+          docker compose ps
+          docker compose logs web --tail=200
+          docker compose logs db --tail=100
+          exit 1
 
       - name: Stop Docker Compose
         if: always()
