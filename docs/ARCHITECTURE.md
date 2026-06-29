@@ -80,10 +80,67 @@ Deployment:
 - Development now runs on local Docker Compose (app + PostgreSQL).
 - The intended shop has internet access, so a web-capable / hosted deployment
   path is expected later.
+- The app is not production-ready yet.
 - Production deployment is not implemented in the current slices. When it
   happens it will require secure settings, HTTPS, proper `ALLOWED_HOSTS`,
-  backups, admin hardening, and general security hardening. See
+  `DEBUG=False`, secure cookies/CSRF/proxy headers, backups and restore
+  procedure, admin hardening, media/document storage strategy, and
+  deployment-specific environment management. See
   `DECISIONS/0006-web-capable-deployment.md`.
+- The current Dockerfile uses Django `runserver`.
+- Migrations currently run on container startup.
+- Local Docker Compose is for development.
+- Production settings are not split/hardened yet.
+- HTTPS/proxy/security settings are not configured for deployment.
+- Backups/restore are not specified.
+- Admin hardening is incomplete.
+- Media storage for attachments/photos/documents is not designed yet.
+
+Authorization gap:
+
+- The custom user model exists.
+- Role groups exist as names/baseline groups.
+- Most shop-facing views are login-gated.
+- Domain-specific permission enforcement is not implemented yet.
+- Any authenticated staff user may currently have too much functional access
+  unless restricted outside the app.
+
+Proposed permission matrix:
+
+| Role | Intended access direction |
+| --- | --- |
+| Owner/Admin | All actions |
+| Manager | Most operational actions, reports, and explicitly allowed workflow overrides |
+| Front Desk | Customer intake, vehicle intake, repair-order intake, and possibly payments |
+| Estimator | Estimates, supplements, repair-order notes, and status updates |
+| Technician | View assigned ROs and update production notes/status where allowed |
+| Read-only | View-only access |
+
+The next implementation work should define and enforce permissions before
+significantly expanding features.
+
+Lifecycle-rule centralization gap:
+
+- Some lifecycle rules are centralized, but not all entry points necessarily use
+  the same service boundary.
+- Shop-facing status changes block final repair-order statuses when a non-void
+  invoice has balance due.
+- That rule exists in `repair_orders/business_rules.py`.
+- Admin bulk status actions call `ro.set_status()` directly.
+- If admin is an intentional privileged override, this should be documented as
+  such.
+- If the rule is a true business invariant, it should move behind a domain
+  service used by both views and admin.
+
+Future service-layer direction:
+
+```text
+transition_repair_order_status(ro, new_status, actor, note, source)
+issue_invoice(invoice, actor)
+void_invoice(invoice, actor)
+record_payment(invoice, data, actor)
+edit_invoice_line_item(...)
+```
 
 Future domain spine:
 
@@ -94,3 +151,44 @@ Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Invoice Line Item ->
 Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
 and Payment now exist. Estimates and payment processor integration are planned
 for later slices.
+
+Missing body-shop workflow areas:
+
+| Area | Missing examples |
+| --- | --- |
+| Estimating | estimates, supplements, estimate approval, estimate versions |
+| Insurance | insurer, claim number, adjuster, deductible, DRP fields |
+| Repair planning | labor operations, parts orders, sublet vendors, supplements |
+| Customer communication | call/text/email log, authorization history |
+| Attachments | photos, PDFs, signed forms, invoices, intake images |
+| Scheduling | promised date exists, but not production calendar / technician scheduling |
+| Shop operations | parts received, teardown, quality checklist, delivery checklist |
+| Reporting | revenue, receivables, cycle time, open ROs, aging invoices |
+
+List scalability gap:
+
+Current list views are acceptable for early development, but larger datasets
+need pagination and query hardening. Likely targets are the repair-order list,
+customer list, invoice list, future payment list, and vehicle-related lists.
+Future work should include pagination, stable ordering, select_related /
+prefetch_related review, index review where needed, and search query safety.
+
+Validation gap:
+
+Current strengths include VIN normalization/validation, repair-order
+customer/vehicle relationship validation, invoice/payment amount validation,
+invoice due-date validation, and billing/final-status workflow guards.
+
+Future improvements include phone formatting/normalization, state normalization,
+optional uniqueness policies, VIN check-digit validation, realistic vehicle year
+bounds, audit fields for customers/vehicles if needed, and clearer model/service
+level enforcement for operations currently relying on views/forms.
+
+Quality gate gap:
+
+CI currently runs Django checks, missing migration checks, migrations, tests,
+Docker build/runtime smoke, and `/healthz/`. Missing quality gates include Ruff
+or equivalent linting, Black formatting, mypy/type checking, coverage reporting
+and optional threshold, and pre-commit. These are useful next quality layers as
+the app grows, but they are less urgent than permissions and lifecycle-rule
+centralization.

@@ -7,7 +7,7 @@ Start here:
 
 - `PROJECT_CONTEXT.md` for business context
 - `ARCHITECTURE.md` for current technical direction
-- `ROADMAP.md` and `SLICE_PLAN.md` for phased planning
+- `ROADMAP.md` and `SLICE_PLAN.md` for readiness priorities and phased planning
 - `AI_REVIEW_GUIDE.md` for implementation and review expectations
 - `DECISIONS/` for recorded architectural decisions
 - `HANDOFFS/` for handoff report conventions
