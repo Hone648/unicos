@@ -44,6 +44,7 @@
       </tbody>
     </table>
   </div>
+  {% include "partials/_pagination.html" %}
 {% else %}
   <div class="empty-state">
     <p>No customers found{% if q %} matching &ldquo;{{ q }}&rdquo;{% endif %}.</p>

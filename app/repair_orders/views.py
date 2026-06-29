@@ -9,6 +9,7 @@ from accounts.authorization import (
     app_permission_required,
 )
 from core.document_numbers import generate_repair_order_number
+from core.pagination import paginate_queryset, pagination_querystring
 
 from .business_rules import is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
@@ -81,11 +82,14 @@ def repair_order_list(request):
             | Q(vehicle__license_plate__icontains=q)
         )
 
+    page_obj = paginate_queryset(request, qs)
     return render(
         request,
         "repair_orders/repair_order_list.html",
         {
-            "repair_orders": qs,
+            "repair_orders": page_obj.object_list,
+            "page_obj": page_obj,
+            "pagination_query": pagination_querystring(request),
             "q": q,
             "status_filter": status_filter,
             "status_choices": RepairOrder.Status.choices,

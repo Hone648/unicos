@@ -7,6 +7,7 @@ from accounts.authorization import (
     PERM_CUSTOMERS_VIEW,
     app_permission_required,
 )
+from core.pagination import paginate_queryset, pagination_querystring
 
 from .forms import CustomerForm
 from .models import Customer
@@ -25,7 +26,13 @@ def customer_list(request):
             | Q(email__icontains=q)
             | Q(city__icontains=q)
         )
-    return render(request, "customers/customer_list.html", {"customers": qs, "q": q})
+    page_obj = paginate_queryset(request, qs)
+    return render(request, "customers/customer_list.html", {
+        "customers": page_obj.object_list,
+        "page_obj": page_obj,
+        "pagination_query": pagination_querystring(request),
+        "q": q,
+    })
 
 
 @app_permission_required(PERM_CUSTOMERS_VIEW)

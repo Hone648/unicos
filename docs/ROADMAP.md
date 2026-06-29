@@ -95,30 +95,23 @@ edit_invoice_line_item(...)
 
 ### Priority 4 - Pagination And Query Safety
 
-Likely future slice:
+Status: implemented in Slice 27.
 
 ```text
-Slice 27: pagination for repair orders, customers, and invoice queue
+Slice 27: list pagination and query safety
 ```
 
-Current list views are acceptable for early development but need pagination and
-query hardening before larger datasets.
+Major list pages now use Django's built-in paginator with a fixed page size of
+25. Invalid and out-of-range page values are clamped safely. Query parameters
+(search, status filters) are preserved across pagination links.
 
-Likely targets:
+Remaining pagination gaps:
 
-- Repair-order list
-- Customer list
-- Invoice list
-- Future payment list
-- Vehicle-related lists
-
-Plan:
-
-- Add pagination.
-- Preserve stable ordering.
-- Review `select_related` / `prefetch_related` usage.
-- Review indexes where needed.
-- Keep search queries safe and intentionally scoped.
+- No sortable columns.
+- No user-configurable page size.
+- No advanced search or full-text indexing.
+- No database indexes added (acceptable for current dataset sizes).
+- Future payment list and vehicle-related list pages if they are created.
 
 ### Priority 5 - Estimate/Insurance Spine
 

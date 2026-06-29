@@ -186,6 +186,59 @@ class RepairOrderListSearchTests(TestCase):
         self.assertContains(response, "No repair orders found")
 
 
+class RepairOrderListPaginationTests(TestCase):
+    """Repair-order list uses bounded pagination with safe page-parameter handling."""
+
+    PAGE_SIZE = 25
+
+    def setUp(self):
+        self.user = make_user(username="paginator")
+        self.client.force_login(self.user)
+        self.customer = make_customer(first_name="Page", last_name="Test")
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+        # Create PAGE_SIZE + 3 open repair orders so two pages exist.
+        for i in range(self.PAGE_SIZE + 3):
+            make_repair_order(
+                self.customer, self.vehicle, number=f"RO-PAG-{i:03d}"
+            )
+
+    def test_first_page_returns_page_size_results(self):
+        response = self.client.get(LIST_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["repair_orders"]), self.PAGE_SIZE)
+
+    def test_second_page_returns_remaining_results(self):
+        response = self.client.get(LIST_URL + "?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["repair_orders"]), 3)
+
+    def test_invalid_page_falls_back_to_first_page(self):
+        response = self.client.get(LIST_URL + "?page=abc")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["repair_orders"]), self.PAGE_SIZE)
+
+    def test_out_of_range_page_falls_back_to_last_page(self):
+        response = self.client.get(LIST_URL + "?page=999")
+        self.assertEqual(response.status_code, 200)
+        # Last page has the 3 overflow items.
+        self.assertEqual(len(response.context["repair_orders"]), 3)
+
+    def test_pagination_query_preserves_status_filter(self):
+        response = self.client.get(LIST_URL + "?status=all")
+        self.assertContains(response, "status=all")
+
+    def test_pagination_query_preserves_search_query(self):
+        response = self.client.get(LIST_URL + "?q=RO-PAG")
+        # Should still contain search results (all match) and the q param.
+        self.assertContains(response, "q=RO-PAG")
+
+    def test_search_results_are_paginated(self):
+        response = self.client.get(LIST_URL + "?q=RO-PAG")
+        self.assertEqual(response.status_code, 200)
+        # All PAGE_SIZE + 3 match "RO-PAG", first page caps at PAGE_SIZE.
+        self.assertEqual(len(response.context["repair_orders"]), self.PAGE_SIZE)
+
+
 # ---------------------------------------------------------------------------
 # Detail view tests
 # ---------------------------------------------------------------------------

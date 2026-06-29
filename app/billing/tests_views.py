@@ -343,6 +343,57 @@ class InvoiceListTests(TestCase):
         )
 
 
+class InvoiceListPaginationTests(TestCase):
+    """Invoice list uses bounded pagination with safe page-parameter handling."""
+
+    PAGE_SIZE = 25
+
+    def setUp(self):
+        self.user = make_user(username="inv-paginator")
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        # Create PAGE_SIZE + 4 invoices so two pages exist.
+        for i in range(self.PAGE_SIZE + 4):
+            ro = make_repair_order(
+                self.customer, self.vehicle, number=f"RO-INV-PAG-{i:03d}"
+            )
+            make_invoice(ro, number=f"INV-PAG-{i:03d}")
+
+    def test_first_page_returns_page_size_results(self):
+        response = self.client.get(invoice_list_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["invoices"]), self.PAGE_SIZE)
+
+    def test_second_page_returns_remaining_results(self):
+        response = self.client.get(invoice_list_url() + "?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["invoices"]), 4)
+
+    def test_invalid_page_falls_back_to_first_page(self):
+        response = self.client.get(invoice_list_url() + "?page=abc")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["invoices"]), self.PAGE_SIZE)
+
+    def test_out_of_range_page_falls_back_to_last_page(self):
+        response = self.client.get(invoice_list_url() + "?page=999")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["invoices"]), 4)
+
+    def test_pagination_query_preserves_status_filter(self):
+        response = self.client.get(invoice_list_url() + "?status=draft")
+        self.assertContains(response, "status=draft")
+
+    def test_pagination_query_preserves_search_query(self):
+        response = self.client.get(invoice_list_url() + "?q=INV-PAG")
+        self.assertContains(response, "q=INV-PAG")
+
+    def test_search_results_are_paginated(self):
+        response = self.client.get(invoice_list_url() + "?q=INV-PAG")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["invoices"]), self.PAGE_SIZE)
+
+
 # ---------------------------------------------------------------------------
 # Invoice create
 # ---------------------------------------------------------------------------
