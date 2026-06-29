@@ -113,7 +113,22 @@ Remaining pagination gaps:
 - No database indexes added (acceptable for current dataset sizes).
 - Future payment list and vehicle-related list pages if they are created.
 
-### Priority 5 - Estimate/Insurance Spine
+### Priority 5 - Form Validation and Data Integrity Hardening
+
+Status: implemented in Slice 28.
+
+```text
+Slice 28: form validation and data integrity hardening
+```
+
+Form-level clean methods were added for vehicle year range, invoice line-item
+quantity and unit price, and payment amount. All produce field-attached error
+messages rather than generic MinValueValidator text.
+
+Remaining validation gaps: phone formatting, state normalization, VIN
+check-digit validation, optional uniqueness policies.
+
+### Priority 6 - Estimate/Insurance Spine
 
 Start the next major domain expansion after lifecycle service boundaries and
 remaining authorization limits are addressed.

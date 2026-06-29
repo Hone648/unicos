@@ -58,8 +58,20 @@ class InvoiceLineItemForm(forms.ModelForm):
             "unit_price": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
         }
     # invoice, created_at, and updated_at are excluded.
-    # Quantity/unit price and overpayment guards are validated by
-    # InvoiceLineItem.clean() via ModelForm._post_clean().
+    # Quantity/unit price guards below fire at field-clean time (before _post_clean),
+    # giving field-attached error messages instead of the generic MinValueValidator text.
+
+    def clean_quantity(self):
+        quantity = self.cleaned_data.get("quantity")
+        if quantity is not None and quantity <= 0:
+            raise forms.ValidationError("Quantity must be greater than zero.")
+        return quantity
+
+    def clean_unit_price(self):
+        price = self.cleaned_data.get("unit_price")
+        if price is not None and price < 0:
+            raise forms.ValidationError("Unit price cannot be negative.")
+        return price
 
 
 class PaymentForm(forms.ModelForm):
@@ -77,6 +89,12 @@ class PaymentForm(forms.ModelForm):
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
     # invoice, received_by, created_at are excluded.
-    # Amount > 0 is validated by Payment.clean() via ModelForm._post_clean().
     # Void and overpayment checks require invoice_id to be set; the view calls
     # payment.full_clean() after setting payment.invoice from the URL before saving.
+    # clean_amount fires at field-clean time so the error attaches to the amount field.
+
+    def clean_amount(self):
+        amount = self.cleaned_data.get("amount")
+        if amount is not None and amount <= 0:
+            raise forms.ValidationError("Amount must be greater than zero.")
+        return amount

@@ -31,9 +31,11 @@ Planned slices:
 27. Slice 26: repair-order lifecycle service boundary (centralized status transition service in services.py; unpaid-invoice block enforced by service for views, admin actions, and admin form saves; set_status routes through service; _apply_status_change private fallback for test setup; no migrations)
 28. Slice 27: list pagination and query safety (core.pagination helper; paginate_queryset and pagination_querystring; 25-item page size; safe invalid/out-of-range page handling; pagination partial template; repair-order, customer, and invoice list views paginated; no migrations; no new dependencies)
 
+29. Slice 28: form validation and data integrity hardening (VehicleForm year range; InvoiceLineItemForm quantity/unit-price field-level clean; PaymentForm amount field-level clean; no migrations)
+
 Likely next implementation slices:
 
-- Slice 28: estimate/insurance spine or advanced search/filtering
+- Slice 29: estimate/insurance spine or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
