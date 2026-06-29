@@ -26,6 +26,7 @@ screenshot set.
 ## Current Features
 
 - Custom user model and login/logout
+- Initial role-based shop-facing permission enforcement
 - Dashboard/workflow visibility
 - Customers and vehicles
 - Repair orders and status history
@@ -119,8 +120,18 @@ The app has a login/logout baseline backed by a custom user model
 
 Baseline staff role groups (`Owner/Admin`, `Manager`, `Front Desk`,
 `Estimator`, `Technician`, `Read-only`) are created automatically by a data
-migration. Group names exist, but domain-specific permission enforcement is not
-implemented yet. Treat authorization as a known readiness gap.
+migration. Shop-facing views now use centralized app-level permission helpers
+from `accounts.authorization`.
+
+Current authorization limits:
+
+- No object-level permissions yet.
+- No technician assignment constraints yet.
+- `is_staff` is not treated as a shop permission.
+- Django admin still uses Django admin authorization and is not unified with the
+  shop-facing helpers.
+- Lifecycle service-layer centralization remains future work.
+- Production hardening remains future work.
 
 ## Roadmap And Readiness
 

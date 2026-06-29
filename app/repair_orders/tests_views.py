@@ -2,9 +2,11 @@ from decimal import Decimal
 from datetime import date
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
+from accounts.authorization import ROLE_MANAGER, ROLE_TECHNICIAN
 from billing.models import Invoice, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
@@ -22,10 +24,19 @@ CREATE_URL = reverse("repair_orders:create")
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_user(username="staffer", **kwargs):
-    return get_user_model().objects.create_user(
+def assign_role(user, role_name):
+    group, _created = Group.objects.get_or_create(name=role_name)
+    user.groups.add(group)
+    return user
+
+
+def make_user(username="staffer", role_name=ROLE_MANAGER, **kwargs):
+    user = get_user_model().objects.create_user(
         username=username, password="pw-test-12345", **kwargs
     )
+    if role_name:
+        assign_role(user, role_name)
+    return user
 
 
 def make_customer(**kwargs):
@@ -950,3 +961,53 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
         self._htmx_post("delivered")
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+
+# ---------------------------------------------------------------------------
+# Invoice summary billing permission tests
+# ---------------------------------------------------------------------------
+
+class InvoiceSummaryPermissionTests(TestCase):
+    """RO detail invoice card: billing.view gate; Technician sees neutral message."""
+
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-INV-PERM-01")
+        self.invoice = make_invoice(self.ro, number="INV-PERM-001")
+
+    def _login(self, username, role_name):
+        user = make_user(username=username, role_name=role_name)
+        self.client.force_login(user)
+
+    def test_technician_can_load_ro_detail(self):
+        self._login("tech-ro-load", ROLE_TECHNICIAN)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_technician_sees_neutral_invoice_message(self):
+        self._login("tech-ro-neutral", ROLE_TECHNICIAN)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, "Invoice details require billing permission.")
+
+    def test_technician_does_not_see_invoice_number(self):
+        self._login("tech-ro-no-num", ROLE_TECHNICIAN)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, "INV-PERM-001")
+
+    def test_technician_does_not_see_balance_due_label(self):
+        self._login("tech-ro-no-bal", ROLE_TECHNICIAN)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, "Balance due")
+
+    def test_technician_does_not_see_view_print_invoice_link(self):
+        self._login("tech-ro-no-link", ROLE_TECHNICIAN)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertNotContains(response, "View/Print Invoice")
+
+    def test_manager_sees_invoice_summary(self):
+        self._login("mgr-ro-sees", ROLE_MANAGER)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, "INV-PERM-001")
+        self.assertContains(response, "View/Print Invoice")
+        self.assertNotContains(response, "Invoice details require billing permission.")

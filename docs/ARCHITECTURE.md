@@ -12,7 +12,8 @@ Architectural style:
 
 - Server-rendered Django monolith
 - PostgreSQL relational database
-- Custom user model (`accounts.User`) for staff authentication
+- Custom user model (`accounts.User`) for staff authentication and centralized
+  shop-facing app permission helpers in `accounts.authorization`
 - Browser-based access
 - Current operational interfaces:
   - Django admin: full back-office operations for customer, vehicle, repair
@@ -96,16 +97,21 @@ Deployment:
 - Admin hardening is incomplete.
 - Media storage for attachments/photos/documents is not designed yet.
 
-Authorization gap:
+Authorization:
 
 - The custom user model exists.
-- Role groups exist as names/baseline groups.
-- Most shop-facing views are login-gated.
-- Domain-specific permission enforcement is not implemented yet.
-- Any authenticated staff user may currently have too much functional access
-  unless restricted outside the app.
+- Baseline role groups exist: Owner/Admin, Manager, Front Desk, Estimator,
+  Technician, and Read-only.
+- `accounts.authorization` maps those role groups to explicit app-level
+  permissions.
+- Major shop-facing views require app permissions, not only login.
+- Superusers and Owner/Admin retain full app-level access.
+- `is_staff` is not treated as a shop permission.
+- Templates may hide actions, but view checks are authoritative.
+- Django admin still uses Django admin/staff/superuser authorization and is not
+  unified with the shop-facing helper yet.
 
-Proposed permission matrix:
+Current permission matrix:
 
 | Role | Intended access direction |
 | --- | --- |
@@ -116,8 +122,14 @@ Proposed permission matrix:
 | Technician | View assigned ROs and update production notes/status where allowed |
 | Read-only | View-only access |
 
-The next implementation work should define and enforce permissions before
-significantly expanding features.
+Remaining limitations:
+
+- No object-level permissions yet.
+- No technician assignment constraints yet.
+- Technician access is intentionally conservative until assigned-RO semantics
+  exist.
+- Admin permissions are not unified with shop-facing helpers.
+- Lifecycle service-layer centralization remains future work.
 
 Lifecycle-rule centralization gap:
 

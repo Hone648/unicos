@@ -1,11 +1,14 @@
 {% extends "base.html" %}
+{% load app_permissions %}
 
 {% block title %}Repair Orders - Unicos{% endblock %}
 
 {% block content %}
 <div class="page-header">
   <h1>Repair Orders</h1>
-  <a class="button button-primary" href="{% url 'repair_orders:create' %}">New Repair Order</a>
+  {% if user|has_app_permission:"repair_orders.manage" %}
+    <a class="button button-primary" href="{% url 'repair_orders:create' %}">New Repair Order</a>
+  {% endif %}
 </div>
 
 <form class="toolbar" method="get" action="">

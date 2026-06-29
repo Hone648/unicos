@@ -2,10 +2,12 @@ from datetime import date, timedelta
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from accounts.authorization import ROLE_MANAGER
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
@@ -19,10 +21,19 @@ VALID_VIN_2 = "2T1BURHE0JC043821"
 # Helpers
 # ---------------------------------------------------------------------------
 
-def make_user(username="staffer", **kwargs):
-    return get_user_model().objects.create_user(
+def assign_role(user, role_name):
+    group, _created = Group.objects.get_or_create(name=role_name)
+    user.groups.add(group)
+    return user
+
+
+def make_user(username="staffer", role_name=ROLE_MANAGER, **kwargs):
+    user = get_user_model().objects.create_user(
         username=username, password="pw-test-12345", **kwargs
     )
+    if role_name:
+        assign_role(user, role_name)
+    return user
 
 
 def make_customer(**kwargs):

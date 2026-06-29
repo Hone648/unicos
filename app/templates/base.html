@@ -1,4 +1,4 @@
-{% load static %}
+{% load static app_permissions %}
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -14,10 +14,18 @@
         <a class="brand" href="{% url 'dashboard' %}">Unicos</a>
         {% if user.is_authenticated %}
           <nav class="nav">
-            <a href="{% url 'dashboard' %}">Dashboard</a>
-            <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
-            <a href="{% url 'customers:list' %}">Customers</a>
-            <a href="{% url 'billing:invoice_list' %}">Billing</a>
+            {% if user|has_app_permission:"dashboard.view" %}
+              <a href="{% url 'dashboard' %}">Dashboard</a>
+            {% endif %}
+            {% if user|has_app_permission:"repair_orders.view" %}
+              <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
+            {% endif %}
+            {% if user|has_app_permission:"customers.view" %}
+              <a href="{% url 'customers:list' %}">Customers</a>
+            {% endif %}
+            {% if user|has_app_permission:"billing.view" %}
+              <a href="{% url 'billing:invoice_list' %}">Billing</a>
+            {% endif %}
           </nav>
           <div class="user-bar">
             <span>{{ user.get_username }}</span>

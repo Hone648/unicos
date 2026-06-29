@@ -1,14 +1,18 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.authorization import (
+    PERM_CUSTOMERS_MANAGE,
+    PERM_CUSTOMERS_VIEW,
+    app_permission_required,
+)
 from customers.models import Customer
 
 from .forms import VehicleForm
 from .models import Vehicle
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_MANAGE)
 def vehicle_create_for_customer(request, pk):
     customer = get_object_or_404(Customer, pk=pk)
     if request.method == "POST":
@@ -34,7 +38,7 @@ def vehicle_create_for_customer(request, pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_VIEW)
 def vehicle_detail(request, pk):
     vehicle = get_object_or_404(Vehicle.objects.select_related("customer"), pk=pk)
     repair_orders = vehicle.repair_orders.select_related("customer").order_by("-opened_at", "-id")
@@ -44,7 +48,7 @@ def vehicle_detail(request, pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_MANAGE)
 def vehicle_edit(request, pk):
     vehicle = get_object_or_404(Vehicle.objects.select_related("customer"), pk=pk)
     if request.method == "POST":
