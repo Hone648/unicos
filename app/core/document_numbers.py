@@ -7,6 +7,7 @@ from .models import DocumentNumberSequence
 
 _RO_PATTERN = re.compile(r"^RO-(\d{4})-(\d{6})$")
 _INV_PATTERN = re.compile(r"^INV-(\d{4})-(\d{6})$")
+_EST_PATTERN = re.compile(r"^EST-(\d{4})-(\d{6})$")
 
 
 def _find_max_existing(document_type, year):
@@ -16,6 +17,11 @@ def _find_max_existing(document_type, year):
 
         numbers = RepairOrder.objects.values_list("repair_order_number", flat=True)
         pattern = _RO_PATTERN
+    elif document_type == DocumentNumberSequence.DocumentType.ESTIMATE:
+        from estimates.models import Estimate
+
+        numbers = Estimate.objects.values_list("estimate_number", flat=True)
+        pattern = _EST_PATTERN
     else:
         from billing.models import Invoice
 
@@ -65,3 +71,7 @@ def generate_repair_order_number():
 
 def generate_invoice_number():
     return _generate_number(DocumentNumberSequence.DocumentType.INVOICE, "INV")
+
+
+def generate_estimate_number():
+    return _generate_number(DocumentNumberSequence.DocumentType.ESTIMATE, "EST")

@@ -130,23 +130,44 @@ check-digit validation, optional uniqueness policies.
 
 ### Priority 6 - Estimate/Insurance Spine
 
-Start the next major domain expansion after lifecycle service boundaries and
-remaining authorization limits are addressed.
+Status: partially implemented in Slice 29.
 
-Proposed model direction:
+```text
+Slice 29: estimate and insurance spine
+```
+
+A basic `Estimate` model now exists in the `estimates` app, linked to
+`RepairOrder` via `PROTECT`, allowing multiple estimates per repair order. It
+captures a small status lifecycle (draft/submitted/approved/declined/expired),
+insurance company, claim number, deductible, estimated total, and notes.
+Estimate numbers are generated (`EST-YYYY-NNNNNN`). Shop-facing create/detail/
+edit views are entered from repair-order detail, which shows an estimate
+summary. Estimates reuse repair-order permissions. Invoice behavior is
+unchanged.
+
+Proposed remaining model direction:
 
 ```text
 RepairOrder
-  -> Estimate
-  -> EstimateLineItem
-  -> Supplement
-  -> InsuranceClaim
+  -> Estimate            (implemented: basic spine)
+  -> EstimateLineItem    (deferred)
+  -> Supplement          (deferred)
+  -> InsuranceClaim      (deferred: richer insurance modeling)
 ```
 
-Do not jump to payment processor integration before estimates, claims, and
-invoice lineage are clearer.
+Remaining estimate gaps:
 
-### Priority 6 - Production Hardening
+- No estimate line items.
+- No supplements or estimate versions.
+- No insurer/customer approval workflow or signatures.
+- No PDF estimate output.
+- No invoice-generation automation from estimates.
+- No global estimate queue / list page.
+
+Do not jump to payment processor integration before estimate line items,
+claims, and invoice lineage are clearer.
+
+### Priority 7 - Production Hardening
 
 Track now, implement later.
 

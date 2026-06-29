@@ -1,0 +1,41 @@
+{% load app_permissions %}
+
+<div class="card">
+  <h2>Estimates</h2>
+  {% if estimates %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Estimate #</th>
+            <th>Status</th>
+            <th>Insurance company</th>
+            <th>Claim number</th>
+            <th>Deductible</th>
+            <th>Estimated total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for estimate in estimates %}
+            <tr>
+              <td><a href="{% url 'estimates:detail' estimate.pk %}">{{ estimate.estimate_number }}</a></td>
+              <td>{{ estimate.get_status_display }}</td>
+              <td>{{ estimate.insurance_company|default:"—" }}</td>
+              <td>{{ estimate.claim_number|default:"—" }}</td>
+              <td>${{ estimate.deductible }}</td>
+              <td>${{ estimate.estimated_total }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No estimates on file for this repair order.</p>
+  {% endif %}
+
+  {% if user|has_app_permission:"repair_orders.manage" %}
+    <div class="action-row">
+      <a class="button button-primary" href="{% url 'estimates:create' repair_order_pk=ro.pk %}">Create Estimate</a>
+    </div>
+  {% endif %}
+</div>

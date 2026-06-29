@@ -5,6 +5,7 @@ class DocumentNumberSequence(models.Model):
     class DocumentType(models.TextChoices):
         REPAIR_ORDER = "repair_order", "Repair Order"
         INVOICE = "invoice", "Invoice"
+        ESTIMATE = "estimate", "Estimate"
 
     document_type = models.CharField(max_length=20, choices=DocumentType.choices)
     year = models.PositiveSmallIntegerField()

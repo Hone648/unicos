@@ -4,7 +4,11 @@ from unittest.mock import patch
 
 from django.test import TestCase
 
-from core.document_numbers import generate_invoice_number, generate_repair_order_number
+from core.document_numbers import (
+    generate_estimate_number,
+    generate_invoice_number,
+    generate_repair_order_number,
+)
 from core.models import DocumentNumberSequence
 
 # Use a far-future year so tests never clash with hand-typed existing records.
@@ -22,6 +26,12 @@ def _gen_inv():
     with patch("core.document_numbers.timezone") as mock_tz:
         mock_tz.localdate.return_value = _FIXED_DATE
         return generate_invoice_number()
+
+
+def _gen_est():
+    with patch("core.document_numbers.timezone") as mock_tz:
+        mock_tz.localdate.return_value = _FIXED_DATE
+        return generate_estimate_number()
 
 
 # ---------------------------------------------------------------------------
@@ -59,6 +69,11 @@ def _make_invoice(ro, number="INV-TEST-001"):
         subtotal=Decimal("0.00"),
         tax_amount=Decimal("0.00"),
     )
+
+
+def _make_estimate(ro, number="EST-TEST-001"):
+    from estimates.models import Estimate
+    return Estimate.objects.create(repair_order=ro, estimate_number=number)
 
 
 # ---------------------------------------------------------------------------
@@ -147,6 +162,46 @@ class GenerateInvoiceNumberTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Estimate number generation
+# ---------------------------------------------------------------------------
+
+class GenerateEstimateNumberTests(TestCase):
+    def test_first_call_returns_formatted_number(self):
+        num = _gen_est()
+        self.assertEqual(num, f"EST-{_YEAR}-000001")
+
+    def test_second_call_increments(self):
+        _gen_est()
+        num = _gen_est()
+        self.assertEqual(num, f"EST-{_YEAR}-000002")
+
+    def test_creates_sequence_record(self):
+        _gen_est()
+        self.assertTrue(
+            DocumentNumberSequence.objects.filter(
+                document_type=DocumentNumberSequence.DocumentType.ESTIMATE,
+                year=_YEAR,
+            ).exists()
+        )
+
+    def test_initializes_from_existing_matching_estimate_numbers(self):
+        customer = _make_customer()
+        vehicle = _make_vehicle(customer)
+        ro = _make_ro(customer, vehicle)
+        _make_estimate(ro, number=f"EST-{_YEAR}-000007")
+        num = _gen_est()
+        self.assertEqual(num, f"EST-{_YEAR}-000008")
+
+    def test_ignores_nonmatching_legacy_estimate_numbers(self):
+        customer = _make_customer()
+        vehicle = _make_vehicle(customer)
+        ro = _make_ro(customer, vehicle)
+        _make_estimate(ro, number="EST-LEGACY-99999")
+        num = _gen_est()
+        self.assertEqual(num, f"EST-{_YEAR}-000001")
+
+
+# ---------------------------------------------------------------------------
 # Sequence independence
 # ---------------------------------------------------------------------------
 
@@ -158,6 +213,16 @@ class SequenceIndependenceTests(TestCase):
             inv_num = generate_invoice_number()
         self.assertEqual(ro_num, f"RO-{_YEAR}-000001")
         self.assertEqual(inv_num, f"INV-{_YEAR}-000001")
+
+    def test_estimate_sequence_is_independent_of_ro_and_invoice(self):
+        with patch("core.document_numbers.timezone") as mock_tz:
+            mock_tz.localdate.return_value = _FIXED_DATE
+            ro_num = generate_repair_order_number()
+            inv_num = generate_invoice_number()
+            est_num = generate_estimate_number()
+        self.assertEqual(ro_num, f"RO-{_YEAR}-000001")
+        self.assertEqual(inv_num, f"INV-{_YEAR}-000001")
+        self.assertEqual(est_num, f"EST-{_YEAR}-000001")
 
     def test_year_boundary_resets_sequence(self):
         with patch("core.document_numbers.timezone") as mock_tz:
