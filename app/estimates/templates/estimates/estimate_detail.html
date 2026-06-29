@@ -10,11 +10,27 @@
   <h1>Estimate {{ estimate.estimate_number }}</h1>
   <div class="action-row page-header-actions">
     <a class="button button-secondary" href="{% url 'estimates:print' estimate.pk %}">Print Estimate</a>
-    {% if user|has_app_permission:"repair_orders.manage" %}
+    {% if user|has_app_permission:"repair_orders.manage" and is_editable %}
       <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
     {% endif %}
   </div>
 </div>
+
+{% if user|has_app_permission:"repair_orders.manage" %}
+  {% if status_action_choices %}
+    <div class="action-row status-action-row">
+      {% for status, label in status_action_choices %}
+        <form method="post" action="{% url 'estimates:status_update' estimate.pk %}">
+          {% csrf_token %}
+          <input type="hidden" name="status" value="{{ status }}">
+          <button type="submit" class="button-primary">{{ label }}</button>
+        </form>
+      {% endfor %}
+    </div>
+  {% elif not is_editable %}
+    <p class="muted-text">This estimate is finalized for the current workflow and cannot be edited.</p>
+  {% endif %}
+{% endif %}
 
 <div class="card-grid">
 
@@ -56,7 +72,7 @@
             <th>Quantity</th>
             <th>Unit price</th>
             <th>Line total</th>
-            {% if user|has_app_permission:"repair_orders.manage" %}<th></th>{% endif %}
+            {% if user|has_app_permission:"repair_orders.manage" and is_editable %}<th></th>{% endif %}
           </tr>
         </thead>
         <tbody>
@@ -67,7 +83,7 @@
               <td>{{ item.quantity }}</td>
               <td>${{ item.unit_price }}</td>
               <td>${{ item.line_total }}</td>
-              {% if user|has_app_permission:"repair_orders.manage" %}
+              {% if user|has_app_permission:"repair_orders.manage" and is_editable %}
                 <td class="line-item-actions">
                   <a href="{% url 'estimates:line_item_edit' pk=item.pk %}">Edit</a>
                   <form method="post" action="{% url 'estimates:line_item_delete' pk=item.pk %}" class="inline-form">
@@ -83,7 +99,7 @@
           <tr>
             <th colspan="4">Estimated total</th>
             <th>${{ estimate.estimated_total }}</th>
-            {% if user|has_app_permission:"repair_orders.manage" %}<th></th>{% endif %}
+            {% if user|has_app_permission:"repair_orders.manage" and is_editable %}<th></th>{% endif %}
           </tr>
         </tfoot>
       </table>
@@ -92,7 +108,7 @@
     <p class="muted-text">No line items yet. The estimated total above is entered manually until line items are added.</p>
   {% endif %}
 
-  {% if user|has_app_permission:"repair_orders.manage" %}
+  {% if user|has_app_permission:"repair_orders.manage" and is_editable %}
     <div class="action-row">
       <a class="button button-primary" href="{% url 'estimates:line_item_create' estimate_pk=estimate.pk %}">Add Line Item</a>
     </div>

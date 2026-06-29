@@ -16,8 +16,8 @@ Implemented:
 - Dashboard workflow visibility
 - Billing foundation, invoices, payments, invoice line items, printable invoice
   detail, lifecycle actions, and invoice queue
-- Estimate and insurance spine, estimate line items, supplement lineage, and
-  browser-printable estimate output
+- Estimate and insurance spine, estimate line items, supplement lineage,
+  browser-printable estimate output, and controlled approval status actions
 - Generated repair-order and invoice numbers
 - Guards for void invoices, final repair-order edits, final repair-order billing
   mutations, and unpaid-invoice closure blocking
@@ -137,6 +137,8 @@ Status: partially implemented in Slices 29 and 30.
 ```text
 Slice 29: estimate and insurance spine
 Slice 30: estimate line items and supplements
+Slice 32: printable estimate output
+Slice 33: estimate approval status flow
 ```
 
 The `Estimate` model lives in the `estimates` app, linked to `RepairOrder` via
@@ -146,10 +148,13 @@ claim number, deductible, estimated total, and notes. Estimate numbers are
 generated (`EST-YYYY-NNNNNN`). Slice 30 added `EstimateLineItem` (line items
 that drive `estimated_total` once any exist; manual total preserved otherwise)
 and a minimal supplement lineage (`kind="supplement"` + `parent_estimate`).
-Shop-facing create/detail/edit, browser-printable estimate output, line-item
-create/edit/delete, and supplement create are entered from repair-order detail
-and estimate detail. Estimates reuse repair-order permissions. Invoice behavior
-is unchanged.
+Slice 33 controls estimate status through explicit POST actions:
+`draft -> submitted`, then `submitted -> approved/declined/expired`. Submitted
+and terminal estimates are read-only for normal estimate edit and line-item
+mutation views. Shop-facing create/detail/edit, browser-printable estimate
+output, line-item create/edit/delete, status actions, and supplement create are
+entered from repair-order detail and estimate detail. Estimates reuse
+repair-order permissions. Invoice behavior is unchanged.
 
 Proposed remaining model direction:
 
@@ -165,7 +170,7 @@ Remaining estimate gaps:
 
 - No invoice generation from estimates and no estimate-line-to-invoice-line
   conversion.
-- No insurer/customer approval workflow or signatures.
+- No customer signatures or approval-capture artifacts.
 - No generated PDF estimate output.
 - No full estimate versioning engine (supplements are a minimal lineage only).
 - No estimate locking by repair-order final status (deferred).
@@ -194,7 +199,7 @@ Required later:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimates, supplements, browser-printable estimate output, estimate approval, estimate versions |
+| Estimating | estimates, supplements, browser-printable estimate output, controlled estimate approval status, estimate versions |
 | Insurance | insurer, claim number, adjuster, deductible, DRP fields |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

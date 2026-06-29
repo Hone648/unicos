@@ -44,12 +44,6 @@
     <div class="form-grid">
 
       <div class="form-field">
-        <label for="{{ form.status.id_for_label }}">Status</label>
-        {{ form.status }}
-        {% if form.status.errors %}<ul class="field-errors">{% for e in form.status.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
-      </div>
-
-      <div class="form-field">
         <label for="{{ form.estimated_total.id_for_label }}">Estimated total ($)</label>
         {{ form.estimated_total }}
         {% if form.estimated_total.help_text %}<p class="form-field-hint">{{ form.estimated_total.help_text }}</p>{% endif %}
