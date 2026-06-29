@@ -7,6 +7,121 @@
     <h1>Dashboard</h1>
   </div>
   <p>Welcome back, <strong>{{ user.get_username }}</strong>.</p>
+
+  <div class="dashboard-metrics">
+    <a class="dashboard-metric" href="{% url 'repair_orders:list' %}">
+      <span class="dashboard-metric__label">Active Repair Orders</span>
+      <span class="dashboard-metric__value">{{ active_repair_order_count }}</span>
+      <span class="dashboard-metric__hint">Open workflow records</span>
+    </a>
+    <a class="dashboard-metric" href="{% url 'repair_orders:list' %}?status={{ repair_orders_status_ready_for_pickup }}">
+      <span class="dashboard-metric__label">Ready for Pickup</span>
+      <span class="dashboard-metric__value">{{ ready_for_pickup_count }}</span>
+      <span class="dashboard-metric__hint">Awaiting customer pickup</span>
+    </a>
+    <div class="dashboard-metric">
+      <span class="dashboard-metric__label">Unpaid Invoices</span>
+      <span class="dashboard-metric__value">{{ unpaid_invoice_count }}</span>
+      <span class="dashboard-metric__hint">${{ unpaid_invoice_total|floatformat:2 }} outstanding</span>
+    </div>
+    <div class="dashboard-metric dashboard-metric--warning">
+      <span class="dashboard-metric__label">Blocked From Closure</span>
+      <span class="dashboard-metric__value">{{ blocked_from_closure_count }}</span>
+      <span class="dashboard-metric__hint">Open orders with balance due</span>
+    </div>
+  </div>
+
+  <div class="card-grid dashboard-card-grid">
+    <section class="card">
+      <h2>Ready for Pickup</h2>
+      {% if ready_for_pickup_repair_orders %}
+        <ul class="dashboard-list">
+          {% for ro in ready_for_pickup_repair_orders %}
+            <li class="dashboard-list__item">
+              <a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a>
+              <span>{{ ro.customer.display_name }}</span>
+              <span class="muted-text">{{ ro.vehicle }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-text">No ready-for-pickup repair orders.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Unpaid Invoices</h2>
+      {% if unpaid_invoices %}
+        <ul class="dashboard-list">
+          {% for invoice in unpaid_invoices %}
+            <li class="dashboard-list__item">
+              <a href="{% url 'billing:invoice_detail' invoice.pk %}">{{ invoice.invoice_number }}</a>
+              <span>{{ invoice.repair_order.repair_order_number }}</span>
+              <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-text">No unpaid invoices.</p>
+      {% endif %}
+    </section>
+
+    <section class="card">
+      <h2>Blocked From Closure</h2>
+      {% if blocked_from_closure_invoices %}
+        <ul class="dashboard-list">
+          {% for invoice in blocked_from_closure_invoices %}
+            <li class="dashboard-list__item">
+              <a href="{% url 'repair_orders:detail' invoice.repair_order.pk %}">
+                {{ invoice.repair_order.repair_order_number }}
+              </a>
+              <span>{{ invoice.invoice_number }}</span>
+              <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted-text">No repair orders blocked from closure.</p>
+      {% endif %}
+    </section>
+  </div>
+
+  <section class="card">
+    <h2>Recently Updated Repair Orders</h2>
+    {% if recent_repair_orders %}
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Repair Order</th>
+              <th>Customer</th>
+              <th>Vehicle</th>
+              <th>Status</th>
+              <th>Updated</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ro in recent_repair_orders %}
+              <tr>
+                <td><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></td>
+                <td>{{ ro.customer.display_name }}</td>
+                <td>{{ ro.vehicle }}</td>
+                <td>
+                  <span class="status-badge status-{{ ro.status|slugify }}">
+                    {{ ro.get_status_display }}
+                  </span>
+                </td>
+                <td>{{ ro.updated_at|date:"M j, Y g:i A" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="muted-text">No recent repair orders.</p>
+    {% endif %}
+  </section>
+
   <div class="quick-links">
     <a class="quick-link-card" href="{% url 'repair_orders:list' %}">
       Repair Orders

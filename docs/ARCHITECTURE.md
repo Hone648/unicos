@@ -27,6 +27,9 @@ Architectural style:
     edit, invoice detail/print view, invoice line-item create/edit, and payment
     create; invoice summary with line items and payments embedded in
     repair-order detail
+  - Dashboard (`/`): read-only workflow overview for active repair orders,
+    ready-for-pickup work, unpaid invoices, closure blockers, and recently
+    updated repair orders
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
   frontend build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
