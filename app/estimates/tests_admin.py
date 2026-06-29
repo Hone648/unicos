@@ -7,8 +7,8 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
 from customers.models import Customer
-from estimates.admin import EstimateAdmin
-from estimates.models import Estimate
+from estimates.admin import EstimateAdmin, EstimateLineItemAdmin, EstimateLineItemInline
+from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -130,3 +130,76 @@ class EstimateAdminChangeListTests(TestCase):
         url = reverse("admin:estimates_estimate_change", args=[self.estimate.pk])
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
+
+
+# ---------------------------------------------------------------------------
+# Supplement / line-item admin
+# ---------------------------------------------------------------------------
+
+class EstimateAdminSupplementFieldsTests(TestCase):
+    def test_admin_exposes_kind_and_parent_estimate(self):
+        instance = EstimateAdmin(Estimate, admin.site)
+        self.assertIn("kind", instance.list_display)
+        self.assertIn("parent_estimate", instance.list_display)
+        self.assertIn("kind", instance.list_filter)
+
+    def test_admin_includes_line_item_inline(self):
+        instance = EstimateAdmin(Estimate, admin.site)
+        self.assertIn(EstimateLineItemInline, instance.inlines)
+
+
+class EstimateLineItemAdminTests(TestCase):
+    def setUp(self):
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle)
+        self.estimate = Estimate.objects.create(
+            repair_order=ro, estimate_number="EST-LI-ADM",
+        )
+        self.item = EstimateLineItem.objects.create(
+            estimate=self.estimate,
+            item_type=EstimateLineItem.ItemType.PARTS,
+            description="Bumper cover",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("250.00"),
+        )
+
+    def test_line_item_admin_is_registered(self):
+        self.assertIn(EstimateLineItem, admin.site._registry)
+        self.assertIs(
+            admin.site._registry[EstimateLineItem].__class__, EstimateLineItemAdmin
+        )
+
+    def test_line_total_display(self):
+        instance = EstimateLineItemAdmin(EstimateLineItem, admin.site)
+        self.assertEqual(instance.line_total_display(self.item), Decimal("250.00"))
+
+
+class EstimateLineItemAdminChangeListTests(TestCase):
+    def setUp(self):
+        self.client.force_login(make_superuser())
+        customer = make_customer()
+        vehicle = make_vehicle(customer)
+        ro = make_repair_order(customer, vehicle)
+        estimate = Estimate.objects.create(
+            repair_order=ro, estimate_number="EST-LI-CL",
+        )
+        self.item = EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Frame pull",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("400.00"),
+        )
+
+    def test_changelist_loads(self):
+        url = reverse("admin:estimates_estimatelineitem_changelist")
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Frame pull")
+
+    def test_changelist_search_works(self):
+        url = reverse("admin:estimates_estimatelineitem_changelist")
+        response = self.client.get(url, {"q": "Frame pull"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Frame pull")

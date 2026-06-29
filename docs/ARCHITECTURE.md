@@ -30,8 +30,13 @@ Architectural style:
     payments embedded in repair-order detail
   - Estimates: estimate create/detail/edit entered from repair-order detail
     (`/repair-orders/<pk>/estimates/new/`, `/estimates/<pk>/`,
-    `/estimates/<pk>/edit/`); estimate summary embedded in repair-order detail;
-    estimates reuse repair-order permissions; no global estimate queue yet
+    `/estimates/<pk>/edit/`); estimate line-item create/edit/delete
+    (`/estimates/<pk>/line-items/new/`, `/estimates/line-items/<pk>/edit/`,
+    `/estimates/line-items/<pk>/delete/`) and supplement create
+    (`/estimates/<pk>/supplements/new/`); estimate detail shows line items,
+    calculated total, and supplement lineage; estimate summary embedded in
+    repair-order detail; estimates reuse repair-order permissions; no global
+    estimate queue yet
   - Dashboard (`/`): read-only workflow overview for active repair orders,
     ready-for-pickup work, unpaid invoices, closure blockers, and recently
     updated repair orders
@@ -78,7 +83,17 @@ Current domain models:
   estimates; tracks a small status lifecycle (draft/submitted/approved/declined/
   expired) plus insurance company, claim number, deductible, and estimated
   total; number is system-generated (`EST-YYYY-NNNNNN`); does not affect invoice
-  behavior; no estimate line items or supplements yet
+  behavior. An estimate may be an initial estimate or a supplement
+  (`kind="supplement"`) that links back to a `parent_estimate` (`PROTECT`,
+  self-FK) belonging to the same repair order; lineage rules are enforced in
+  `Estimate.clean()`
+- `estimates.EstimateLineItem`: itemized estimate row linked to an estimate via
+  `CASCADE`; supports labor/parts/materials/sublet/misc rows; `save()` and
+  `delete()` recalculate the parent estimate's `estimated_total`. Once an
+  estimate has line items, `estimated_total` is calculated from them and the
+  form disables manual editing (mirrors the billing invoice subtotal pattern);
+  estimates with no line items keep a manual `estimated_total`. Estimate line
+  items are separate from `billing.InvoiceLineItem` and do not feed invoices
 - `core.DocumentNumberSequence`: tracks the last-used sequence value per
   `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN`,
   `INV-YYYY-NNNNNN`, and `EST-YYYY-NNNNNN` generators in
@@ -184,17 +199,18 @@ Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Invoice Line Item ->
 ```
 
 Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
-and Payment now exist. A basic Estimate/insurance spine now exists (estimate
-records with status and insurance/claim context attached to a repair order).
-Estimate line items, supplements, approval workflow, PDF output, invoice
-generation from estimates, and payment processor integration are planned for
-later slices.
+and Payment now exist. The Estimate spine now includes itemized estimate line
+items (which drive the estimated total) and a minimal supplement lineage
+(supplements are estimates with `kind="supplement"` and a parent estimate).
+Approval workflow, PDF output, invoice generation from estimates, conversion of
+estimate lines into invoice lines, and payment processor integration are planned
+for later slices.
 
 Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | basic estimate records exist; still missing estimate line items, supplements, estimate approval, estimate versions |
+| Estimating | estimate records, estimate line items, and supplement lineage exist; still missing estimate approval, full estimate versioning, and invoice generation from estimates |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

@@ -20,7 +20,12 @@
     <dl>
       <dt>Estimate #</dt><dd>{{ estimate.estimate_number }}</dd>
       <dt>Repair order</dt><dd><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></dd>
+      <dt>Kind</dt><dd>{{ estimate.get_kind_display }}</dd>
       <dt>Status</dt><dd>{{ estimate.get_status_display }}</dd>
+      {% if estimate.is_supplement and estimate.parent_estimate %}
+        <dt>Supplement of</dt>
+        <dd><a href="{% url 'estimates:detail' estimate.parent_estimate.pk %}">{{ estimate.parent_estimate.estimate_number }}</a></dd>
+      {% endif %}
       <dt>Estimated total</dt><dd>${{ estimate.estimated_total }}</dd>
     </dl>
   </div>
@@ -34,6 +39,95 @@
     </dl>
   </div>
 
+</div>
+
+<div class="card">
+  <h2>Line Items</h2>
+  {% if line_items %}
+    <div class="table-wrap">
+      <table class="line-item-table">
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>Description</th>
+            <th>Quantity</th>
+            <th>Unit price</th>
+            <th>Line total</th>
+            {% if user|has_app_permission:"repair_orders.manage" %}<th></th>{% endif %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in line_items %}
+            <tr>
+              <td>{{ item.get_item_type_display }}</td>
+              <td>{{ item.description }}</td>
+              <td>{{ item.quantity }}</td>
+              <td>${{ item.unit_price }}</td>
+              <td>${{ item.line_total }}</td>
+              {% if user|has_app_permission:"repair_orders.manage" %}
+                <td class="line-item-actions">
+                  <a href="{% url 'estimates:line_item_edit' pk=item.pk %}">Edit</a>
+                  <form method="post" action="{% url 'estimates:line_item_delete' pk=item.pk %}" class="inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="link-button">Remove</button>
+                  </form>
+                </td>
+              {% endif %}
+            </tr>
+          {% endfor %}
+        </tbody>
+        <tfoot>
+          <tr>
+            <th colspan="4">Estimated total</th>
+            <th>${{ estimate.estimated_total }}</th>
+            {% if user|has_app_permission:"repair_orders.manage" %}<th></th>{% endif %}
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No line items yet. The estimated total above is entered manually until line items are added.</p>
+  {% endif %}
+
+  {% if user|has_app_permission:"repair_orders.manage" %}
+    <div class="action-row">
+      <a class="button button-primary" href="{% url 'estimates:line_item_create' estimate_pk=estimate.pk %}">Add Line Item</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Supplements</h2>
+  {% if supplements %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Estimate #</th>
+            <th>Status</th>
+            <th>Estimated total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for supplement in supplements %}
+            <tr>
+              <td><a href="{% url 'estimates:detail' supplement.pk %}">{{ supplement.estimate_number }}</a></td>
+              <td>{{ supplement.get_status_display }}</td>
+              <td>${{ supplement.estimated_total }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No supplements for this estimate.</p>
+  {% endif %}
+
+  {% if user|has_app_permission:"repair_orders.manage" %}
+    <div class="action-row">
+      <a class="button button-secondary" href="{% url 'estimates:supplement_create' pk=estimate.pk %}">Create Supplement</a>
+    </div>
+  {% endif %}
 </div>
 
 {% if estimate.notes %}

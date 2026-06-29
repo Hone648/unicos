@@ -8,6 +8,7 @@
         <thead>
           <tr>
             <th>Estimate #</th>
+            <th>Kind</th>
             <th>Status</th>
             <th>Insurance company</th>
             <th>Claim number</th>
@@ -18,7 +19,13 @@
         <tbody>
           {% for estimate in estimates %}
             <tr>
-              <td><a href="{% url 'estimates:detail' estimate.pk %}">{{ estimate.estimate_number }}</a></td>
+              <td>
+                <a href="{% url 'estimates:detail' estimate.pk %}">{{ estimate.estimate_number }}</a>
+                {% if estimate.is_supplement and estimate.parent_estimate %}
+                  <span class="muted-text">(of {{ estimate.parent_estimate.estimate_number }})</span>
+                {% endif %}
+              </td>
+              <td>{{ estimate.get_kind_display }}</td>
               <td>{{ estimate.get_status_display }}</td>
               <td>{{ estimate.insurance_company|default:"—" }}</td>
               <td>{{ estimate.claim_number|default:"—" }}</td>
