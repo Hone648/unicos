@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.authorization import ROLE_MANAGER
+from accounts.authorization import ROLE_MANAGER, ROLE_TECHNICIAN
 from billing.models import Invoice, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
@@ -230,3 +230,42 @@ class DashboardWorkflowVisibilityTests(TestCase):
         self.assertContains(response, reverse("customers:list"))
         self.assertContains(response, reverse("billing:invoice_list"))
         self.assertContains(response, "Dashboard")
+
+
+class TechnicianDashboardPermissionTests(TestCase):
+    """Technician (repair_orders.view, no billing.view) sees no invoice numbers or amounts."""
+
+    def setUp(self):
+        self.user = make_user(username="tech-dash", role_name=ROLE_TECHNICIAN)
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        vehicle = make_vehicle(self.customer, index=0)
+        self.ro = make_repair_order(self.customer, vehicle, number="RO-TECH-001")
+        # Invoice total = 110 (subtotal=100, tax=10), nothing paid → balance_due = 110
+        self.invoice = make_invoice(self.ro, number="INV-TECH-001")
+
+    def test_dashboard_loads_for_technician(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_technician_does_not_see_invoice_numbers_on_dashboard(self):
+        response = self.client.get("/")
+        self.assertNotContains(response, "INV-TECH-001")
+
+    def test_technician_does_not_see_unpaid_invoices_card(self):
+        response = self.client.get("/")
+        self.assertNotContains(response, "Unpaid Invoices")
+
+    def test_technician_sees_blocked_from_closure_section(self):
+        response = self.client.get("/")
+        self.assertContains(response, "Blocked From Closure")
+        self.assertContains(response, "RO-TECH-001")
+
+    def test_technician_does_not_see_invoice_number_in_blocked_card(self):
+        response = self.client.get("/")
+        self.assertNotContains(response, "INV-TECH-001")
+
+    def test_technician_does_not_see_balance_due_hint(self):
+        response = self.client.get("/")
+        self.assertNotContains(response, "balance due")
+        self.assertContains(response, "Open orders pending closure")

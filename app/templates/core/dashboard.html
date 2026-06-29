@@ -29,11 +29,13 @@
         <span class="dashboard-metric__hint">${{ unpaid_invoice_total|floatformat:2 }} outstanding</span>
       </a>
     {% endif %}
-    <div class="dashboard-metric dashboard-metric--warning">
-      <span class="dashboard-metric__label">Blocked From Closure</span>
-      <span class="dashboard-metric__value">{{ blocked_from_closure_count }}</span>
-      <span class="dashboard-metric__hint">Open orders with balance due</span>
-    </div>
+    {% if user|has_app_permission:"repair_orders.view" %}
+      <div class="dashboard-metric dashboard-metric--warning">
+        <span class="dashboard-metric__label">Blocked From Closure</span>
+        <span class="dashboard-metric__value">{{ blocked_from_closure_count }}</span>
+        <span class="dashboard-metric__hint">{% if user|has_app_permission:"billing.view" %}Open orders with balance due{% else %}Open orders pending closure{% endif %}</span>
+      </div>
+    {% endif %}
   </div>
 
   <div class="card-grid dashboard-card-grid">
@@ -54,41 +56,47 @@
       {% endif %}
     </section>
 
-    <section class="card">
-      <h2>Unpaid Invoices</h2>
-      {% if unpaid_invoices %}
-        <ul class="dashboard-list">
-          {% for invoice in unpaid_invoices %}
-            <li class="dashboard-list__item">
-              <a href="{% url 'billing:invoice_detail' invoice.pk %}">{{ invoice.invoice_number }}</a>
-              <span>{{ invoice.repair_order.repair_order_number }}</span>
-              <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted-text">No unpaid invoices.</p>
-      {% endif %}
-    </section>
+    {% if user|has_app_permission:"billing.view" %}
+      <section class="card">
+        <h2>Unpaid Invoices</h2>
+        {% if unpaid_invoices %}
+          <ul class="dashboard-list">
+            {% for invoice in unpaid_invoices %}
+              <li class="dashboard-list__item">
+                <a href="{% url 'billing:invoice_detail' invoice.pk %}">{{ invoice.invoice_number }}</a>
+                <span>{{ invoice.repair_order.repair_order_number }}</span>
+                <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted-text">No unpaid invoices.</p>
+        {% endif %}
+      </section>
+    {% endif %}
 
-    <section class="card">
-      <h2>Blocked From Closure</h2>
-      {% if blocked_from_closure_invoices %}
-        <ul class="dashboard-list">
-          {% for invoice in blocked_from_closure_invoices %}
-            <li class="dashboard-list__item">
-              <a href="{% url 'repair_orders:detail' invoice.repair_order.pk %}">
-                {{ invoice.repair_order.repair_order_number }}
-              </a>
-              <span>{{ invoice.invoice_number }}</span>
-              <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
-            </li>
-          {% endfor %}
-        </ul>
-      {% else %}
-        <p class="muted-text">No repair orders blocked from closure.</p>
-      {% endif %}
-    </section>
+    {% if user|has_app_permission:"repair_orders.view" %}
+      <section class="card">
+        <h2>Blocked From Closure</h2>
+        {% if blocked_from_closure_invoices %}
+          <ul class="dashboard-list">
+            {% for invoice in blocked_from_closure_invoices %}
+              <li class="dashboard-list__item">
+                <a href="{% url 'repair_orders:detail' invoice.repair_order.pk %}">
+                  {{ invoice.repair_order.repair_order_number }}
+                </a>
+                {% if user|has_app_permission:"billing.view" %}
+                  <span>{{ invoice.invoice_number }}</span>
+                  <span class="amount-due">${{ invoice.balance_due|floatformat:2 }} due</span>
+                {% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="muted-text">No repair orders blocked from closure.</p>
+        {% endif %}
+      </section>
+    {% endif %}
   </div>
 
   <section class="card">
