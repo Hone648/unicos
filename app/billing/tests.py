@@ -156,6 +156,77 @@ class InvoiceModelTests(TestCase):
 
 
 # ---------------------------------------------------------------------------
+# Invoice source-estimate traceability
+# ---------------------------------------------------------------------------
+
+class InvoiceSourceEstimateTests(TestCase):
+    def setUp(self):
+        from estimates.models import Estimate
+
+        self.Estimate = Estimate
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+
+    def _estimate(self, ro, number="EST-SRC-1"):
+        return self.Estimate.objects.create(
+            repair_order=ro,
+            estimate_number=number,
+            status=self.Estimate.Status.APPROVED,
+        )
+
+    def test_invoice_source_estimate_defaults_to_null(self):
+        inv = make_invoice(self.ro)
+        self.assertIsNone(inv.source_estimate)
+
+    def test_invoice_can_reference_source_estimate(self):
+        estimate = self._estimate(self.ro)
+        inv = make_invoice(self.ro, source_estimate=estimate)
+        self.assertEqual(inv.source_estimate, estimate)
+        self.assertIn(inv, estimate.converted_invoices.all())
+
+    def test_two_invoices_cannot_share_one_source_estimate(self):
+        from django.db import IntegrityError
+
+        estimate = self._estimate(self.ro)
+        make_invoice(self.ro, number="INV-SRC-A", source_estimate=estimate)
+
+        other_customer = make_customer()
+        other_vehicle = Vehicle.objects.create(
+            customer=other_customer,
+            vin="2HGBH41JXMN109187",
+            make="Honda",
+            model="Accord",
+            year=2022,
+        )
+        other_ro = make_repair_order(
+            other_customer, other_vehicle, number="RO-SRC-B"
+        )
+        with self.assertRaises(IntegrityError):
+            Invoice.objects.create(
+                repair_order=other_ro,
+                invoice_number="INV-SRC-B",
+                source_estimate=estimate,
+            )
+
+    def test_multiple_invoices_can_have_null_source_estimate(self):
+        make_invoice(self.ro, number="INV-NULL-A")
+        other_customer = make_customer()
+        other_vehicle = Vehicle.objects.create(
+            customer=other_customer,
+            vin="3HGBH41JXMN109188",
+            make="Honda",
+            model="Fit",
+            year=2023,
+        )
+        other_ro = make_repair_order(
+            other_customer, other_vehicle, number="RO-NULL-B"
+        )
+        make_invoice(other_ro, number="INV-NULL-B")
+        self.assertEqual(Invoice.objects.filter(source_estimate__isnull=True).count(), 2)
+
+
+# ---------------------------------------------------------------------------
 # Invoice line item model tests
 # ---------------------------------------------------------------------------
 

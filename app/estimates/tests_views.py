@@ -104,6 +104,14 @@ def supplement_create_url(pk):
     return reverse("estimates:supplement_create", kwargs={"pk": pk})
 
 
+def convert_url(pk):
+    return reverse("estimates:convert_to_invoice", kwargs={"pk": pk})
+
+
+def invoice_detail_url(pk):
+    return reverse("billing:invoice_detail", kwargs={"pk": pk})
+
+
 def make_line_item(estimate, **kwargs):
     from estimates.models import EstimateLineItem
     defaults = {
@@ -938,3 +946,111 @@ class SupplementCreateTests(TestCase):
         response = self.client.get(detail_url(supplement.pk))
         self.assertContains(response, self.parent.estimate_number)
         self.assertContains(response, detail_url(self.parent.pk))
+
+
+# ---------------------------------------------------------------------------
+# Estimate-to-invoice conversion
+# ---------------------------------------------------------------------------
+
+def make_approved_estimate_with_line_item(ro, number="EST-CONV-V"):
+    estimate = make_estimate(ro, number=number, status=Estimate.Status.APPROVED)
+    make_line_item(estimate, quantity=Decimal("2.00"), unit_price=Decimal("75.00"))
+    estimate.refresh_from_db()
+    return estimate
+
+
+class EstimateConvertToInvoiceViewTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.estimate = make_approved_estimate_with_line_item(self.ro)
+
+    def test_convert_requires_login(self):
+        url = convert_url(self.estimate.pk)
+        self.assertRedirects(self.client.post(url), f"/accounts/login/?next={url}")
+
+    def test_user_without_billing_manage_forbidden(self):
+        # Read-only has billing.view but not billing.manage.
+        self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.post(convert_url(self.estimate.pk)).status_code, 403)
+
+    def test_get_is_not_allowed(self):
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(convert_url(self.estimate.pk))
+        self.assertEqual(response.status_code, 405)
+
+    def test_manager_can_convert_approved_estimate(self):
+        from billing.models import Invoice
+
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.post(convert_url(self.estimate.pk))
+        invoice = Invoice.objects.get(source_estimate=self.estimate)
+        self.assertRedirects(response, invoice_detail_url(invoice.pk))
+        self.assertEqual(invoice.status, Invoice.Status.DRAFT)
+        self.assertEqual(invoice.repair_order, self.ro)
+        self.assertEqual(invoice.subtotal, Decimal("150.00"))
+        self.assertEqual(invoice.line_items.count(), 1)
+
+    def test_blocked_conversion_redirects_to_estimate_detail(self):
+        from billing.models import Invoice
+
+        draft = make_estimate(self.ro, number="EST-DRAFT-CONV", status=Estimate.Status.DRAFT)
+        make_line_item(draft)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.post(convert_url(draft.pk))
+        self.assertRedirects(response, detail_url(draft.pk))
+        self.assertFalse(Invoice.objects.filter(source_estimate=draft).exists())
+
+    def test_duplicate_conversion_is_blocked(self):
+        from billing.models import Invoice
+
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        self.client.post(convert_url(self.estimate.pk))
+        response = self.client.post(convert_url(self.estimate.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.assertEqual(Invoice.objects.filter(repair_order=self.ro).count(), 1)
+
+
+class EstimateConvertButtonVisibilityTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+
+    def test_button_shown_for_convertible_estimate(self):
+        estimate = make_approved_estimate_with_line_item(self.ro)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertContains(response, "Create Invoice Draft")
+        self.assertContains(response, convert_url(estimate.pk))
+
+    def test_button_hidden_for_draft_estimate(self):
+        estimate = make_estimate(self.ro, number="EST-DRAFT-VIS")
+        make_line_item(estimate)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertNotContains(response, "Create Invoice Draft")
+
+    def test_button_hidden_for_approved_without_line_items(self):
+        estimate = make_estimate(self.ro, number="EST-NOITEMS", status=Estimate.Status.APPROVED)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertNotContains(response, "Create Invoice Draft")
+
+    def test_button_hidden_without_billing_manage(self):
+        estimate = make_approved_estimate_with_line_item(self.ro)
+        self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertNotContains(response, "Create Invoice Draft")
+
+    def test_detail_links_to_converted_invoice_after_conversion(self):
+        from billing.services import convert_estimate_to_invoice
+
+        estimate = make_approved_estimate_with_line_item(self.ro)
+        invoice = convert_estimate_to_invoice(estimate)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertNotContains(response, "Create Invoice Draft")
+        self.assertContains(response, invoice_detail_url(invoice.pk))
+        self.assertContains(response, invoice.invoice_number)

@@ -134,6 +134,7 @@ def invoice_detail(request, pk):
             "repair_order",
             "repair_order__customer",
             "repair_order__vehicle",
+            "source_estimate",
         ),
         pk=pk,
     )

@@ -58,10 +58,11 @@ class InvoiceAdmin(admin.ModelAdmin):
         "repair_order",
         "repair_order__customer",
         "repair_order__vehicle",
+        "source_estimate",
         "created_by",
         "updated_by",
     )
-    raw_id_fields = ("repair_order", "created_by", "updated_by")
+    raw_id_fields = ("repair_order", "source_estimate", "created_by", "updated_by")
     readonly_fields = (
         "created_at",
         "updated_at",
@@ -76,7 +77,7 @@ class InvoiceAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Invoice",
-            {"fields": ("repair_order", "invoice_number", "status")},
+            {"fields": ("repair_order", "invoice_number", "status", "source_estimate")},
         ),
         (
             "Amounts",

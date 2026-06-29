@@ -3,9 +3,15 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
 from accounts.authorization import (
+    PERM_BILLING_MANAGE,
     PERM_REPAIR_ORDERS_MANAGE,
     PERM_REPAIR_ORDERS_VIEW,
     app_permission_required,
+)
+from billing.services import (
+    EstimateInvoiceConversionBlocked,
+    convert_estimate_to_invoice,
+    estimate_can_convert_to_invoice,
 )
 from core.document_numbers import generate_estimate_number
 from repair_orders.models import RepairOrder
@@ -61,6 +67,7 @@ def estimate_detail(request, pk):
     supplements = list(
         estimate.supplements.order_by("-updated_at", "-id")
     )
+    converted_invoice = estimate.converted_invoices.first()
     return render(request, "estimates/estimate_detail.html", {
         "estimate": estimate,
         "ro": estimate.repair_order,
@@ -69,6 +76,8 @@ def estimate_detail(request, pk):
         "has_line_items": bool(line_items),
         "is_editable": estimate_is_editable(estimate),
         "status_action_choices": _status_action_choices(estimate),
+        "can_convert_to_invoice": estimate_can_convert_to_invoice(estimate),
+        "converted_invoice": converted_invoice,
     })
 
 
@@ -110,6 +119,28 @@ def estimate_status_update(request, pk):
         f"{estimate.get_status_display().lower()}.",
     )
     return redirect("estimates:detail", pk=estimate.pk)
+
+
+@app_permission_required(PERM_BILLING_MANAGE)
+@require_POST
+def estimate_convert_to_invoice(request, pk):
+    estimate = get_object_or_404(
+        Estimate.objects.select_related("repair_order"),
+        pk=pk,
+    )
+
+    try:
+        invoice = convert_estimate_to_invoice(estimate, created_by=request.user)
+    except EstimateInvoiceConversionBlocked as exc:
+        messages.error(request, str(exc))
+        return redirect("estimates:detail", pk=estimate.pk)
+
+    messages.success(
+        request,
+        f"Invoice {invoice.invoice_number} created from estimate "
+        f"{estimate.estimate_number}.",
+    )
+    return redirect("billing:invoice_detail", pk=invoice.pk)
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)

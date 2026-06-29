@@ -100,6 +100,10 @@ class InvoiceAdminSaveModelTests(TestCase):
     def test_invoice_admin_includes_line_item_inline(self):
         self.assertIn(InvoiceLineItemInline, self.admin_instance.inlines)
 
+    def test_invoice_admin_exposes_source_estimate(self):
+        self.assertIn("source_estimate", self.admin_instance.raw_id_fields)
+        self.assertIn("source_estimate", self.admin_instance.list_select_related)
+
 
 class InvoiceAdminDisplayMethodTests(TestCase):
     def setUp(self):
