@@ -147,6 +147,7 @@ class DashboardWorkflowVisibilityTests(TestCase):
         self.assertEqual(response.context["unpaid_invoice_total"], Decimal("110.00"))
         self.assertEqual(response.context["unpaid_invoices"], [unpaid])
         self.assertContains(response, "INV-UNPAID")
+        self.assertContains(response, reverse("billing:invoice_list"))
         self.assertContains(response, reverse("billing:invoice_detail", args=[unpaid.pk]))
         self.assertNotContains(response, "INV-PAID")
         self.assertNotContains(response, "INV-VOID")
@@ -216,4 +217,5 @@ class DashboardWorkflowVisibilityTests(TestCase):
         self.assertContains(response, "No recent repair orders.")
         self.assertContains(response, reverse("repair_orders:list"))
         self.assertContains(response, reverse("customers:list"))
+        self.assertContains(response, reverse("billing:invoice_list"))
         self.assertContains(response, "Dashboard")

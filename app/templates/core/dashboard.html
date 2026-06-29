@@ -19,11 +19,11 @@
       <span class="dashboard-metric__value">{{ ready_for_pickup_count }}</span>
       <span class="dashboard-metric__hint">Awaiting customer pickup</span>
     </a>
-    <div class="dashboard-metric">
+    <a class="dashboard-metric" href="{% url 'billing:invoice_list' %}">
       <span class="dashboard-metric__label">Unpaid Invoices</span>
       <span class="dashboard-metric__value">{{ unpaid_invoice_count }}</span>
       <span class="dashboard-metric__hint">${{ unpaid_invoice_total|floatformat:2 }} outstanding</span>
-    </div>
+    </a>
     <div class="dashboard-metric dashboard-metric--warning">
       <span class="dashboard-metric__label">Blocked From Closure</span>
       <span class="dashboard-metric__value">{{ blocked_from_closure_count }}</span>
@@ -130,6 +130,10 @@
     <a class="quick-link-card" href="{% url 'customers:list' %}">
       Customers
       <span class="qlc-label">View and manage customers and their vehicles</span>
+    </a>
+    <a class="quick-link-card" href="{% url 'billing:invoice_list' %}">
+      Billing
+      <span class="qlc-label">Find and review invoices</span>
     </a>
   </div>
 {% endblock %}
