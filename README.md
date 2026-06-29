@@ -46,6 +46,18 @@ Run Django checks:
 docker compose exec web python app/manage.py check
 ```
 
+Check for missing migrations:
+
+```powershell
+docker compose exec web python app/manage.py makemigrations --check
+```
+
+Apply migrations:
+
+```powershell
+docker compose exec web python app/manage.py migrate --noinput
+```
+
 Run tests:
 
 ```powershell
@@ -54,6 +66,13 @@ docker compose exec web python app/manage.py test
 
 For non-Docker local runs, install `requirements.txt` and provide the same
 environment variables shown in `.env.example`.
+
+## CI Validation
+
+GitHub Actions runs a PostgreSQL-backed Django test job and a separate Docker
+smoke job. CI checks Django system checks, missing migrations, migration
+application, the full test suite, Docker image build, Docker Compose startup,
+and `/healthz/`.
 
 ## Authentication
 

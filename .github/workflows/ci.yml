@@ -52,5 +52,43 @@ jobs:
       - name: Run Django checks
         run: python app/manage.py check
 
+      - name: Check for missing migrations
+        run: python app/manage.py makemigrations --check
+
+      - name: Apply migrations
+        run: python app/manage.py migrate --noinput
+
       - name: Run tests
         run: python app/manage.py test
+
+  docker-smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Create Docker environment file
+        run: cp .env.example .env
+
+      - name: Build Docker image
+        run: docker compose build
+
+      - name: Start Docker Compose
+        run: docker compose up -d
+
+      - name: Run Django checks in container
+        run: docker compose exec -T web python app/manage.py check
+
+      - name: Check migrations in container
+        run: docker compose exec -T web python app/manage.py makemigrations --check
+
+      - name: Apply migrations in container
+        run: docker compose exec -T web python app/manage.py migrate --noinput
+
+      - name: Smoke test health endpoint
+        run: curl --fail --retry 10 --retry-delay 3 http://localhost:8000/healthz/
+
+      - name: Stop Docker Compose
+        if: always()
+        run: docker compose down
