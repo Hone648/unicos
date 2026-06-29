@@ -71,7 +71,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 |---|---|
 | Owner/Admin | All actions across all areas |
 | Manager | All actions across all areas |
-| Front Desk | Customer intake, vehicle intake, repair order create/edit, view invoices, record payments |
+- - **Front Desk** can create and edit estimates, supplements, and estimate line items because those actions currently use `repair_orders.manage`. Front Desk cannot change repair order status, issue or void invoices, or convert estimates to invoices. Front Desk can record payments.
 | Estimator | View dashboard, view customers, view repair orders, change repair order status, view invoices |
 | Technician | View dashboard, view repair orders |
 | Read-only | View dashboard, view customers, view repair orders, view invoices |
