@@ -1336,3 +1336,364 @@ class VoidInvoiceUIRenderingTests(TestCase):
     def test_void_ro_summary_shows_payment_rows(self):
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "50.00")
+
+
+# ---------------------------------------------------------------------------
+# Final repair-order billing guards
+# ---------------------------------------------------------------------------
+
+class FinalRepairOrderBillingGuardTests(TestCase):
+    def setUp(self):
+        self.user = make_user(username="final_billing_user")
+        self.client.force_login(self.user)
+        self.customer = make_customer(first_name="Final", last_name="Billing")
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+
+        self.final_ro_no_invoice = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-FINAL-NO-INV",
+        )
+        self.final_ro_no_invoice.set_status(
+            RepairOrder.Status.DELIVERED,
+            changed_by=self.user,
+            note="Final for billing guard test",
+        )
+
+        self.final_ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-FINAL-BILLING",
+        )
+        self.final_invoice = make_invoice(
+            self.final_ro,
+            number="INV-FINAL-BILLING",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("10.00"),
+        )
+        self.final_line_item = make_line_item(
+            self.final_invoice,
+            description="Final line item",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+        )
+        self.final_ro.set_status(
+            RepairOrder.Status.DELIVERED,
+            changed_by=self.user,
+            note="Final for billing guard test",
+        )
+
+        self.final_ro_with_payment = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-FINAL-PAYMENT",
+        )
+        self.final_invoice_with_payment = make_invoice(
+            self.final_ro_with_payment,
+            number="INV-FINAL-PAYMENT",
+            subtotal=Decimal("200.00"),
+            tax_amount=Decimal("20.00"),
+        )
+        make_payment(self.final_invoice_with_payment, Decimal("50.00"))
+        self.final_ro_with_payment.set_status(
+            RepairOrder.Status.DELIVERED,
+            changed_by=self.user,
+            note="Final with payment for billing guard test",
+        )
+
+        self.open_ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-OPEN-BILLING",
+        )
+        self.open_invoice = make_invoice(
+            self.open_ro,
+            number="INV-OPEN-BILLING",
+            subtotal=Decimal("0.00"),
+            tax_amount=Decimal("0.00"),
+        )
+        self.open_line_item = make_line_item(
+            self.open_invoice,
+            description="Open line item",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("75.00"),
+        )
+
+    def _invoice_data(self, **overrides):
+        data = {
+            "issued_at": "",
+            "due_date": "",
+            "subtotal": "111.00",
+            "tax_amount": "11.00",
+            "notes": "Changed invoice note",
+        }
+        data.update(overrides)
+        return data
+
+    def _line_item_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.PARTS,
+            "description": "Changed line item",
+            "quantity": "2.00",
+            "unit_price": "33.00",
+        }
+        data.update(overrides)
+        return data
+
+    def _payment_data(self, **overrides):
+        data = {
+            "payment_date": date.today().isoformat(),
+            "amount": "10.00",
+            "method": Payment.Method.CASH,
+            "reference": "",
+            "notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    # --- invoice create guard ---
+
+    def test_final_repair_order_with_no_invoice_hides_create_invoice(self):
+        response = self.client.get(ro_detail_url(self.final_ro_no_invoice.pk))
+        self.assertContains(response, "No invoice on file")
+        self.assertNotContains(response, invoice_create_url(self.final_ro_no_invoice.pk))
+
+    def test_direct_invoice_create_get_for_final_repair_order_redirects(self):
+        response = self.client.get(invoice_create_url(self.final_ro_no_invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.final_ro_no_invoice.pk))
+
+    def test_direct_invoice_create_post_for_final_repair_order_redirects(self):
+        response = self.client.post(
+            invoice_create_url(self.final_ro_no_invoice.pk),
+            self._invoice_data(),
+        )
+        self.assertRedirects(response, ro_detail_url(self.final_ro_no_invoice.pk))
+
+    def test_direct_invoice_create_post_for_final_repair_order_does_not_create_invoice(self):
+        self.client.post(invoice_create_url(self.final_ro_no_invoice.pk), self._invoice_data())
+        self.assertFalse(Invoice.objects.filter(repair_order=self.final_ro_no_invoice).exists())
+
+    def test_non_final_repair_order_invoice_create_still_works(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-OPEN-CREATE")
+        response = self.client.post(invoice_create_url(ro.pk), self._invoice_data())
+        self.assertRedirects(response, ro_detail_url(ro.pk))
+        self.assertTrue(Invoice.objects.filter(repair_order=ro).exists())
+
+    # --- invoice edit guard ---
+
+    def test_final_repair_order_invoice_detail_hides_edit_invoice(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertNotContains(response, invoice_edit_url(self.final_invoice.pk))
+
+    def test_direct_invoice_edit_get_for_final_repair_order_redirects(self):
+        response = self.client.get(invoice_edit_url(self.final_invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_invoice_edit_post_for_final_repair_order_redirects(self):
+        response = self.client.post(
+            invoice_edit_url(self.final_invoice.pk),
+            self._invoice_data(notes="Should not save"),
+        )
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_invoice_edit_post_for_final_repair_order_does_not_change_invoice(self):
+        self.client.post(
+            invoice_edit_url(self.final_invoice.pk),
+            self._invoice_data(subtotal="999.00", notes="Should not save"),
+        )
+        self.final_invoice.refresh_from_db()
+        self.assertEqual(self.final_invoice.subtotal, Decimal("100.00"))
+        self.assertEqual(self.final_invoice.notes, "")
+
+    def test_non_final_invoice_edit_still_works(self):
+        response = self.client.post(
+            invoice_edit_url(self.open_invoice.pk),
+            self._invoice_data(notes="Open invoice changed"),
+        )
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.open_invoice.refresh_from_db()
+        self.assertEqual(self.open_invoice.notes, "Open invoice changed")
+
+    # --- line-item guards ---
+
+    def test_final_repair_order_invoice_summary_hides_add_line_item(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertNotContains(response, line_item_create_url(self.final_invoice.pk))
+
+    def test_final_repair_order_invoice_summary_hides_edit_line_item(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertNotContains(response, line_item_edit_url(self.final_line_item.pk))
+
+    def test_final_repair_order_invoice_detail_hides_add_line_item(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertNotContains(response, line_item_create_url(self.final_invoice.pk))
+
+    def test_direct_line_item_create_get_for_final_repair_order_redirects(self):
+        response = self.client.get(line_item_create_url(self.final_invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_line_item_create_post_for_final_repair_order_redirects(self):
+        response = self.client.post(
+            line_item_create_url(self.final_invoice.pk),
+            self._line_item_data(),
+        )
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_line_item_create_post_for_final_repair_order_does_not_create_line_item(self):
+        count_before = InvoiceLineItem.objects.filter(invoice=self.final_invoice).count()
+        self.client.post(line_item_create_url(self.final_invoice.pk), self._line_item_data())
+        self.assertEqual(
+            InvoiceLineItem.objects.filter(invoice=self.final_invoice).count(),
+            count_before,
+        )
+
+    def test_direct_line_item_edit_get_for_final_repair_order_redirects(self):
+        response = self.client.get(line_item_edit_url(self.final_line_item.pk))
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_line_item_edit_post_for_final_repair_order_redirects(self):
+        response = self.client.post(
+            line_item_edit_url(self.final_line_item.pk),
+            self._line_item_data(),
+        )
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_line_item_edit_post_for_final_repair_order_does_not_change_line_item(self):
+        self.client.post(line_item_edit_url(self.final_line_item.pk), self._line_item_data())
+        self.final_line_item.refresh_from_db()
+        self.assertEqual(self.final_line_item.description, "Final line item")
+        self.assertEqual(self.final_line_item.unit_price, Decimal("100.00"))
+
+    def test_non_final_line_item_create_still_works(self):
+        count_before = InvoiceLineItem.objects.filter(invoice=self.open_invoice).count()
+        response = self.client.post(
+            line_item_create_url(self.open_invoice.pk),
+            self._line_item_data(description="Open created line item"),
+        )
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.assertEqual(
+            InvoiceLineItem.objects.filter(invoice=self.open_invoice).count(),
+            count_before + 1,
+        )
+
+    def test_non_final_line_item_edit_still_works(self):
+        response = self.client.post(
+            line_item_edit_url(self.open_line_item.pk),
+            self._line_item_data(description="Open line item changed"),
+        )
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.open_line_item.refresh_from_db()
+        self.assertEqual(self.open_line_item.description, "Open line item changed")
+
+    # --- payment guard ---
+
+    def test_final_repair_order_invoice_summary_hides_record_payment(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertNotContains(response, payment_create_url(self.final_invoice.pk))
+
+    def test_final_repair_order_invoice_detail_hides_record_payment(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertNotContains(response, payment_create_url(self.final_invoice.pk))
+
+    def test_direct_payment_create_get_for_final_repair_order_redirects(self):
+        response = self.client.get(payment_create_url(self.final_invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.final_ro.pk))
+
+    def test_direct_payment_create_post_for_final_repair_order_redirects(self):
+        response = self.client.post(
+            payment_create_url(self.final_invoice.pk),
+            self._payment_data(),
+        )
+        self.assertRedirects(response, ro_detail_url(self.final_ro.pk))
+
+    def test_direct_payment_create_post_for_final_repair_order_does_not_create_payment(self):
+        count_before = Payment.objects.filter(invoice=self.final_invoice).count()
+        self.client.post(payment_create_url(self.final_invoice.pk), self._payment_data())
+        self.assertEqual(Payment.objects.filter(invoice=self.final_invoice).count(), count_before)
+
+    def test_non_final_payment_create_still_works(self):
+        response = self.client.post(
+            payment_create_url(self.open_invoice.pk),
+            self._payment_data(),
+        )
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.assertTrue(Payment.objects.filter(invoice=self.open_invoice).exists())
+
+    # --- lifecycle action guards ---
+
+    def test_final_repair_order_invoice_detail_hides_issue_invoice(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertNotContains(response, invoice_issue_url(self.final_invoice.pk))
+        self.assertNotContains(response, "Issue Invoice")
+
+    def test_final_repair_order_invoice_detail_hides_void_invoice(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertNotContains(response, invoice_void_url(self.final_invoice.pk))
+        self.assertNotContains(response, "Void Invoice")
+
+    def test_final_repair_order_invoice_summary_hides_issue_invoice(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertNotContains(response, invoice_issue_url(self.final_invoice.pk))
+        self.assertNotContains(response, "Issue Invoice")
+
+    def test_final_repair_order_invoice_summary_hides_void_invoice(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertNotContains(response, invoice_void_url(self.final_invoice.pk))
+        self.assertNotContains(response, "Void Invoice")
+
+    def test_direct_issue_post_for_final_repair_order_does_not_change_invoice_status(self):
+        self.client.post(invoice_issue_url(self.final_invoice.pk))
+        self.final_invoice.refresh_from_db()
+        self.assertEqual(self.final_invoice.status, Invoice.Status.DRAFT)
+
+    def test_direct_issue_post_for_final_repair_order_redirects(self):
+        response = self.client.post(invoice_issue_url(self.final_invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_direct_void_post_for_final_repair_order_does_not_change_invoice_status(self):
+        self.client.post(invoice_void_url(self.final_invoice.pk))
+        self.final_invoice.refresh_from_db()
+        self.assertEqual(self.final_invoice.status, Invoice.Status.DRAFT)
+
+    def test_direct_void_post_for_final_repair_order_redirects(self):
+        response = self.client.post(invoice_void_url(self.final_invoice.pk))
+        self.assertRedirects(response, invoice_detail_url(self.final_invoice.pk))
+
+    def test_non_final_issue_still_works(self):
+        response = self.client.post(invoice_issue_url(self.open_invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.open_invoice.refresh_from_db()
+        self.assertEqual(self.open_invoice.status, Invoice.Status.ISSUED)
+
+    def test_non_final_void_still_works(self):
+        response = self.client.post(invoice_void_url(self.open_invoice.pk))
+        self.assertRedirects(response, ro_detail_url(self.open_ro.pk))
+        self.open_invoice.refresh_from_db()
+        self.assertEqual(self.open_invoice.status, Invoice.Status.VOID)
+
+    # --- visibility regression ---
+
+    def test_final_repair_order_detail_still_shows_invoice_summary(self):
+        response = self.client.get(ro_detail_url(self.final_ro.pk))
+        self.assertContains(response, "INV-FINAL-BILLING")
+        self.assertContains(response, "Final line item")
+
+    def test_final_invoice_detail_still_loads(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "INV-FINAL-BILLING")
+
+    def test_final_invoice_detail_still_shows_line_items(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertContains(response, "Final line item")
+
+    def test_final_invoice_detail_still_shows_payments_and_totals(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice_with_payment.pk))
+        self.assertContains(response, "50.00")
+        self.assertContains(response, "220.00")
+        self.assertContains(response, "170.00")
+
+    def test_printable_invoice_view_still_works_for_final_repair_order(self):
+        response = self.client.get(invoice_detail_url(self.final_invoice.pk))
+        self.assertContains(response, "Use")
+        self.assertContains(response, "print or save as PDF")
