@@ -13,6 +13,7 @@ from accounts.authorization import (
     app_permission_required,
 )
 from core.document_numbers import generate_invoice_number
+from core.pagination import paginate_queryset, pagination_querystring
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 
@@ -108,11 +109,14 @@ def invoice_list(request):
     if status_filter:
         clear_search_href = f"?status={status_filter}"
 
+    page_obj = paginate_queryset(request, invoices)
     return render(
         request,
         "billing/invoice_list.html",
         {
-            "invoices": invoices,
+            "invoices": page_obj.object_list,
+            "page_obj": page_obj,
+            "pagination_query": pagination_querystring(request),
             "q": q,
             "status_filter": status_filter,
             "status_choices": Invoice.Status.choices,

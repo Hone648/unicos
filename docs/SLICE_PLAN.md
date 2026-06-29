@@ -29,10 +29,11 @@ Planned slices:
 25. Slice 24: documentation reality check / readiness roadmap (current capabilities, production-readiness gaps, authorization gap, service-layer direction, missing workflow areas, scalability, validation, and quality-gate roadmap)
 26. Slice 25: authorization matrix and permission helpers (central app-level role/permission matrix, shop-facing view enforcement, and permission-aware action visibility)
 27. Slice 26: repair-order lifecycle service boundary (centralized status transition service in services.py; unpaid-invoice block enforced by service for views, admin actions, and admin form saves; set_status routes through service; _apply_status_change private fallback for test setup; no migrations)
+28. Slice 27: list pagination and query safety (core.pagination helper; paginate_queryset and pagination_querystring; 25-item page size; safe invalid/out-of-range page handling; pagination partial template; repair-order, customer, and invoice list views paginated; no migrations; no new dependencies)
 
 Likely next implementation slices:
 
-- Slice 27: pagination for repair orders, customers, and invoice queue
+- Slice 28: estimate/insurance spine or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

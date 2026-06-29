@@ -154,6 +154,18 @@ record_payment(invoice, data, actor)
 edit_invoice_line_item(...)
 ```
 
+List pagination:
+
+- Major list pages use `core.pagination.paginate_queryset()` which wraps
+  Django's built-in `Paginator.get_page()`.
+- Page size is fixed at 25 (`DEFAULT_PAGE_SIZE`).
+- Invalid and out-of-range `page` values are clamped silently.
+- `core.pagination.pagination_querystring()` strips `page` from the query
+  string so pagination links preserve existing filters without duplication.
+- A shared template partial (`app/templates/partials/_pagination.html`) renders
+  prev/page-indicator/next controls only when more than one page exists.
+- No sortable columns, no user-configurable page size, no advanced search.
+
 Future domain spine:
 
 ```text

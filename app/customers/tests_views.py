@@ -99,6 +99,47 @@ class CustomerListTests(TestCase):
         self.assertContains(response, "No customers")
 
 
+class CustomerListPaginationTests(TestCase):
+    """Customer list uses bounded pagination with safe page-parameter handling."""
+
+    PAGE_SIZE = 25
+
+    def setUp(self):
+        self.user = make_user(username="cust-paginator")
+        self.client.force_login(self.user)
+        # Create PAGE_SIZE + 2 customers so two pages exist.
+        for i in range(self.PAGE_SIZE + 2):
+            Customer.objects.create(
+                customer_type=Customer.CustomerType.INDIVIDUAL,
+                first_name="Paginate",
+                last_name=f"Customer{i:03d}",
+            )
+
+    def test_first_page_returns_page_size_results(self):
+        response = self.client.get(LIST_URL)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["customers"]), self.PAGE_SIZE)
+
+    def test_second_page_returns_remaining_results(self):
+        response = self.client.get(LIST_URL + "?page=2")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["customers"]), 2)
+
+    def test_invalid_page_falls_back_to_first_page(self):
+        response = self.client.get(LIST_URL + "?page=abc")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["customers"]), self.PAGE_SIZE)
+
+    def test_out_of_range_page_falls_back_to_last_page(self):
+        response = self.client.get(LIST_URL + "?page=999")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context["customers"]), 2)
+
+    def test_pagination_query_preserves_search_query(self):
+        response = self.client.get(LIST_URL + "?q=Paginate")
+        self.assertContains(response, "q=Paginate")
+
+
 # ---------------------------------------------------------------------------
 # Customer detail
 # ---------------------------------------------------------------------------
