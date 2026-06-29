@@ -1,4 +1,4 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import RepairOrder, RepairOrderStatusHistory
 
@@ -92,26 +92,59 @@ class RepairOrderAdmin(admin.ModelAdmin):
         return obj.is_closed
 
     def save_model(self, request, obj, form, change):
+        from .services import RepairOrderStatusTransitionBlocked, transition_repair_order_status
+
         if not change and not obj.created_by_id:
             obj.created_by = request.user
         obj.updated_by = request.user
-        # Pass the current user as status changer so history records correctly.
-        obj._status_changed_by = request.user
-        super().save_model(request, obj, form, change)
+
+        if change and form is not None and "status" in form.changed_data:
+            # Route the status change through the lifecycle service so rules
+            # are enforced uniformly.  Save other field changes first with
+            # the original status, then let the service apply the transition.
+            desired_status = obj.status
+            obj.status = form.initial["status"]
+            super().save_model(request, obj, form, change)
+            try:
+                transition_repair_order_status(
+                    obj, desired_status,
+                    changed_by=request.user,
+                    note="Status changed from Django admin.",
+                )
+            except RepairOrderStatusTransitionBlocked as exc:
+                self.message_user(request, str(exc), level=messages.ERROR)
+        else:
+            # Pass the current user as status changer so history records correctly.
+            obj._status_changed_by = request.user
+            super().save_model(request, obj, form, change)
 
     # ------------------------------------------------------------------
     # Shared action helper
     # ------------------------------------------------------------------
 
     def _apply_status_action(self, request, queryset, target_status):
+        from .services import RepairOrderStatusTransitionBlocked
+
         updated = 0
+        blocked = 0
         for ro in queryset:
             if ro.status == target_status:
                 continue
-            ro.set_status(target_status, changed_by=request.user, note=_ACTION_NOTE)
-            updated += 1
+            try:
+                ro.set_status(target_status, changed_by=request.user, note=_ACTION_NOTE)
+                updated += 1
+            except RepairOrderStatusTransitionBlocked as exc:
+                blocked += 1
+                self.message_user(request, str(exc), level=messages.ERROR)
         label = RepairOrder.Status(target_status).label
-        self.message_user(request, f"{updated} repair order(s) set to '{label}'.")
+        if updated:
+            self.message_user(request, f"{updated} repair order(s) set to '{label}'.")
+        if blocked:
+            self.message_user(
+                request,
+                f"{blocked} repair order(s) could not be set to '{label}' due to lifecycle rules.",
+                level=messages.WARNING,
+            )
 
     # ------------------------------------------------------------------
     # Status-change actions

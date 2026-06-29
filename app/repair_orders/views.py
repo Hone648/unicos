@@ -10,9 +10,10 @@ from accounts.authorization import (
 )
 from core.document_numbers import generate_repair_order_number
 
-from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
+from .business_rules import is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
 from .models import RepairOrder
+from .services import RepairOrderStatusTransitionBlocked, transition_repair_order_status
 
 # Status values that count as "closed" for default list filtering
 _CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
@@ -133,23 +134,18 @@ def repair_order_status_update(request, pk):
         return render(request, "repair_orders/partials/_status_update_response.html",
                       _repair_order_detail_context(ro))
 
-    blocking_invoice = closure_blocked_by_invoice(ro, new_status)
-    if blocking_invoice:
-        label = dict(RepairOrder.Status.choices).get(new_status, new_status)
-        messages.error(
-            request,
-            f"Repair order cannot be marked {label.lower()} because "
-            f"invoice {blocking_invoice.invoice_number} has a balance due.",
-        )
+    if not note:
+        note = "Status changed from repair order workspace."
+
+    try:
+        transition_repair_order_status(ro, new_status, changed_by=request.user, note=note)
+    except RepairOrderStatusTransitionBlocked as exc:
+        messages.error(request, str(exc))
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
         return render(request, "repair_orders/partials/_status_update_response.html",
                       _repair_order_detail_context(ro))
 
-    if not note:
-        note = "Status changed from repair order workspace."
-
-    ro.set_status(new_status, changed_by=request.user, note=note)
     label = dict(RepairOrder.Status.choices).get(new_status, new_status)
     messages.success(request, f"Status updated to \"{label}\".")
 

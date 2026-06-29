@@ -68,29 +68,25 @@ Remaining limits:
 
 ### Priority 3 - Centralized Lifecycle/Domain Services
 
-Likely future slice:
+Status: partially implemented in Slice 26.
 
 ```text
-Slice 26: repair-order/billing lifecycle service layer
+Slice 26: repair-order lifecycle service boundary
 ```
 
-Some lifecycle rules are centralized, but not all entry points necessarily use
-the same service boundary.
+Repair-order status transitions are now centralized in
+`repair_orders/services.py`. The unpaid-invoice final-status block is enforced
+uniformly across shop-facing views and Django admin.
 
-Concrete current issue:
+Remaining service-layer gaps:
 
-- Shop-facing status changes block final repair-order statuses when a non-void
-  invoice has balance due.
-- That rule exists in `repair_orders/business_rules.py`.
-- Admin bulk status actions call `ro.set_status()` directly.
-- If admin is an intentional privileged override, this should be documented.
-- If the rule is a true business invariant, it should move behind a domain
-  service used by both views and admin.
+- Billing workflow operations (invoice issue, void, payment) do not yet have a
+  service boundary.
+- No admin override pathway exists for lifecycle rules.
 
 Future service-layer direction:
 
 ```text
-transition_repair_order_status(ro, new_status, actor, note, source)
 issue_invoice(invoice, actor)
 void_invoice(invoice, actor)
 record_payment(invoice, data, actor)

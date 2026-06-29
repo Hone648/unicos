@@ -1,8 +1,12 @@
+from decimal import Decimal
+from datetime import date
+
 from django.contrib import admin
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 from django.contrib.auth import get_user_model
 
+from billing.models import Invoice, Payment
 from customers.models import Customer
 from repair_orders.admin import RepairOrderAdmin, RepairOrderStatusHistoryAdmin
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
@@ -10,6 +14,7 @@ from vehicles.models import Vehicle
 
 VALID_VIN = "1HGBH41JXMN109186"
 VALID_VIN_2 = "2T1BURHE0JC043821"
+VALID_VIN_3 = "5NPE24AF6FH002401"
 
 
 # ---------------------------------------------------------------------------
@@ -42,6 +47,20 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
     return RepairOrder.objects.create(
         customer=customer, vehicle=vehicle, repair_order_number=number, **kwargs
     )
+
+
+def make_invoice(repair_order, number="INV-0001", **kwargs):
+    defaults = {"subtotal": Decimal("400.00"), "tax_amount": Decimal("40.00")}
+    defaults.update(kwargs)
+    return Invoice.objects.create(
+        repair_order=repair_order, invoice_number=number, **defaults
+    )
+
+
+def make_payment(invoice, amount=Decimal("440.00"), **kwargs):
+    defaults = {"payment_date": date.today(), "method": Payment.Method.CASH}
+    defaults.update(kwargs)
+    return Payment.objects.create(invoice=invoice, amount=amount, **defaults)
 
 
 def make_request(user):
@@ -148,3 +167,137 @@ class RepairOrderStatusHistoryAdminPermissionTests(TestCase):
 
     def test_has_delete_permission_returns_false(self):
         self.assertFalse(self.admin_instance.has_delete_permission(self.request))
+
+
+# ---------------------------------------------------------------------------
+# Admin action lifecycle-block tests
+# ---------------------------------------------------------------------------
+
+class RepairOrderAdminActionLifecycleTests(TestCase):
+    """Admin bulk status actions obey the unpaid-invoice final-status block."""
+
+    def setUp(self):
+        self.admin_instance = RepairOrderAdmin(RepairOrder, admin.site)
+        self.user = make_user(username="admin-lifecycle")
+        self.request = make_request(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+
+    def _ro(self, number, vin=None, **kwargs):
+        v = make_vehicle(self.customer, vin=vin or VALID_VIN_3) if vin else self.vehicle
+        return make_repair_order(self.customer, v, number=number, **kwargs)
+
+    def test_mark_closed_blocked_when_unpaid_invoice_exists(self):
+        ro = self._ro("RO-CLOSE-BLOCK")
+        make_invoice(ro, number="INV-CLOSE-BLOCK")  # balance_due = 440 > 0
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_closed(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertNotEqual(ro.status, RepairOrder.Status.CLOSED)
+
+    def test_mark_canceled_blocked_when_unpaid_invoice_exists(self):
+        ro = self._ro("RO-CANCEL-BLOCK", vin=VALID_VIN_3)
+        make_invoice(ro, number="INV-CANCEL-BLOCK")
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_canceled(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertNotEqual(ro.status, RepairOrder.Status.CANCELED)
+
+    def test_mark_closed_blocked_transition_does_not_create_history(self):
+        ro = self._ro("RO-CLOSE-HIST-BLOCK")
+        make_invoice(ro, number="INV-HIST-BLOCK")
+        count_before = ro.status_history.count()
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_closed(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status_history.count(), count_before)
+
+    def test_mark_closed_allowed_with_no_invoice(self):
+        ro = self._ro("RO-CLOSE-ALLOW")
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_closed(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.CLOSED)
+
+    def test_mark_closed_allowed_with_fully_paid_invoice(self):
+        ro = self._ro("RO-CLOSE-PAID")
+        invoice = make_invoice(ro, number="INV-CLOSE-PAID")
+        make_payment(invoice, Decimal("440.00"))  # fully paid
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_closed(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.CLOSED)
+
+    def test_mark_closed_allowed_with_void_invoice(self):
+        ro = self._ro("RO-CLOSE-VOID")
+        invoice = make_invoice(ro, number="INV-CLOSE-VOID")
+        invoice.status = Invoice.Status.VOID
+        invoice.save(update_fields=["status", "updated_at"])
+        queryset = RepairOrder.objects.filter(pk=ro.pk)
+        self.admin_instance.mark_closed(self.request, queryset)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.CLOSED)
+
+
+# ---------------------------------------------------------------------------
+# Admin save_model status routing tests
+# ---------------------------------------------------------------------------
+
+class MockStatusChangeForm:
+    """Minimal form stub for save_model routing tests."""
+
+    def __init__(self, initial_status, new_status=None):
+        self.initial = {"status": initial_status}
+        if new_status is not None and new_status != initial_status:
+            self.changed_data = ["status"]
+        else:
+            self.changed_data = []
+
+
+class RepairOrderAdminSaveModelStatusRoutingTests(TestCase):
+    """Admin save_model routes status changes through the lifecycle service."""
+
+    def setUp(self):
+        self.admin_instance = RepairOrderAdmin(RepairOrder, admin.site)
+        self.user = make_user(username="admin-save-model")
+        self.request = make_request(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+
+    def test_save_model_blocks_final_status_when_unpaid_invoice_exists(self):
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-ADMIN-FORM-BLOCK")
+        make_invoice(ro, number="INV-ADMIN-FORM-BLOCK")  # balance_due > 0
+        form = MockStatusChangeForm(
+            initial_status=RepairOrder.Status.INTAKE,
+            new_status=RepairOrder.Status.DELIVERED,
+        )
+        ro.status = RepairOrder.Status.DELIVERED  # simulate form applying new value
+        self.admin_instance.save_model(self.request, ro, form, change=True)
+        ro.refresh_from_db()
+        self.assertNotEqual(ro.status, RepairOrder.Status.DELIVERED)
+
+    def test_save_model_allows_non_final_status_change(self):
+        ro = make_repair_order(
+            self.customer, self.vehicle, number="RO-ADMIN-FORM-NON-FINAL"
+        )
+        form = MockStatusChangeForm(
+            initial_status=RepairOrder.Status.INTAKE,
+            new_status=RepairOrder.Status.IN_REPAIR,
+        )
+        ro.status = RepairOrder.Status.IN_REPAIR
+        self.admin_instance.save_model(self.request, ro, form, change=True)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.IN_REPAIR)
+
+    def test_save_model_allows_final_status_when_no_invoice(self):
+        ro = make_repair_order(
+            self.customer, self.vehicle, number="RO-ADMIN-FORM-FINAL-OK"
+        )
+        form = MockStatusChangeForm(
+            initial_status=RepairOrder.Status.INTAKE,
+            new_status=RepairOrder.Status.DELIVERED,
+        )
+        ro.status = RepairOrder.Status.DELIVERED
+        self.admin_instance.save_model(self.request, ro, form, change=True)
+        ro.refresh_from_db()
+        self.assertEqual(ro.status, RepairOrder.Status.DELIVERED)
