@@ -5,6 +5,8 @@
 {% block content %}
 {% if mode == "edit" %}
   <a class="back-link" href="{% url 'estimates:detail' estimate.pk %}">&larr; Back to Estimate {{ estimate.estimate_number }}</a>
+{% elif supplement_parent %}
+  <a class="back-link" href="{% url 'estimates:detail' supplement_parent.pk %}">&larr; Back to Estimate {{ supplement_parent.estimate_number }}</a>
 {% else %}
   <a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to RO {{ ro.repair_order_number }}</a>
 {% endif %}
@@ -18,6 +20,9 @@
     <dt>Repair order</dt><dd>{{ ro.repair_order_number }}</dd>
     <dt>Customer</dt><dd>{{ ro.customer }}</dd>
     <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
+    {% if supplement_parent %}
+      <dt>Supplement of</dt><dd>{{ supplement_parent.estimate_number }}</dd>
+    {% endif %}
     {% if mode == "edit" %}
       <dt>Estimate #</dt><dd>{{ estimate.estimate_number }}</dd>
     {% else %}
@@ -47,6 +52,7 @@
       <div class="form-field">
         <label for="{{ form.estimated_total.id_for_label }}">Estimated total ($)</label>
         {{ form.estimated_total }}
+        {% if form.estimated_total.help_text %}<p class="form-field-hint">{{ form.estimated_total.help_text }}</p>{% endif %}
         {% if form.estimated_total.errors %}<ul class="field-errors">{% for e in form.estimated_total.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 

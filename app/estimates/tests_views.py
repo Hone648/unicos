@@ -80,6 +80,34 @@ def ro_detail_url(pk):
     return reverse("repair_orders:detail", kwargs={"pk": pk})
 
 
+def li_create_url(estimate_pk):
+    return reverse("estimates:line_item_create", kwargs={"estimate_pk": estimate_pk})
+
+
+def li_edit_url(pk):
+    return reverse("estimates:line_item_edit", kwargs={"pk": pk})
+
+
+def li_delete_url(pk):
+    return reverse("estimates:line_item_delete", kwargs={"pk": pk})
+
+
+def supplement_create_url(pk):
+    return reverse("estimates:supplement_create", kwargs={"pk": pk})
+
+
+def make_line_item(estimate, **kwargs):
+    from estimates.models import EstimateLineItem
+    defaults = {
+        "item_type": EstimateLineItem.ItemType.LABOR,
+        "description": "Labor",
+        "quantity": Decimal("1.00"),
+        "unit_price": Decimal("100.00"),
+    }
+    defaults.update(kwargs)
+    return EstimateLineItem.objects.create(estimate=estimate, **defaults)
+
+
 # ---------------------------------------------------------------------------
 # Authentication
 # ---------------------------------------------------------------------------
@@ -373,3 +401,212 @@ class RepairOrderDetailEstimateIntegrationTests(TestCase):
         self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "No estimates on file")
+
+
+# ---------------------------------------------------------------------------
+# Line item: authentication & permissions
+# ---------------------------------------------------------------------------
+
+class LineItemAuthTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.estimate = make_estimate(self.ro)
+        self.item = make_line_item(self.estimate)
+
+    def test_create_requires_login(self):
+        url = li_create_url(self.estimate.pk)
+        self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
+
+    def test_edit_requires_login(self):
+        url = li_edit_url(self.item.pk)
+        self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
+
+    def test_delete_requires_login(self):
+        url = li_delete_url(self.item.pk)
+        self.assertRedirects(self.client.post(url), f"/accounts/login/?next={url}")
+
+    def test_view_only_user_forbidden_for_create(self):
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.get(li_create_url(self.estimate.pk)).status_code, 403)
+
+    def test_view_only_user_forbidden_for_edit(self):
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.get(li_edit_url(self.item.pk)).status_code, 403)
+
+    def test_view_only_user_forbidden_for_delete(self):
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.post(li_delete_url(self.item.pk)).status_code, 403)
+
+
+# ---------------------------------------------------------------------------
+# Line item: create / edit / delete
+# ---------------------------------------------------------------------------
+
+class LineItemCreateEditDeleteTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.estimate = make_estimate(self.ro, number="EST-LI-V", estimated_total=Decimal("0.00"))
+
+    def _data(self, **overrides):
+        from estimates.models import EstimateLineItem
+        data = {
+            "item_type": EstimateLineItem.ItemType.LABOR,
+            "description": "Refinish labor",
+            "quantity": "2.00",
+            "unit_price": "75.00",
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_get_returns_200(self):
+        self.assertEqual(self.client.get(li_create_url(self.estimate.pk)).status_code, 200)
+
+    def test_manage_user_can_open_edit(self):
+        item = make_line_item(self.estimate)
+        self.assertEqual(self.client.get(li_edit_url(item.pk)).status_code, 200)
+
+    def test_valid_create_adds_line_item_and_redirects(self):
+        response = self.client.post(li_create_url(self.estimate.pk), self._data())
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.assertEqual(self.estimate.line_items.count(), 1)
+
+    def test_valid_create_recalculates_total(self):
+        self.client.post(li_create_url(self.estimate.pk), self._data())
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.estimated_total, Decimal("150.00"))
+
+    def test_invalid_create_does_not_add(self):
+        response = self.client.post(li_create_url(self.estimate.pk), self._data(quantity="0.00"))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Quantity must be greater than zero.")
+        self.assertEqual(self.estimate.line_items.count(), 0)
+
+    def test_valid_edit_updates_and_recalculates(self):
+        item = make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("100.00"))
+        self.client.post(li_edit_url(item.pk), self._data(quantity="3.00", unit_price="50.00"))
+        item.refresh_from_db()
+        self.estimate.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("3.00"))
+        self.assertEqual(self.estimate.estimated_total, Decimal("150.00"))
+
+    def test_invalid_edit_does_not_mutate(self):
+        item = make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("100.00"))
+        self.client.post(li_edit_url(item.pk), self._data(unit_price="-5.00"))
+        item.refresh_from_db()
+        self.assertEqual(item.unit_price, Decimal("100.00"))
+
+    def test_delete_via_post_removes_and_recalculates(self):
+        item = make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("100.00"))
+        make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("40.00"))
+        response = self.client.post(li_delete_url(item.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.line_items.count(), 1)
+        self.assertEqual(self.estimate.estimated_total, Decimal("40.00"))
+
+    def test_delete_via_get_does_not_remove(self):
+        item = make_line_item(self.estimate)
+        response = self.client.get(li_delete_url(item.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.assertTrue(self.estimate.line_items.filter(pk=item.pk).exists())
+
+    def test_detail_shows_line_items_and_total(self):
+        make_line_item(self.estimate, description="Blend panel", quantity=Decimal("2.00"), unit_price=Decimal("60.00"))
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, "Blend panel")
+        self.assertContains(response, "120.00")
+
+    def test_detail_line_item_actions_hidden_without_manage(self):
+        item = make_line_item(self.estimate)
+        self.client.logout()
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertNotContains(response, li_edit_url(item.pk))
+        self.assertNotContains(response, li_create_url(self.estimate.pk))
+
+
+# ---------------------------------------------------------------------------
+# Supplement create
+# ---------------------------------------------------------------------------
+
+class SupplementCreateTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.parent = make_estimate(
+            self.ro, number="EST-PARENT-V",
+            insurance_company="Acme", claim_number="CLM-P", deductible=Decimal("500.00"),
+        )
+
+    def _data(self, **overrides):
+        data = {
+            "status": Estimate.Status.DRAFT,
+            "insurance_company": "Acme",
+            "claim_number": "CLM-P",
+            "deductible": "500.00",
+            "estimated_total": "0.00",
+            "notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_requires_login(self):
+        url = supplement_create_url(self.parent.pk)
+        self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
+
+    def test_view_only_user_forbidden(self):
+        self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.get(supplement_create_url(self.parent.pk)).status_code, 403)
+
+    def test_manage_user_can_open_form(self):
+        self.client.force_login(self.user)
+        response = self.client.get(supplement_create_url(self.parent.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.parent.estimate_number)
+
+    def test_form_seeds_parent_insurance_values(self):
+        self.client.force_login(self.user)
+        response = self.client.get(supplement_create_url(self.parent.pk))
+        self.assertContains(response, "Acme")
+
+    def test_valid_create_sets_supplement_fields(self):
+        self.client.force_login(self.user)
+        response = self.client.post(supplement_create_url(self.parent.pk), self._data())
+        supplement = Estimate.objects.exclude(pk=self.parent.pk).get(repair_order=self.ro)
+        self.assertEqual(supplement.kind, Estimate.Kind.SUPPLEMENT)
+        self.assertEqual(supplement.parent_estimate, self.parent)
+        self.assertEqual(supplement.repair_order, self.ro)
+        self.assertRegex(supplement.estimate_number, r"^EST-\d{4}-\d{6}$")
+        self.assertEqual(supplement.created_by, self.user)
+        self.assertRedirects(response, detail_url(supplement.pk))
+
+    def test_invalid_create_does_not_create(self):
+        self.client.force_login(self.user)
+        count_before = Estimate.objects.count()
+        response = self.client.post(supplement_create_url(self.parent.pk), self._data(deductible="-1.00"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Estimate.objects.count(), count_before)
+
+    def test_detail_shows_supplement_link_on_parent(self):
+        self.client.force_login(self.user)
+        self.client.post(supplement_create_url(self.parent.pk), self._data())
+        supplement = Estimate.objects.exclude(pk=self.parent.pk).get(repair_order=self.ro)
+        response = self.client.get(detail_url(self.parent.pk))
+        self.assertContains(response, supplement.estimate_number)
+        self.assertContains(response, detail_url(supplement.pk))
+
+    def test_supplement_detail_links_back_to_parent(self):
+        self.client.force_login(self.user)
+        self.client.post(supplement_create_url(self.parent.pk), self._data())
+        supplement = Estimate.objects.exclude(pk=self.parent.pk).get(repair_order=self.ro)
+        response = self.client.get(detail_url(supplement.pk))
+        self.assertContains(response, self.parent.estimate_number)
+        self.assertContains(response, detail_url(self.parent.pk))

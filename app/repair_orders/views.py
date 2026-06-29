@@ -38,7 +38,7 @@ def _repair_order_detail_context(ro):
     except RepairOrder.invoice.RelatedObjectDoesNotExist:
         pass
     estimates = list(
-        ro.estimates.select_related("created_by", "updated_by").order_by("-updated_at", "-id")
+        ro.estimates.select_related("parent_estimate", "created_by", "updated_by").order_by("-updated_at", "-id")
     )
     return {
         "ro": ro,

@@ -819,6 +819,34 @@ a.dashboard-metric:hover {
   white-space: nowrap;
 }
 
+/* Inline edit/remove actions in a line-item table cell */
+.line-item-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.inline-form {
+  display: inline;
+  margin: 0;
+}
+
+/* Link-styled submit button (e.g. table-row "Remove" action) */
+.link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: #c05621;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: #9c4221;
+}
+
 /* Row of action buttons inside a card (invoice actions) */
 .action-row {
   display: flex;

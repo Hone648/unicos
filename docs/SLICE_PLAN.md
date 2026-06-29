@@ -33,10 +33,11 @@ Planned slices:
 
 29. Slice 28: form validation and data integrity hardening (VehicleForm year range; InvoiceLineItemForm quantity/unit-price field-level clean; PaymentForm amount field-level clean; no migrations)
 30. Slice 29: estimate and insurance spine (new estimates app; Estimate model linked to RepairOrder via PROTECT; multiple estimates per RO; status lifecycle; insurance company/claim number/deductible/estimated total fields; generated EST-YYYY-NNNNNN numbers via core document-number sequence; shop-facing create/detail/edit views from repair-order detail; estimate summary on RO detail; admin; estimates reuse repair-order permissions; invoice behavior unchanged; estimates + core document-type migrations)
+31. Slice 30: estimate line items and supplements (EstimateLineItem model with CASCADE to Estimate; line-item create/edit/POST-delete; estimated_total recalculated from line items when present, manual otherwise; estimate edit disables estimated_total when line items exist; supplement lineage via Estimate.kind=supplement + parent_estimate self-FK with clean() validation; supplement create workflow from estimate detail; line items and supplement links on estimate detail; admin inline + EstimateLineItem admin; estimates reuse repair-order permissions; invoice/billing behavior unchanged; one estimates migration)
 
 Likely next implementation slices:
 
-- Slice 30: estimate line items and supplements, or advanced search/filtering
+- Slice 31: estimate approval workflow, invoice generation from estimates, or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

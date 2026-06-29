@@ -130,42 +130,46 @@ check-digit validation, optional uniqueness policies.
 
 ### Priority 6 - Estimate/Insurance Spine
 
-Status: partially implemented in Slice 29.
+Status: partially implemented in Slices 29 and 30.
 
 ```text
 Slice 29: estimate and insurance spine
+Slice 30: estimate line items and supplements
 ```
 
-A basic `Estimate` model now exists in the `estimates` app, linked to
-`RepairOrder` via `PROTECT`, allowing multiple estimates per repair order. It
-captures a small status lifecycle (draft/submitted/approved/declined/expired),
-insurance company, claim number, deductible, estimated total, and notes.
-Estimate numbers are generated (`EST-YYYY-NNNNNN`). Shop-facing create/detail/
-edit views are entered from repair-order detail, which shows an estimate
-summary. Estimates reuse repair-order permissions. Invoice behavior is
-unchanged.
+The `Estimate` model lives in the `estimates` app, linked to `RepairOrder` via
+`PROTECT`, allowing multiple estimates per repair order. It captures a small
+status lifecycle (draft/submitted/approved/declined/expired), insurance company,
+claim number, deductible, estimated total, and notes. Estimate numbers are
+generated (`EST-YYYY-NNNNNN`). Slice 30 added `EstimateLineItem` (line items
+that drive `estimated_total` once any exist; manual total preserved otherwise)
+and a minimal supplement lineage (`kind="supplement"` + `parent_estimate`).
+Shop-facing create/detail/edit, line-item create/edit/delete, and supplement
+create are entered from repair-order detail and estimate detail. Estimates reuse
+repair-order permissions. Invoice behavior is unchanged.
 
 Proposed remaining model direction:
 
 ```text
 RepairOrder
-  -> Estimate            (implemented: basic spine)
-  -> EstimateLineItem    (deferred)
-  -> Supplement          (deferred)
+  -> Estimate            (implemented: spine)
+  -> EstimateLineItem    (implemented)
+  -> Supplement          (implemented: Estimate kind=supplement + parent)
   -> InsuranceClaim      (deferred: richer insurance modeling)
 ```
 
 Remaining estimate gaps:
 
-- No estimate line items.
-- No supplements or estimate versions.
+- No invoice generation from estimates and no estimate-line-to-invoice-line
+  conversion.
 - No insurer/customer approval workflow or signatures.
 - No PDF estimate output.
-- No invoice-generation automation from estimates.
+- No full estimate versioning engine (supplements are a minimal lineage only).
+- No estimate locking by repair-order final status (deferred).
 - No global estimate queue / list page.
 
-Do not jump to payment processor integration before estimate line items,
-claims, and invoice lineage are clearer.
+Do not jump to payment processor integration before invoice generation from
+estimates and insurance-claim modeling are clearer.
 
 ### Priority 7 - Production Hardening
 

@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} - Unicos{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'estimates:detail' estimate.pk %}">&larr; Back to Estimate {{ estimate.estimate_number }}</a>
+
+<div class="page-header">
+  <h1>{{ title }}</h1>
+</div>
+
+<div class="card">
+  <dl>
+    <dt>Estimate #</dt><dd>{{ estimate.estimate_number }}</dd>
+    <dt>Repair order</dt><dd>{{ ro.repair_order_number }}</dd>
+    <dt>Customer</dt><dd>{{ ro.customer }}</dd>
+    <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
+  </dl>
+</div>
+
+{% if form.non_field_errors %}
+<div class="form-errors">
+  {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+</div>
+{% endif %}
+
+<div class="form-card">
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="form-grid">
+
+      <div class="form-field">
+        <label for="{{ form.item_type.id_for_label }}">Type</label>
+        {{ form.item_type }}
+        {% if form.item_type.errors %}<ul class="field-errors">{% for e in form.item_type.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.quantity.id_for_label }}">Quantity</label>
+        {{ form.quantity }}
+        {% if form.quantity.errors %}<ul class="field-errors">{% for e in form.quantity.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field">
+        <label for="{{ form.unit_price.id_for_label }}">Unit price ($)</label>
+        {{ form.unit_price }}
+        {% if form.unit_price.errors %}<ul class="field-errors">{% for e in form.unit_price.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+      <div class="form-field form-field--full">
+        <label for="{{ form.description.id_for_label }}">Description</label>
+        {{ form.description }}
+        {% if form.description.errors %}<ul class="field-errors">{% for e in form.description.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
+    </div>
+
+    <div class="form-actions">
+      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      <a class="button button-secondary" href="{% url 'estimates:detail' estimate.pk %}">Cancel</a>
+    </div>
+
+  </form>
+</div>
+{% endblock %}
