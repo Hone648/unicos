@@ -1,13 +1,18 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+
+from accounts.authorization import (
+    PERM_CUSTOMERS_MANAGE,
+    PERM_CUSTOMERS_VIEW,
+    app_permission_required,
+)
 
 from .forms import CustomerForm
 from .models import Customer
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_VIEW)
 def customer_list(request):
     q = request.GET.get("q", "").strip()
     qs = Customer.objects.order_by("last_name", "first_name", "business_name")
@@ -23,7 +28,7 @@ def customer_list(request):
     return render(request, "customers/customer_list.html", {"customers": qs, "q": q})
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_VIEW)
 def customer_detail(request, pk):
     customer = get_object_or_404(Customer, pk=pk)
     vehicles = customer.vehicles.order_by("make", "model", "vin")
@@ -35,7 +40,7 @@ def customer_detail(request, pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_MANAGE)
 def customer_create(request):
     if request.method == "POST":
         form = CustomerForm(request.POST)
@@ -54,7 +59,7 @@ def customer_create(request):
     })
 
 
-@login_required
+@app_permission_required(PERM_CUSTOMERS_MANAGE)
 def customer_edit(request, pk):
     customer = get_object_or_404(Customer, pk=pk)
     if request.method == "POST":

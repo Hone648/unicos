@@ -1,10 +1,10 @@
 from decimal import Decimal
 
-from django.contrib.auth.decorators import login_required
 from django.db import connections
 from django.http import JsonResponse
 from django.shortcuts import render
 
+from accounts.authorization import PERM_DASHBOARD_VIEW, app_permission_required
 from billing.models import Invoice
 from repair_orders.business_rules import (
     FINAL_REPAIR_ORDER_STATUSES,
@@ -56,7 +56,7 @@ def _dashboard_context():
     }
 
 
-@login_required
+@app_permission_required(PERM_DASHBOARD_VIEW)
 def dashboard(request):
     return render(request, "core/dashboard.html", _dashboard_context())
 

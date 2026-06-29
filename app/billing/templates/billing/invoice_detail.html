@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load app_permissions %}
 
 {% block title %}Invoice {{ invoice.invoice_number }} - Unicos{% endblock %}
 
@@ -13,23 +14,23 @@
   </div>
 
   <div class="action-row" style="margin-bottom: 1.25rem; padding-top: 0; border-top: none; margin-top: 0;">
-    {% if invoice.status != "void" and not is_final_repair_order %}
+    {% if invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
       <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
       <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
     {% endif %}
-    {% if invoice.status == "draft" and not is_final_repair_order %}
+    {% if invoice.status == "draft" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
       <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
         {% csrf_token %}
         <button type="submit" class="button button-primary">Issue Invoice</button>
       </form>
     {% endif %}
-    {% if invoice.status != "void" and not is_final_repair_order %}
+    {% if invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
       <form method="post" action="{% url 'billing:invoice_void' pk=invoice.pk %}">
         {% csrf_token %}
         <button type="submit" class="button button-secondary">Void Invoice</button>
       </form>
     {% endif %}
-    {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order %}
+    {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.record_payment" %}
       <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
     {% endif %}
     <span class="print-hint">Use <kbd>Ctrl+P</kbd> (or <kbd>Cmd+P</kbd> on Mac) to print or save as PDF.</span>

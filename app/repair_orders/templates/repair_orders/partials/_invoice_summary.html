@@ -1,3 +1,5 @@
+{% load app_permissions %}
+
 <div class="card">
   <h2>Invoice</h2>
   {% if invoice %}
@@ -18,23 +20,23 @@
 
     <div class="action-row">
       <a class="button button-secondary" href="{% url 'billing:invoice_detail' pk=invoice.pk %}">View/Print Invoice</a>
-      {% if invoice.status != "void" and not is_final_repair_order %}
+      {% if invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
         <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
         <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
       {% endif %}
-      {% if invoice.status == "draft" and not is_final_repair_order %}
+      {% if invoice.status == "draft" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
         <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
           {% csrf_token %}
           <button type="submit" class="button button-primary">Issue Invoice</button>
         </form>
       {% endif %}
-      {% if invoice.status != "void" and not is_final_repair_order %}
+      {% if invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
         <form method="post" action="{% url 'billing:invoice_void' pk=invoice.pk %}">
           {% csrf_token %}
           <button type="submit" class="button button-secondary">Void Invoice</button>
         </form>
       {% endif %}
-      {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order %}
+      {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.record_payment" %}
         <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
       {% endif %}
     </div>
@@ -61,7 +63,11 @@
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.unit_price }}</td>
                 <td>${{ item.line_total }}</td>
-                <td>{% if invoice.status != "void" and not is_final_repair_order %}<a href="{% url 'billing:line_item_edit' pk=item.pk %}">Edit</a>{% endif %}</td>
+                <td>
+                  {% if invoice.status != "void" and not is_final_repair_order and user|has_app_permission:"billing.manage" %}
+                    <a href="{% url 'billing:line_item_edit' pk=item.pk %}">Edit</a>
+                  {% endif %}
+                </td>
               </tr>
             {% endfor %}
           </tbody>
@@ -99,7 +105,7 @@
 
   {% else %}
     <p class="muted-text">No invoice on file for this repair order.</p>
-    {% if not is_final_repair_order %}
+    {% if not is_final_repair_order and user|has_app_permission:"billing.manage" %}
       <div class="action-row">
         <a class="button button-primary" href="{% url 'billing:invoice_create' repair_order_pk=ro.pk %}">Create Invoice</a>
       </div>

@@ -1,12 +1,17 @@
 from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from accounts.authorization import (
+    PERM_BILLING_MANAGE,
+    PERM_BILLING_RECORD_PAYMENT,
+    PERM_BILLING_VIEW,
+    app_permission_required,
+)
 from core.document_numbers import generate_invoice_number
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
@@ -60,7 +65,7 @@ def _invoice_status_filters(q, status_filter):
     return filters
 
 
-@login_required
+@app_permission_required(PERM_BILLING_VIEW)
 def invoice_list(request):
     q = request.GET.get("q", "").strip()
     status_filter = request.GET.get("status", "").strip()
@@ -118,7 +123,7 @@ def invoice_list(request):
     )
 
 
-@login_required
+@app_permission_required(PERM_BILLING_VIEW)
 def invoice_detail(request, pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -142,7 +147,7 @@ def invoice_detail(request, pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def invoice_create_for_repair_order(request, repair_order_pk):
     ro = get_object_or_404(
         RepairOrder.objects.select_related("customer", "vehicle"),
@@ -189,7 +194,7 @@ def invoice_create_for_repair_order(request, repair_order_pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def invoice_edit(request, pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -230,7 +235,7 @@ def invoice_edit(request, pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def invoice_issue(request, pk):
     if request.method != "POST":
         return redirect("billing:invoice_detail", pk=pk)
@@ -259,7 +264,7 @@ def invoice_issue(request, pk):
     return redirect("repair_orders:detail", pk=ro.pk)
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def invoice_void(request, pk):
     if request.method != "POST":
         return redirect("billing:invoice_detail", pk=pk)
@@ -282,7 +287,7 @@ def invoice_void(request, pk):
     return redirect("repair_orders:detail", pk=ro.pk)
 
 
-@login_required
+@app_permission_required(PERM_BILLING_RECORD_PAYMENT)
 def payment_create(request, invoice_pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -333,7 +338,7 @@ def payment_create(request, invoice_pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def line_item_create(request, invoice_pk):
     invoice = get_object_or_404(
         Invoice.objects.select_related(
@@ -379,7 +384,7 @@ def line_item_create(request, invoice_pk):
     })
 
 
-@login_required
+@app_permission_required(PERM_BILLING_MANAGE)
 def line_item_edit(request, pk):
     line_item = get_object_or_404(
         InvoiceLineItem.objects.select_related(

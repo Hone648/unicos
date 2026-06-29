@@ -1,8 +1,13 @@
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 
+from accounts.authorization import (
+    PERM_REPAIR_ORDERS_CHANGE_STATUS,
+    PERM_REPAIR_ORDERS_MANAGE,
+    PERM_REPAIR_ORDERS_VIEW,
+    app_permission_required,
+)
 from core.document_numbers import generate_repair_order_number
 
 from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
@@ -41,7 +46,7 @@ def _repair_order_detail_context(ro):
     }
 
 
-@login_required
+@app_permission_required(PERM_REPAIR_ORDERS_VIEW)
 def repair_order_list(request):
     qs = (
         RepairOrder.objects.select_related("customer", "vehicle", "assigned_to")
@@ -87,7 +92,7 @@ def repair_order_list(request):
     )
 
 
-@login_required
+@app_permission_required(PERM_REPAIR_ORDERS_VIEW)
 def repair_order_detail(request, pk):
     ro = get_object_or_404(
         RepairOrder.objects.select_related(
@@ -103,7 +108,7 @@ def repair_order_detail(request, pk):
                   _repair_order_detail_context(ro))
 
 
-@login_required
+@app_permission_required(PERM_REPAIR_ORDERS_CHANGE_STATUS)
 def repair_order_status_update(request, pk):
     if request.method != "POST":
         return redirect("repair_orders:detail", pk=pk)
@@ -155,7 +160,7 @@ def repair_order_status_update(request, pk):
                   _repair_order_detail_context(ro))
 
 
-@login_required
+@app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
 def repair_order_create(request):
     if request.method == "POST":
         form = RepairOrderCreateForm(request.POST)
@@ -178,7 +183,7 @@ def repair_order_create(request):
     })
 
 
-@login_required
+@app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
 def repair_order_edit(request, pk):
     ro = get_object_or_404(RepairOrder, pk=pk)
     if is_final_repair_order_status(ro.status):

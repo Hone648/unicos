@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load app_permissions %}
 
 {% block title %}{{ customer.display_name }} - Unicos{% endblock %}
 
@@ -7,8 +8,10 @@
 
 <div class="page-header">
   <h1>{{ customer.display_name }}</h1>
-  <a class="button button-secondary" href="{% url 'customers:edit' customer.pk %}">Edit Customer</a>
-  <a class="button button-primary" href="{% url 'customers:vehicle_create' customer.pk %}">Add Vehicle</a>
+  {% if user|has_app_permission:"customers.manage" %}
+    <a class="button button-secondary" href="{% url 'customers:edit' customer.pk %}">Edit Customer</a>
+    <a class="button button-primary" href="{% url 'customers:vehicle_create' customer.pk %}">Add Vehicle</a>
+  {% endif %}
 </div>
 
 <div class="card-grid">
@@ -87,14 +90,23 @@
               <td>{{ vehicle.license_plate|default:"—" }}</td>
               <td>{{ vehicle.year|default:"—" }}</td>
               <td>{% if vehicle.is_active %}Yes{% else %}No{% endif %}</td>
-              <td><a href="{% url 'vehicles:edit' vehicle.pk %}">Edit</a></td>
+              <td>
+                {% if user|has_app_permission:"customers.manage" %}
+                  <a href="{% url 'vehicles:edit' vehicle.pk %}">Edit</a>
+                {% endif %}
+              </td>
             </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
   {% else %}
-    <p class="muted-text">No vehicles on file. <a href="{% url 'customers:vehicle_create' customer.pk %}">Add one.</a></p>
+    <p class="muted-text">
+      No vehicles on file.
+      {% if user|has_app_permission:"customers.manage" %}
+        <a href="{% url 'customers:vehicle_create' customer.pk %}">Add one.</a>
+      {% endif %}
+    </p>
   {% endif %}
 </div>
 

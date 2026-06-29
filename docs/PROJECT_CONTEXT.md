@@ -23,7 +23,8 @@ order workflows, billing records, invoice line items, payments, printable
 invoices, dashboard visibility, and an invoice queue.
 
 The app is still local-development only and is not production-ready. Major
-readiness gaps include domain-specific authorization, centralized lifecycle
-services, production deployment hardening, backups/restore, media storage, list
-scalability, and missing body-shop workflow objects such as estimates,
-insurance claims, attachments, scheduling, and reports.
+readiness gaps include object-level authorization and admin authorization
+unification, centralized lifecycle services, production deployment hardening,
+backups/restore, media storage, list scalability, and missing body-shop workflow
+objects such as estimates, insurance claims, attachments, scheduling, and
+reports.

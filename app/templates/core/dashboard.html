@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load app_permissions %}
 
 {% block title %}Dashboard - Unicos{% endblock %}
 
@@ -9,21 +10,25 @@
   <p>Welcome back, <strong>{{ user.get_username }}</strong>.</p>
 
   <div class="dashboard-metrics">
-    <a class="dashboard-metric" href="{% url 'repair_orders:list' %}">
-      <span class="dashboard-metric__label">Active Repair Orders</span>
-      <span class="dashboard-metric__value">{{ active_repair_order_count }}</span>
-      <span class="dashboard-metric__hint">Open workflow records</span>
-    </a>
-    <a class="dashboard-metric" href="{% url 'repair_orders:list' %}?status={{ repair_orders_status_ready_for_pickup }}">
-      <span class="dashboard-metric__label">Ready for Pickup</span>
-      <span class="dashboard-metric__value">{{ ready_for_pickup_count }}</span>
-      <span class="dashboard-metric__hint">Awaiting customer pickup</span>
-    </a>
-    <a class="dashboard-metric" href="{% url 'billing:invoice_list' %}">
-      <span class="dashboard-metric__label">Unpaid Invoices</span>
-      <span class="dashboard-metric__value">{{ unpaid_invoice_count }}</span>
-      <span class="dashboard-metric__hint">${{ unpaid_invoice_total|floatformat:2 }} outstanding</span>
-    </a>
+    {% if user|has_app_permission:"repair_orders.view" %}
+      <a class="dashboard-metric" href="{% url 'repair_orders:list' %}">
+        <span class="dashboard-metric__label">Active Repair Orders</span>
+        <span class="dashboard-metric__value">{{ active_repair_order_count }}</span>
+        <span class="dashboard-metric__hint">Open workflow records</span>
+      </a>
+      <a class="dashboard-metric" href="{% url 'repair_orders:list' %}?status={{ repair_orders_status_ready_for_pickup }}">
+        <span class="dashboard-metric__label">Ready for Pickup</span>
+        <span class="dashboard-metric__value">{{ ready_for_pickup_count }}</span>
+        <span class="dashboard-metric__hint">Awaiting customer pickup</span>
+      </a>
+    {% endif %}
+    {% if user|has_app_permission:"billing.view" %}
+      <a class="dashboard-metric" href="{% url 'billing:invoice_list' %}">
+        <span class="dashboard-metric__label">Unpaid Invoices</span>
+        <span class="dashboard-metric__value">{{ unpaid_invoice_count }}</span>
+        <span class="dashboard-metric__hint">${{ unpaid_invoice_total|floatformat:2 }} outstanding</span>
+      </a>
+    {% endif %}
     <div class="dashboard-metric dashboard-metric--warning">
       <span class="dashboard-metric__label">Blocked From Closure</span>
       <span class="dashboard-metric__value">{{ blocked_from_closure_count }}</span>
@@ -123,17 +128,23 @@
   </section>
 
   <div class="quick-links">
-    <a class="quick-link-card" href="{% url 'repair_orders:list' %}">
-      Repair Orders
-      <span class="qlc-label">View and manage open repair orders</span>
-    </a>
-    <a class="quick-link-card" href="{% url 'customers:list' %}">
-      Customers
-      <span class="qlc-label">View and manage customers and their vehicles</span>
-    </a>
-    <a class="quick-link-card" href="{% url 'billing:invoice_list' %}">
-      Billing
-      <span class="qlc-label">Find and review invoices</span>
-    </a>
+    {% if user|has_app_permission:"repair_orders.view" %}
+      <a class="quick-link-card" href="{% url 'repair_orders:list' %}">
+        Repair Orders
+        <span class="qlc-label">View and manage open repair orders</span>
+      </a>
+    {% endif %}
+    {% if user|has_app_permission:"customers.view" %}
+      <a class="quick-link-card" href="{% url 'customers:list' %}">
+        Customers
+        <span class="qlc-label">View and manage customers and their vehicles</span>
+      </a>
+    {% endif %}
+    {% if user|has_app_permission:"billing.view" %}
+      <a class="quick-link-card" href="{% url 'billing:invoice_list' %}">
+        Billing
+        <span class="qlc-label">Find and review invoices</span>
+      </a>
+    {% endif %}
   </div>
 {% endblock %}

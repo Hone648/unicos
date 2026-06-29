@@ -1,7 +1,16 @@
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.test import SimpleTestCase, TestCase
+
+from accounts.authorization import ROLE_MANAGER
+
+
+def assign_role(user, role_name):
+    group, _created = Group.objects.get_or_create(name=role_name)
+    user.groups.add(group)
+    return user
 
 
 class HealthCheckTests(SimpleTestCase):
@@ -50,7 +59,10 @@ class DashboardAccessTests(TestCase):
         self.assertEqual(response.url, "/accounts/login/?next=/")
 
     def test_authenticated_user_can_access_dashboard(self):
-        get_user_model().objects.create_user(username="tech", password=self.PASSWORD)
+        user = get_user_model().objects.create_user(
+            username="tech", password=self.PASSWORD
+        )
+        assign_role(user, ROLE_MANAGER)
         self.client.login(username="tech", password=self.PASSWORD)
         response = self.client.get("/")
         self.assertEqual(response.status_code, 200)

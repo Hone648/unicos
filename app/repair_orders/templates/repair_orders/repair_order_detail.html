@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load app_permissions %}
 
 {% block title %}Repair Order {{ ro.repair_order_number }} - Unicos{% endblock %}
 
@@ -8,7 +9,7 @@
 <div class="page-header">
   <h1>Repair Order {{ ro.repair_order_number }}</h1>
   {% include "repair_orders/partials/_status_badge.html" %}
-  {% if not is_final_repair_order %}
+  {% if not is_final_repair_order and user|has_app_permission:"repair_orders.manage" %}
     <a class="button button-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
   {% endif %}
 </div>
@@ -37,7 +38,9 @@
 
 </div>
 
-{% include "repair_orders/partials/_status_form.html" %}
+{% if user|has_app_permission:"repair_orders.change_status" %}
+  {% include "repair_orders/partials/_status_form.html" %}
+{% endif %}
 
 {% if ro.reported_problem or ro.internal_notes %}
 <div class="card">

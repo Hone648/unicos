@@ -9,6 +9,8 @@ Implemented:
 
 - Django/PostgreSQL/Docker Compose scaffold
 - Custom user model, login/logout, and baseline role groups
+- Initial app-level permission helpers and role-based shop-facing view
+  enforcement
 - Customer and vehicle records
 - Repair orders, status history, create/edit workflow, and HTMX status updates
 - Dashboard workflow visibility
@@ -34,14 +36,14 @@ readiness gaps and future direction.
 
 ### Priority 2 - Real Role/Permission Enforcement
 
-Likely future slice:
+Status: implemented in Slice 25 at an initial app-permission level.
 
 ```text
 Slice 25: authorization matrix and permission helpers
 ```
 
-Define a domain-specific permission matrix and enforce it in shop-facing views
-and admin where appropriate.
+The app now defines a domain-specific permission matrix and enforces app-level
+permissions in major shop-facing views.
 
 Proposed matrix:
 
@@ -54,10 +56,15 @@ Proposed matrix:
 | Technician | View assigned ROs and update production notes/status where allowed |
 | Read-only | View-only access |
 
-Current gap: group names exist and most shop-facing views are login-gated, but
-domain-specific permission enforcement is not implemented. Any authenticated
-staff user may currently have too much functional access unless restricted
-outside the app.
+Remaining limits:
+
+- No object-level permissions yet.
+- No technician assignment constraints yet.
+- Django admin still uses Django admin/staff/superuser authorization and is not
+  unified with shop-facing helpers.
+- `is_staff` is not treated as a shop permission.
+- Templates hide obvious actions where practical, but view checks remain
+  authoritative.
 
 ### Priority 3 - Centralized Lifecycle/Domain Services
 
@@ -119,8 +126,8 @@ Plan:
 
 ### Priority 5 - Estimate/Insurance Spine
 
-Start the next major domain expansion after permissions and lifecycle service
-boundaries are addressed.
+Start the next major domain expansion after lifecycle service boundaries and
+remaining authorization limits are addressed.
 
 Proposed model direction:
 
