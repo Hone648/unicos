@@ -511,6 +511,80 @@ tbody tr:hover { background: #f7fafc; }
    Dashboard quick links
    -------------------------------------------------------------------------- */
 
+.dashboard-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 1rem;
+  margin: 1.25rem 0;
+}
+
+.dashboard-metric {
+  display: block;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  padding: 1rem 1.125rem;
+  color: #2d3748;
+}
+
+a.dashboard-metric:hover {
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37,99,235,0.12);
+  text-decoration: none;
+}
+
+.dashboard-metric--warning {
+  border-left: 4px solid #d97706;
+}
+
+.dashboard-metric__label,
+.dashboard-metric__hint {
+  display: block;
+  color: #718096;
+  font-size: 0.75rem;
+}
+
+.dashboard-metric__label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.dashboard-metric__value {
+  display: block;
+  color: #1a202c;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.15;
+  margin: 0.35rem 0 0.125rem;
+}
+
+.dashboard-card-grid {
+  align-items: start;
+}
+
+.dashboard-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.dashboard-list__item {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.625rem 0;
+  border-bottom: 1px solid #edf2f7;
+}
+
+.dashboard-list__item:first-child {
+  padding-top: 0;
+}
+
+.dashboard-list__item:last-child {
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
 .quick-links {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));

@@ -24,6 +24,7 @@ Planned slices:
 20. Slice 19: final repair-order edit guards (delivered, closed, and canceled repair orders remain visible but block ordinary repair-order field edits; Delivered -> Closed remains allowed)
 21. Slice 20: final repair-order billing guards (final repair orders remain billing-visible but block shop-facing invoice, line-item, payment, issue, and void mutations)
 22. Slice 21: CI hardening (missing migration check, migration application, Docker build/runtime smoke, and `/healthz/` validation)
+23. Slice 22: dashboard workflow visibility (read-only counts/lists for active repair orders, ready-for-pickup work, unpaid invoices, closure blockers, and recently updated repair orders)
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
