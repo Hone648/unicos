@@ -44,9 +44,10 @@ Current domain models:
   system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually;
   final-status transitions (delivered, closed, canceled) are blocked by the
   shop-facing status-update view when a non-void invoice has a balance due;
-  ordinary repair-order field edits are blocked once the order is delivered,
-  closed, or canceled, while detail, history, billing summary, and allowed
-  status movement remain visible/available
+  ordinary repair-order field edits and shop-facing billing mutations are
+  blocked once the order is delivered, closed, or canceled, while detail,
+  history, billing summary, printable invoices, and allowed status movement
+  remain visible/available
 - `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
   changes on a repair order; cascades with the repair order
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
@@ -56,7 +57,9 @@ Current domain models:
   lifecycle transitions (draft→issued, any→void) are POST-only shop-facing
   actions at `/billing/invoices/<pk>/issue/` and `/billing/invoices/<pk>/void/`;
   void invoices are billing-read-only — invoice edit, line-item create/edit,
-  and payment create are all blocked with a redirect and error message
+  and payment create are all blocked with a redirect and error message; invoices
+  that belong to final repair orders are also billing-read-only in shop-facing
+  mutation views
 - `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
   labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
   on save

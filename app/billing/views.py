@@ -5,10 +5,26 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
 from core.document_numbers import generate_invoice_number
+from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 
 from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
 from .models import Invoice, InvoiceLineItem, Payment
+
+
+def _repair_order_is_final(ro):
+    return is_final_repair_order_status(ro.status)
+
+
+def _final_repair_order_message(ro):
+    return f"Repair order {ro.repair_order_number} is final and billing cannot be changed."
+
+
+def _final_invoice_message(invoice):
+    return (
+        f"Invoice {invoice.invoice_number} belongs to a final repair order "
+        "and cannot be changed."
+    )
 
 
 @login_required
@@ -28,6 +44,7 @@ def invoice_detail(request, pk):
     )
     return render(request, "billing/invoice_detail.html", {
         "invoice": invoice,
+        "is_final_repair_order": _repair_order_is_final(ro),
         "ro": ro,
         "line_items": line_items,
         "payments": payments,
@@ -40,6 +57,10 @@ def invoice_create_for_repair_order(request, repair_order_pk):
         RepairOrder.objects.select_related("customer", "vehicle"),
         pk=repair_order_pk,
     )
+
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_repair_order_message(ro))
+        return redirect("repair_orders:detail", pk=ro.pk)
 
     # Prevent duplicate invoice — one invoice per repair order.
     try:
@@ -89,6 +110,10 @@ def invoice_edit(request, pk):
     )
     ro = invoice.repair_order
 
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if invoice.status == Invoice.Status.VOID:
         messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
         return redirect("billing:invoice_detail", pk=invoice.pk)
@@ -122,6 +147,10 @@ def invoice_issue(request, pk):
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
 
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if invoice.status != Invoice.Status.DRAFT:
         messages.info(
             request,
@@ -147,6 +176,10 @@ def invoice_void(request, pk):
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
 
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if invoice.status == Invoice.Status.VOID:
         messages.info(request, f"Invoice {invoice.invoice_number} is already void.")
         return redirect("repair_orders:detail", pk=ro.pk)
@@ -169,6 +202,10 @@ def payment_create(request, invoice_pk):
         pk=invoice_pk,
     )
     ro = invoice.repair_order
+
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("repair_orders:detail", pk=ro.pk)
 
     if invoice.status == Invoice.Status.VOID:
         messages.error(
@@ -217,6 +254,10 @@ def line_item_create(request, invoice_pk):
     )
     ro = invoice.repair_order
 
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("billing:invoice_detail", pk=invoice.pk)
+
     if invoice.status == Invoice.Status.VOID:
         messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
         return redirect("billing:invoice_detail", pk=invoice.pk)
@@ -260,6 +301,10 @@ def line_item_edit(request, pk):
     )
     invoice = line_item.invoice
     ro = invoice.repair_order
+
+    if _repair_order_is_final(ro):
+        messages.error(request, _final_invoice_message(invoice))
+        return redirect("billing:invoice_detail", pk=invoice.pk)
 
     if invoice.status == Invoice.Status.VOID:
         messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
