@@ -26,6 +26,13 @@ Planned slices:
 22. Slice 21: CI hardening (missing migration check, migration application, Docker build/runtime smoke, and `/healthz/` validation)
 23. Slice 22: dashboard workflow visibility (read-only counts/lists for active repair orders, ready-for-pickup work, unpaid invoices, closure blockers, and recently updated repair orders)
 24. Slice 23: billing invoice queue (read-only `/billing/invoices/` list with status filters, search, and links to invoice/repair-order detail)
+25. Slice 24: documentation reality check / readiness roadmap (current capabilities, production-readiness gaps, authorization gap, service-layer direction, missing workflow areas, scalability, validation, and quality-gate roadmap)
+
+Likely next implementation slices:
+
+- Slice 25: authorization matrix and permission helpers
+- Slice 26: repair-order/billing lifecycle service layer
+- Slice 27: pagination for repair orders, customers, and invoice queue
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
