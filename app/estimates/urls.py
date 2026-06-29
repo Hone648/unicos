@@ -15,6 +15,11 @@ urlpatterns = [
     path("estimates/<int:pk>/edit/", views.estimate_edit, name="edit"),
     path("estimates/<int:pk>/status/", views.estimate_status_update, name="status_update"),
     path(
+        "estimates/<int:pk>/convert-to-invoice/",
+        views.estimate_convert_to_invoice,
+        name="convert_to_invoice",
+    ),
+    path(
         "estimates/<int:pk>/supplements/new/",
         views.supplement_create,
         name="supplement_create",

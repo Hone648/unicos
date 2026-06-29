@@ -36,9 +36,13 @@ Architectural style:
     (`/estimates/<pk>/line-items/new/`, `/estimates/line-items/<pk>/edit/`,
     `/estimates/line-items/<pk>/delete/`) and supplement create
     (`/estimates/<pk>/supplements/new/`); estimate detail shows line items,
-    calculated total, and supplement lineage; estimate summary embedded in
-    repair-order detail; estimates reuse repair-order permissions; no global
-    estimate queue yet
+    calculated total, and supplement lineage; an approved, itemized estimate can
+    be converted into a draft invoice via
+    `POST /estimates/<pk>/convert-to-invoice/` (requires `billing.manage`),
+    copying estimate line items into invoice line items and linking the invoice
+    back to its source estimate; estimate summary embedded in repair-order
+    detail; estimates reuse repair-order permissions; no global estimate queue
+    yet
   - Dashboard (`/`): read-only workflow overview for active repair orders,
     ready-for-pickup work, unpaid invoices, closure blockers, and recently
     updated repair orders
@@ -74,7 +78,10 @@ Current domain models:
   void invoices are billing-read-only — invoice edit, line-item create/edit,
   and payment create are all blocked with a redirect and error message; invoices
   that belong to final repair orders are also billing-read-only in shop-facing
-  mutation views
+  mutation views; an optional nullable `source_estimate` FK (`PROTECT`,
+  `related_name="converted_invoices"`, partial-unique while non-null) records the
+  approved estimate an invoice was converted from — null for manually created
+  invoices
 - `billing.InvoiceLineItem`: itemized billing row linked to an invoice; supports
   labor, parts, materials, sublet, and misc rows; recalculates invoice subtotal
   on save
@@ -174,6 +181,11 @@ Lifecycle service layer:
   callers: shop-facing views, admin bulk actions, and admin status form saves.
 - No admin override pathway exists; a future override slice would require
   explicit audit semantics.
+- Estimate-to-invoice draft conversion is centralized in `billing/services.py`
+  via `convert_estimate_to_invoice()` (with the
+  `estimate_can_convert_to_invoice()` predicate). It validates that the estimate
+  is approved, itemized, and not already converted, then creates a draft invoice
+  and copies line items inside a single transaction.
 - Billing workflow operations (invoice issue, void, payment) do not yet have a
   service boundary — that is planned as future work.
 
@@ -207,16 +219,19 @@ Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Invoice Line Item ->
 Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
 and Payment now exist. The Estimate spine now includes itemized estimate line
 items (which drive the estimated total) and a minimal supplement lineage
-(supplements are estimates with `kind="supplement"` and a parent estimate).
-Generated PDF output, invoice generation from estimates, conversion of estimate
-lines into invoice lines, and payment processor integration are planned for
+(supplements are estimates with `kind="supplement"` and a parent estimate). An
+approved, itemized estimate can be converted into a draft invoice
+(`billing.services.convert_estimate_to_invoice`), copying estimate line items
+into invoice line items and linking the invoice to its source estimate.
+Generated PDF output, re-sync of estimate edits into an existing invoice,
+supplement-to-invoice handling, and payment processor integration are planned for
 later slices.
 
 Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, and a small approval status flow exist; still missing full estimate versioning, generated PDF output, and invoice generation from estimates |
+| Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, a small approval status flow, and approved-estimate-to-draft-invoice conversion exist; still missing full estimate versioning, generated PDF output, and supplement-to-invoice handling |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

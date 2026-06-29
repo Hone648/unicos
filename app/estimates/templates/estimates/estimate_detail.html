@@ -13,6 +13,16 @@
     {% if user|has_app_permission:"repair_orders.manage" and is_editable %}
       <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
     {% endif %}
+    {% if user|has_app_permission:"billing.manage" %}
+      {% if can_convert_to_invoice %}
+        <form method="post" action="{% url 'estimates:convert_to_invoice' estimate.pk %}" class="inline-form">
+          {% csrf_token %}
+          <button type="submit" class="button button-primary">Create Invoice Draft</button>
+        </form>
+      {% elif converted_invoice %}
+        <a class="button button-secondary" href="{% url 'billing:invoice_detail' converted_invoice.pk %}">View Invoice {{ converted_invoice.invoice_number }}</a>
+      {% endif %}
+    {% endif %}
   </div>
 </div>
 

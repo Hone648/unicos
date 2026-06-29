@@ -25,6 +25,14 @@ class Invoice(models.Model):
         choices=Status.choices,
         default=Status.DRAFT,
     )
+    source_estimate = models.ForeignKey(
+        "estimates.Estimate",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        related_name="converted_invoices",
+        help_text="The approved estimate this invoice was created from, if any.",
+    )
     issued_at = models.DateField(null=True, blank=True)
     due_date = models.DateField(null=True, blank=True)
 
@@ -51,6 +59,13 @@ class Invoice(models.Model):
 
     class Meta:
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["source_estimate"],
+                condition=models.Q(source_estimate__isnull=False),
+                name="unique_invoice_source_estimate",
+            ),
+        ]
 
     def clean(self):
         if self.subtotal is not None and self.subtotal < Decimal("0.00"):

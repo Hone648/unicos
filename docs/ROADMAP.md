@@ -132,13 +132,14 @@ check-digit validation, optional uniqueness policies.
 
 ### Priority 6 - Estimate/Insurance Spine
 
-Status: partially implemented in Slices 29 and 30.
+Status: partially implemented in Slices 29, 30, 32, 33, and 34.
 
 ```text
 Slice 29: estimate and insurance spine
 Slice 30: estimate line items and supplements
 Slice 32: printable estimate output
 Slice 33: estimate approval status flow
+Slice 34: estimate-to-invoice draft conversion
 ```
 
 The `Estimate` model lives in the `estimates` app, linked to `RepairOrder` via
@@ -154,7 +155,11 @@ and terminal estimates are read-only for normal estimate edit and line-item
 mutation views. Shop-facing create/detail/edit, browser-printable estimate
 output, line-item create/edit/delete, status actions, and supplement create are
 entered from repair-order detail and estimate detail. Estimates reuse
-repair-order permissions. Invoice behavior is unchanged.
+repair-order permissions. Slice 34 added a controlled conversion: an approved,
+itemized estimate can be turned into a *draft* invoice via `billing.services`,
+copying estimate line items into invoice line items and linking the invoice back
+to its source estimate (`Invoice.source_estimate`, with duplicate conversion
+blocked). Invoice issuing, voiding, and payment behavior are unchanged.
 
 Proposed remaining model direction:
 
@@ -163,21 +168,24 @@ RepairOrder
   -> Estimate            (implemented: spine)
   -> EstimateLineItem    (implemented)
   -> Supplement          (implemented: Estimate kind=supplement + parent)
+  -> Invoice draft       (implemented: approved estimate -> draft invoice)
   -> InsuranceClaim      (deferred: richer insurance modeling)
 ```
 
 Remaining estimate gaps:
 
-- No invoice generation from estimates and no estimate-line-to-invoice-line
-  conversion.
+- Conversion is one-way (estimate -> draft invoice); no re-sync of estimate
+  edits into an existing invoice and no "unconvert" action.
+- No supplement-to-invoice handling or multi-estimate invoice merging (a repair
+  order still has a single one-to-one invoice).
 - No customer signatures or approval-capture artifacts.
 - No generated PDF estimate output.
 - No full estimate versioning engine (supplements are a minimal lineage only).
 - No estimate locking by repair-order final status (deferred).
 - No global estimate queue / list page.
 
-Do not jump to payment processor integration before invoice generation from
-estimates and insurance-claim modeling are clearer.
+Do not jump to payment processor integration before insurance-claim modeling
+and supplement-to-invoice handling are clearer.
 
 ### Priority 7 - Production Hardening
 
