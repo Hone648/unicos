@@ -28,6 +28,10 @@ Architectural style:
     queue/list, invoice edit, invoice detail/print view, invoice line-item
     create/edit, and payment create; invoice summary with line items and
     payments embedded in repair-order detail
+  - Estimates: estimate create/detail/edit entered from repair-order detail
+    (`/repair-orders/<pk>/estimates/new/`, `/estimates/<pk>/`,
+    `/estimates/<pk>/edit/`); estimate summary embedded in repair-order detail;
+    estimates reuse repair-order permissions; no global estimate queue yet
   - Dashboard (`/`): read-only workflow overview for active repair orders,
     ready-for-pickup work, unpaid invoices, closure blockers, and recently
     updated repair orders
@@ -69,9 +73,16 @@ Current domain models:
   on save
 - `billing.Payment`: individual payment linked to an invoice; updates invoice
   payment status automatically on save/delete
+- `estimates.Estimate`: estimate / insurance-claim context attached to a repair
+  order; FK to repair order uses `PROTECT`; a repair order may have multiple
+  estimates; tracks a small status lifecycle (draft/submitted/approved/declined/
+  expired) plus insurance company, claim number, deductible, and estimated
+  total; number is system-generated (`EST-YYYY-NNNNNN`); does not affect invoice
+  behavior; no estimate line items or supplements yet
 - `core.DocumentNumberSequence`: tracks the last-used sequence value per
-  `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN` and
-  `INV-YYYY-NNNNNN` generators in `core/document_numbers.py`
+  `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN`,
+  `INV-YYYY-NNNNNN`, and `EST-YYYY-NNNNNN` generators in
+  `core/document_numbers.py`
 
 Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No
 configurable status table exists yet.
@@ -173,15 +184,18 @@ Customer -> Vehicle -> Repair Order -> Status -> Invoice -> Invoice Line Item ->
 ```
 
 Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
-and Payment now exist. Estimates and payment processor integration are planned
-for later slices.
+and Payment now exist. A basic Estimate/insurance spine now exists (estimate
+records with status and insurance/claim context attached to a repair order).
+Estimate line items, supplements, approval workflow, PDF output, invoice
+generation from estimates, and payment processor integration are planned for
+later slices.
 
 Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimates, supplements, estimate approval, estimate versions |
-| Insurance | insurer, claim number, adjuster, deductible, DRP fields |
+| Estimating | basic estimate records exist; still missing estimate line items, supplements, estimate approval, estimate versions |
+| Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
 | Attachments | photos, PDFs, signed forms, invoices, intake images |

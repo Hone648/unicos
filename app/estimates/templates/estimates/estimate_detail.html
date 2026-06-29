@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% load app_permissions %}
+
+{% block title %}Estimate {{ estimate.estimate_number }} - Unicos{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to RO {{ ro.repair_order_number }}</a>
+
+<div class="page-header">
+  <h1>Estimate {{ estimate.estimate_number }}</h1>
+  {% if user|has_app_permission:"repair_orders.manage" %}
+    <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
+  {% endif %}
+</div>
+
+<div class="card-grid">
+
+  <div class="card">
+    <h2>Estimate</h2>
+    <dl>
+      <dt>Estimate #</dt><dd>{{ estimate.estimate_number }}</dd>
+      <dt>Repair order</dt><dd><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></dd>
+      <dt>Status</dt><dd>{{ estimate.get_status_display }}</dd>
+      <dt>Estimated total</dt><dd>${{ estimate.estimated_total }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Insurance &amp; Claim</h2>
+    <dl>
+      <dt>Insurance company</dt><dd>{{ estimate.insurance_company|default:"—" }}</dd>
+      <dt>Claim number</dt><dd>{{ estimate.claim_number|default:"—" }}</dd>
+      <dt>Deductible</dt><dd>${{ estimate.deductible }}</dd>
+    </dl>
+  </div>
+
+</div>
+
+{% if estimate.notes %}
+<div class="card">
+  <h2>Notes</h2>
+  <p>{{ estimate.notes }}</p>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>Record</h2>
+  <dl>
+    <dt>Created</dt><dd>{{ estimate.created_at|date:"Y-m-d H:i" }}{% if estimate.created_by %} by {{ estimate.created_by.get_username }}{% endif %}</dd>
+    <dt>Updated</dt><dd>{{ estimate.updated_at|date:"Y-m-d H:i" }}{% if estimate.updated_by %} by {{ estimate.updated_by.get_username }}{% endif %}</dd>
+  </dl>
+</div>
+{% endblock %}

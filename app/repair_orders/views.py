@@ -37,6 +37,9 @@ def _repair_order_detail_context(ro):
         )
     except RepairOrder.invoice.RelatedObjectDoesNotExist:
         pass
+    estimates = list(
+        ro.estimates.select_related("created_by", "updated_by").order_by("-updated_at", "-id")
+    )
     return {
         "ro": ro,
         "history": history,
@@ -44,6 +47,7 @@ def _repair_order_detail_context(ro):
         "is_final_repair_order": is_final_repair_order_status(ro.status),
         "line_items": line_items,
         "payments": payments,
+        "estimates": estimates,
         "status_choices": RepairOrder.Status.choices,
     }
 
