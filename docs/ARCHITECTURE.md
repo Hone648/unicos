@@ -197,16 +197,27 @@ customer list, invoice list, future payment list, and vehicle-related lists.
 Future work should include pagination, stable ordering, select_related /
 prefetch_related review, index review where needed, and search query safety.
 
-Validation gap:
+Form validation:
 
-Current strengths include VIN normalization/validation, repair-order
-customer/vehicle relationship validation, invoice/payment amount validation,
-invoice due-date validation, and billing/final-status workflow guards.
+- Customer name validation: `Customer.clean()` enforces individual (first or
+  last name required) and business (business_name required) name rules with
+  `.strip()` checks; `CustomerForm` delegates via `ModelForm._post_clean()`.
+- Vehicle VIN: normalized (strip + uppercase) by `Vehicle.clean_fields()`;
+  validated by `validate_vin()` (17-char, no I/O/Q).
+- Vehicle year: `VehicleForm.clean_year()` rejects values outside
+  1900–(current year + 2) with a field-attached error message.
+- Repair order customer/vehicle relationship: `RepairOrder.clean()` validates
+  that the vehicle belongs to the selected customer.
+- Invoice: `Invoice.clean()` enforces subtotal/tax ≥ 0 and due_date ≥ issued_at.
+- Invoice line items: `InvoiceLineItemForm.clean_quantity()` rejects quantity ≤ 0;
+  `clean_unit_price()` rejects negative prices; both attach errors to their
+  respective fields.
+- Payment: `PaymentForm.clean_amount()` rejects amount ≤ 0 at field level;
+  `Payment.clean()` additionally checks for overpayment and void-invoice
+  rejection after the view sets the invoice FK.
 
-Future improvements include phone formatting/normalization, state normalization,
-optional uniqueness policies, VIN check-digit validation, realistic vehicle year
-bounds, audit fields for customers/vehicles if needed, and clearer model/service
-level enforcement for operations currently relying on views/forms.
+Remaining validation gaps: phone formatting, state normalization, VIN
+check-digit validation, optional uniqueness policies.
 
 Quality gate gap:
 

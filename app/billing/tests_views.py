@@ -763,7 +763,7 @@ class LineItemCreateTests(TestCase):
             self._valid_data(quantity="0.00"),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "Ensure this value is greater than or equal to 0.01")
+        self.assertContains(response, "Quantity must be greater than zero.")
         self.assertFalse(InvoiceLineItem.objects.filter(invoice=self.invoice).exists())
 
 

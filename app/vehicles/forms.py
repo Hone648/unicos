@@ -1,6 +1,10 @@
+import datetime
+
 from django import forms
 
 from .models import Vehicle
+
+_YEAR_MIN = 1900
 
 
 class VehicleForm(forms.ModelForm):
@@ -26,3 +30,13 @@ class VehicleForm(forms.ModelForm):
     # and edit preserves the existing customer via the instance.
     # VIN normalization (strip + uppercase) is handled by Vehicle.clean_fields(),
     # called automatically via ModelForm._post_clean() -> instance.full_clean().
+
+    def clean_year(self):
+        year = self.cleaned_data.get("year")
+        if year is not None:
+            year_max = datetime.date.today().year + 2
+            if year < _YEAR_MIN or year > year_max:
+                raise forms.ValidationError(
+                    f"Enter a year between {_YEAR_MIN} and {year_max}."
+                )
+        return year
