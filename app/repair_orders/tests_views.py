@@ -267,7 +267,9 @@ class FinalRepairOrderDetailTests(TestCase):
         )
 
     def _set_status(self, status):
-        self.ro.set_status(status, changed_by=self.user, note="Final status for test")
+        # Use _apply_status_change to bypass lifecycle rules for test setup;
+        # these tests exercise detail-page rendering, not the transition itself.
+        self.ro._apply_status_change(status, changed_by=self.user, note="Final status for test")
         self.ro.refresh_from_db()
 
     def test_delivered_detail_does_not_show_edit_repair_order_link(self):

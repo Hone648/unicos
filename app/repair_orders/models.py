@@ -84,10 +84,13 @@ class RepairOrder(models.Model):
     def is_closed(self):
         return self.status in {self.Status.CLOSED, self.Status.CANCELED}
 
-    def set_status(self, new_status, *, changed_by=None, note=""):
-        """Change status and record history. No-op if status is unchanged.
+    def _apply_status_change(self, new_status, *, changed_by=None, note=""):
+        """Write a status change and history record without enforcing lifecycle rules.
 
         Raises ValidationError for values outside RepairOrder.Status.
+        No-ops if new_status equals the current status.
+        Prefer set_status() for normal callers; use this only when lifecycle
+        rules must be intentionally bypassed (e.g. test setup or migrations).
         """
         if new_status not in self.Status.values:
             raise ValidationError(
@@ -102,6 +105,17 @@ class RepairOrder(models.Model):
         self._status_change_note = note
         self.status = new_status
         self.save()
+
+    def set_status(self, new_status, *, changed_by=None, note=""):
+        """Change status through the lifecycle service. No-op if status unchanged.
+
+        Raises:
+            ValidationError: for values outside RepairOrder.Status.
+            RepairOrderStatusTransitionBlocked: when a lifecycle rule blocks
+                the transition (e.g. unpaid-invoice final-status block).
+        """
+        from .services import transition_repair_order_status  # local import
+        transition_repair_order_status(self, new_status, changed_by=changed_by, note=note)
 
     def _clear_status_change_context(self):
         """Remove transient set_status attributes so they cannot leak into a later save."""

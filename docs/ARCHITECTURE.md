@@ -129,25 +129,25 @@ Remaining limitations:
 - Technician access is intentionally conservative until assigned-RO semantics
   exist.
 - Admin permissions are not unified with shop-facing helpers.
-- Lifecycle service-layer centralization remains future work.
 
-Lifecycle-rule centralization gap:
+Lifecycle service layer:
 
-- Some lifecycle rules are centralized, but not all entry points necessarily use
-  the same service boundary.
-- Shop-facing status changes block final repair-order statuses when a non-void
-  invoice has balance due.
-- That rule exists in `repair_orders/business_rules.py`.
-- Admin bulk status actions call `ro.set_status()` directly.
-- If admin is an intentional privileged override, this should be documented as
-  such.
-- If the rule is a true business invariant, it should move behind a domain
-  service used by both views and admin.
+- Repair-order status transitions are centralized in `repair_orders/services.py`
+  via `transition_repair_order_status()`.
+- `RepairOrder.set_status()` delegates to the service and is the normal public
+  entry point.
+- `RepairOrder._apply_status_change()` is a private low-level method for test
+  setup only; application code must not call it.
+- The unpaid-invoice final-status block is enforced by the service for all
+  callers: shop-facing views, admin bulk actions, and admin status form saves.
+- No admin override pathway exists; a future override slice would require
+  explicit audit semantics.
+- Billing workflow operations (invoice issue, void, payment) do not yet have a
+  service boundary — that is planned as future work.
 
 Future service-layer direction:
 
 ```text
-transition_repair_order_status(ro, new_status, actor, note, source)
 issue_invoice(invoice, actor)
 void_invoice(invoice, actor)
 record_payment(invoice, data, actor)

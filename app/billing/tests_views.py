@@ -1607,7 +1607,7 @@ class FinalRepairOrderBillingGuardTests(TestCase):
             quantity=Decimal("1.00"),
             unit_price=Decimal("100.00"),
         )
-        self.final_ro.set_status(
+        self.final_ro._apply_status_change(
             RepairOrder.Status.DELIVERED,
             changed_by=self.user,
             note="Final for billing guard test",
@@ -1625,7 +1625,7 @@ class FinalRepairOrderBillingGuardTests(TestCase):
             tax_amount=Decimal("20.00"),
         )
         make_payment(self.final_invoice_with_payment, Decimal("50.00"))
-        self.final_ro_with_payment.set_status(
+        self.final_ro_with_payment._apply_status_change(
             RepairOrder.Status.DELIVERED,
             changed_by=self.user,
             note="Final with payment for billing guard test",
