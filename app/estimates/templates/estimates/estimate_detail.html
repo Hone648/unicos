@@ -8,9 +8,12 @@
 
 <div class="page-header">
   <h1>Estimate {{ estimate.estimate_number }}</h1>
-  {% if user|has_app_permission:"repair_orders.manage" %}
-    <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
-  {% endif %}
+  <div class="action-row page-header-actions">
+    <a class="button button-secondary" href="{% url 'estimates:print' estimate.pk %}">Print Estimate</a>
+    {% if user|has_app_permission:"repair_orders.manage" %}
+      <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card-grid">

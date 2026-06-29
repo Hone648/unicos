@@ -30,7 +30,8 @@ Architectural style:
     payments embedded in repair-order detail
   - Estimates: estimate create/detail/edit entered from repair-order detail
     (`/repair-orders/<pk>/estimates/new/`, `/estimates/<pk>/`,
-    `/estimates/<pk>/edit/`); estimate line-item create/edit/delete
+    `/estimates/<pk>/edit/`); browser-printable estimate output
+    (`/estimates/<pk>/print/`); estimate line-item create/edit/delete
     (`/estimates/<pk>/line-items/new/`, `/estimates/line-items/<pk>/edit/`,
     `/estimates/line-items/<pk>/delete/`) and supplement create
     (`/estimates/<pk>/supplements/new/`); estimate detail shows line items,
@@ -202,15 +203,15 @@ Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
 and Payment now exist. The Estimate spine now includes itemized estimate line
 items (which drive the estimated total) and a minimal supplement lineage
 (supplements are estimates with `kind="supplement"` and a parent estimate).
-Approval workflow, PDF output, invoice generation from estimates, conversion of
-estimate lines into invoice lines, and payment processor integration are planned
-for later slices.
+Approval workflow, generated PDF output, invoice generation from estimates,
+conversion of estimate lines into invoice lines, and payment processor
+integration are planned for later slices.
 
 Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimate records, estimate line items, and supplement lineage exist; still missing estimate approval, full estimate versioning, and invoice generation from estimates |
+| Estimating | estimate records, estimate line items, supplement lineage, and browser-printable estimate output exist; still missing estimate approval, full estimate versioning, generated PDF output, and invoice generation from estimates |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
