@@ -13,7 +13,6 @@ VALID_VIN = "1HGBH41JXMN109186"
 
 def _form_data(**overrides):
     data = {
-        "status": Estimate.Status.DRAFT,
         "insurance_company": "Acme Insurance",
         "claim_number": "CLM-001",
         "deductible": "500.00",
@@ -61,10 +60,14 @@ class EstimateFormTests(TestCase):
         form = EstimateForm(_form_data(deductible="0.00", estimated_total="0.00"))
         self.assertTrue(form.is_valid(), form.errors)
 
-    def test_invalid_status_is_rejected(self):
+    def test_form_does_not_expose_status(self):
+        form = EstimateForm()
+        self.assertNotIn("status", form.fields)
+
+    def test_posted_status_is_ignored(self):
         form = EstimateForm(_form_data(status="not-a-status"))
-        self.assertFalse(form.is_valid())
-        self.assertIn("status", form.errors)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn("status", form.cleaned_data)
 
     def test_form_excludes_repair_order_and_estimate_number(self):
         form = EstimateForm()

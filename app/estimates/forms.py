@@ -20,7 +20,6 @@ class EstimateForm(forms.ModelForm):
     class Meta:
         model = Estimate
         fields = [
-            "status",
             "insurance_company",
             "claim_number",
             "deductible",
@@ -32,11 +31,12 @@ class EstimateForm(forms.ModelForm):
             "estimated_total": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
-    # repair_order, estimate_number, kind, parent_estimate, created_by,
-    # updated_by, and timestamps are excluded. The view assigns repair_order,
-    # the generated estimate_number, and (for supplements) kind/parent_estimate.
-    # insurance_company and claim_number may be blank because customer-pay
-    # estimates do not have insurance context.
+    # status, repair_order, estimate_number, kind, parent_estimate, created_by,
+    # updated_by, and timestamps are excluded. Status changes use explicit
+    # lifecycle actions; the view assigns repair_order, the generated
+    # estimate_number, and (for supplements) kind/parent_estimate. Insurance
+    # company and claim number may be blank because customer-pay estimates do
+    # not have insurance context.
 
     def clean_deductible(self):
         deductible = self.cleaned_data.get("deductible")

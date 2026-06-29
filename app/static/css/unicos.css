@@ -869,6 +869,17 @@ a.dashboard-metric:hover {
   margin-bottom: 1.25rem;
 }
 
+.status-action-row {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.status-action-row form {
+  margin: 0;
+}
+
 /* --------------------------------------------------------------------------
    Print hint (inline note next to action buttons)
    -------------------------------------------------------------------------- */

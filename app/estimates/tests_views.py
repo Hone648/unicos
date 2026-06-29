@@ -76,6 +76,10 @@ def print_url(pk):
     return reverse("estimates:print", kwargs={"pk": pk})
 
 
+def status_update_url(pk):
+    return reverse("estimates:status_update", kwargs={"pk": pk})
+
+
 def edit_url(pk):
     return reverse("estimates:edit", kwargs={"pk": pk})
 
@@ -135,6 +139,11 @@ class EstimateAuthTests(TestCase):
         url = print_url(self.estimate.pk)
         self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
 
+    def test_status_update_requires_login(self):
+        url = status_update_url(self.estimate.pk)
+        response = self.client.post(url, {"status": Estimate.Status.SUBMITTED})
+        self.assertRedirects(response, f"/accounts/login/?next={url}")
+
     def test_edit_requires_login(self):
         url = edit_url(self.estimate.pk)
         self.assertRedirects(self.client.get(url), f"/accounts/login/?next={url}")
@@ -175,6 +184,14 @@ class EstimatePermissionTests(TestCase):
         self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
         self.assertEqual(self.client.get(edit_url(self.estimate.pk)).status_code, 403)
 
+    def test_view_only_user_forbidden_for_status_update(self):
+        self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.SUBMITTED},
+        )
+        self.assertEqual(response.status_code, 403)
+
     def test_manage_user_can_open_create(self):
         self.client.force_login(make_user("manager", ROLE_MANAGER))
         self.assertEqual(self.client.get(create_url(self.ro.pk)).status_code, 200)
@@ -198,7 +215,6 @@ class EstimateCreateTests(TestCase):
 
     def _valid_data(self, **overrides):
         data = {
-            "status": Estimate.Status.DRAFT,
             "insurance_company": "Acme Insurance",
             "claim_number": "CLM-9",
             "deductible": "500.00",
@@ -215,6 +231,18 @@ class EstimateCreateTests(TestCase):
         response = self.client.get(create_url(self.ro.pk))
         self.assertNotContains(response, 'name="estimate_number"')
         self.assertNotContains(response, 'name="repair_order"')
+
+    def test_form_does_not_expose_status(self):
+        response = self.client.get(create_url(self.ro.pk))
+        self.assertNotContains(response, 'name="status"')
+
+    def test_posted_status_is_ignored_on_create(self):
+        self.client.post(
+            create_url(self.ro.pk),
+            self._valid_data(status=Estimate.Status.APPROVED),
+        )
+        estimate = Estimate.objects.get(repair_order=self.ro)
+        self.assertEqual(estimate.status, Estimate.Status.DRAFT)
 
     def test_valid_post_creates_estimate(self):
         self.client.post(create_url(self.ro.pk), self._valid_data())
@@ -305,6 +333,28 @@ class EstimateDetailTests(TestCase):
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertContains(response, edit_url(self.estimate.pk))
 
+    def test_detail_shows_submit_button_for_draft(self):
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, "Submit Estimate")
+        self.assertContains(response, status_update_url(self.estimate.pk))
+
+    def test_detail_shows_submitted_status_buttons(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, "Approve Estimate")
+        self.assertContains(response, "Decline Estimate")
+        self.assertContains(response, "Expire Estimate")
+
+    def test_detail_hides_status_buttons_for_terminal_status(self):
+        self.estimate.status = Estimate.Status.APPROVED
+        self.estimate.save()
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertNotContains(response, "Submit Estimate")
+        self.assertNotContains(response, "Approve Estimate")
+        self.assertNotContains(response, "Decline Estimate")
+        self.assertNotContains(response, "Expire Estimate")
+
     def test_detail_shows_print_link(self):
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertContains(response, print_url(self.estimate.pk))
@@ -312,6 +362,12 @@ class EstimateDetailTests(TestCase):
     def test_detail_hides_edit_link_without_manage_permission(self):
         self.client.logout()
         self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertNotContains(response, edit_url(self.estimate.pk))
+
+    def test_detail_hides_edit_link_after_submission(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertNotContains(response, edit_url(self.estimate.pk))
 
@@ -400,6 +456,96 @@ class EstimatePrintTests(TestCase):
         self.assertContains(response, "EST-PRINT-001")
         self.assertContains(response, detail_url(self.estimate.pk))
 
+    def test_print_page_remains_accessible_for_submitted_estimate(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(print_url(self.estimate.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "EST-PRINT-001")
+
+    def test_print_page_remains_accessible_for_approved_estimate(self):
+        self.estimate.status = Estimate.Status.APPROVED
+        self.estimate.save()
+        response = self.client.get(print_url(self.estimate.pk))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "EST-PRINT-001")
+
+
+# ---------------------------------------------------------------------------
+# Status actions
+# ---------------------------------------------------------------------------
+
+class EstimateStatusUpdateTests(TestCase):
+    def setUp(self):
+        self.user = make_user()
+        self.client.force_login(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.estimate = make_estimate(self.ro, number="EST-STATUS-1")
+
+    def test_manage_user_can_submit_draft(self):
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.SUBMITTED},
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.SUBMITTED)
+
+    def test_manage_user_can_approve_submitted(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.APPROVED},
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.APPROVED)
+
+    def test_manage_user_can_decline_submitted(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.DECLINED},
+        )
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.DECLINED)
+
+    def test_manage_user_can_expire_submitted(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.EXPIRED},
+        )
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.EXPIRED)
+
+    def test_blocked_transition_does_not_mutate_status(self):
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.APPROVED},
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.DRAFT)
+
+    def test_invalid_status_does_not_mutate_status(self):
+        self.client.post(status_update_url(self.estimate.pk), {"status": "bad"})
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.DRAFT)
+
+    def test_status_update_sets_updated_by(self):
+        self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.SUBMITTED},
+        )
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.updated_by, self.user)
+
 
 # ---------------------------------------------------------------------------
 # Edit
@@ -420,7 +566,6 @@ class EstimateEditTests(TestCase):
 
     def _valid_data(self, **overrides):
         data = {
-            "status": Estimate.Status.SUBMITTED,
             "insurance_company": "Progressive",
             "claim_number": "CLM-EDIT",
             "deductible": "100.00",
@@ -436,12 +581,21 @@ class EstimateEditTests(TestCase):
     def test_get_shows_existing_values(self):
         response = self.client.get(edit_url(self.estimate.pk))
         self.assertContains(response, "EST-EDIT-1")
+        self.assertNotContains(response, 'name="status"')
 
     def test_valid_post_updates_estimate(self):
         self.client.post(edit_url(self.estimate.pk), self._valid_data())
         self.estimate.refresh_from_db()
         self.assertEqual(self.estimate.estimated_total, Decimal("1500.00"))
-        self.assertEqual(self.estimate.status, Estimate.Status.SUBMITTED)
+        self.assertEqual(self.estimate.status, Estimate.Status.DRAFT)
+
+    def test_posted_status_is_ignored_on_edit(self):
+        self.client.post(
+            edit_url(self.estimate.pk),
+            self._valid_data(status=Estimate.Status.APPROVED),
+        )
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.DRAFT)
 
     def test_valid_post_sets_updated_by(self):
         updater = make_user("updater")
@@ -465,6 +619,20 @@ class EstimateEditTests(TestCase):
         self.client.post(edit_url(self.estimate.pk), self._valid_data())
         self.estimate.refresh_from_db()
         self.assertEqual(self.estimate.estimate_number, original_number)
+
+    def test_submitted_estimate_cannot_open_edit_form(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(edit_url(self.estimate.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+
+    def test_submitted_estimate_cannot_be_edited_by_post(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        self.client.post(edit_url(self.estimate.pk), self._valid_data())
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.estimated_total, Decimal("1000.00"))
+        self.assertEqual(self.estimate.status, Estimate.Status.SUBMITTED)
 
 
 # ---------------------------------------------------------------------------
@@ -635,6 +803,60 @@ class LineItemCreateEditDeleteTests(TestCase):
         self.assertNotContains(response, li_edit_url(item.pk))
         self.assertNotContains(response, li_create_url(self.estimate.pk))
 
+    def test_submitted_estimate_cannot_open_line_item_create(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(li_create_url(self.estimate.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+
+    def test_submitted_estimate_cannot_receive_new_line_item(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(li_create_url(self.estimate.pk), self._data())
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.assertEqual(self.estimate.line_items.count(), 0)
+
+    def test_submitted_estimate_line_item_cannot_open_edit(self):
+        item = make_line_item(self.estimate)
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(li_edit_url(item.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+
+    def test_submitted_estimate_line_item_cannot_be_edited(self):
+        item = make_line_item(
+            self.estimate,
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+        )
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(
+            li_edit_url(item.pk),
+            self._data(quantity="3.00", unit_price="50.00"),
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        item.refresh_from_db()
+        self.assertEqual(item.quantity, Decimal("1.00"))
+        self.assertEqual(item.unit_price, Decimal("100.00"))
+
+    def test_submitted_estimate_line_item_cannot_be_deleted(self):
+        item = make_line_item(self.estimate)
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(li_delete_url(item.pk))
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.assertTrue(self.estimate.line_items.filter(pk=item.pk).exists())
+
+    def test_detail_line_item_actions_hidden_after_submission(self):
+        item = make_line_item(self.estimate)
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertNotContains(response, li_create_url(self.estimate.pk))
+        self.assertNotContains(response, li_edit_url(item.pk))
+        self.assertNotContains(response, li_delete_url(item.pk))
+
 
 # ---------------------------------------------------------------------------
 # Supplement create
@@ -653,7 +875,6 @@ class SupplementCreateTests(TestCase):
 
     def _data(self, **overrides):
         data = {
-            "status": Estimate.Status.DRAFT,
             "insurance_company": "Acme",
             "claim_number": "CLM-P",
             "deductible": "500.00",
@@ -681,6 +902,7 @@ class SupplementCreateTests(TestCase):
         self.client.force_login(self.user)
         response = self.client.get(supplement_create_url(self.parent.pk))
         self.assertContains(response, "Acme")
+        self.assertNotContains(response, 'name="status"')
 
     def test_valid_create_sets_supplement_fields(self):
         self.client.force_login(self.user)
@@ -689,6 +911,7 @@ class SupplementCreateTests(TestCase):
         self.assertEqual(supplement.kind, Estimate.Kind.SUPPLEMENT)
         self.assertEqual(supplement.parent_estimate, self.parent)
         self.assertEqual(supplement.repair_order, self.ro)
+        self.assertEqual(supplement.status, Estimate.Status.DRAFT)
         self.assertRegex(supplement.estimate_number, r"^EST-\d{4}-\d{6}$")
         self.assertEqual(supplement.created_by, self.user)
         self.assertRedirects(response, detail_url(supplement.pk))

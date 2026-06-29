@@ -13,6 +13,7 @@ urlpatterns = [
     path("estimates/<int:pk>/", views.estimate_detail, name="detail"),
     path("estimates/<int:pk>/print/", views.estimate_print, name="print"),
     path("estimates/<int:pk>/edit/", views.estimate_edit, name="edit"),
+    path("estimates/<int:pk>/status/", views.estimate_status_update, name="status_update"),
     path(
         "estimates/<int:pk>/supplements/new/",
         views.supplement_create,

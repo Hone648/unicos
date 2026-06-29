@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 
 from accounts.authorization import (
     PERM_REPAIR_ORDERS_MANAGE,
@@ -11,6 +12,36 @@ from repair_orders.models import RepairOrder
 
 from .forms import EstimateForm, EstimateLineItemForm
 from .models import Estimate, EstimateLineItem
+from .services import (
+    EstimateStatusTransitionBlocked,
+    estimate_is_editable,
+    get_available_estimate_status_transitions,
+    transition_estimate_status,
+)
+
+
+_STATUS_ACTION_LABELS = {
+    Estimate.Status.SUBMITTED: "Submit Estimate",
+    Estimate.Status.APPROVED: "Approve Estimate",
+    Estimate.Status.DECLINED: "Decline Estimate",
+    Estimate.Status.EXPIRED: "Expire Estimate",
+}
+
+
+def _estimate_locked_message(estimate):
+    return (
+        f"Estimate {estimate.estimate_number} is "
+        f"{estimate.get_status_display().lower()} and cannot be edited."
+    )
+
+
+def _status_action_choices(estimate):
+    available_statuses = get_available_estimate_status_transitions(estimate)
+    return [
+        (status, _STATUS_ACTION_LABELS[status])
+        for status in _STATUS_ACTION_LABELS
+        if status in available_statuses
+    ]
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_VIEW)
@@ -36,6 +67,8 @@ def estimate_detail(request, pk):
         "line_items": line_items,
         "supplements": supplements,
         "has_line_items": bool(line_items),
+        "is_editable": estimate_is_editable(estimate),
+        "status_action_choices": _status_action_choices(estimate),
     })
 
 
@@ -57,6 +90,26 @@ def estimate_print(request, pk):
         "line_items": line_items,
         "has_line_items": bool(line_items),
     })
+
+
+@app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
+@require_POST
+def estimate_status_update(request, pk):
+    estimate = get_object_or_404(Estimate, pk=pk)
+    new_status = request.POST.get("status", "").strip()
+
+    try:
+        transition_estimate_status(estimate, new_status, updated_by=request.user)
+    except EstimateStatusTransitionBlocked as exc:
+        messages.error(request, str(exc))
+        return redirect("estimates:detail", pk=estimate.pk)
+
+    messages.success(
+        request,
+        f"Estimate {estimate.estimate_number} marked "
+        f"{estimate.get_status_display().lower()}.",
+    )
+    return redirect("estimates:detail", pk=estimate.pk)
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -102,6 +155,10 @@ def estimate_edit(request, pk):
         pk=pk,
     )
     ro = estimate.repair_order
+
+    if not estimate_is_editable(estimate):
+        messages.error(request, _estimate_locked_message(estimate))
+        return redirect("estimates:detail", pk=estimate.pk)
 
     if request.method == "POST":
         form = EstimateForm(request.POST, instance=estimate)
@@ -180,6 +237,10 @@ def line_item_create(request, estimate_pk):
         pk=estimate_pk,
     )
 
+    if not estimate_is_editable(estimate):
+        messages.error(request, _estimate_locked_message(estimate))
+        return redirect("estimates:detail", pk=estimate.pk)
+
     if request.method == "POST":
         form = EstimateLineItemForm(request.POST)
         if form.is_valid():
@@ -213,6 +274,10 @@ def line_item_edit(request, pk):
     )
     estimate = line_item.estimate
 
+    if not estimate_is_editable(estimate):
+        messages.error(request, _estimate_locked_message(estimate))
+        return redirect("estimates:detail", pk=estimate.pk)
+
     if request.method == "POST":
         form = EstimateLineItemForm(request.POST, instance=line_item)
         if form.is_valid():
@@ -240,6 +305,10 @@ def line_item_delete(request, pk):
         pk=pk,
     )
     estimate = line_item.estimate
+
+    if not estimate_is_editable(estimate):
+        messages.error(request, _estimate_locked_message(estimate))
+        return redirect("estimates:detail", pk=estimate.pk)
 
     if request.method != "POST":
         return redirect("estimates:detail", pk=estimate.pk)

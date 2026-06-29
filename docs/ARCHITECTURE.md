@@ -31,7 +31,8 @@ Architectural style:
   - Estimates: estimate create/detail/edit entered from repair-order detail
     (`/repair-orders/<pk>/estimates/new/`, `/estimates/<pk>/`,
     `/estimates/<pk>/edit/`); browser-printable estimate output
-    (`/estimates/<pk>/print/`); estimate line-item create/edit/delete
+    (`/estimates/<pk>/print/`); explicit estimate status actions
+    (`/estimates/<pk>/status/`); estimate line-item create/edit/delete
     (`/estimates/<pk>/line-items/new/`, `/estimates/line-items/<pk>/edit/`,
     `/estimates/line-items/<pk>/delete/`) and supplement create
     (`/estimates/<pk>/supplements/new/`); estimate detail shows line items,
@@ -83,8 +84,12 @@ Current domain models:
   order; FK to repair order uses `PROTECT`; a repair order may have multiple
   estimates; tracks a small status lifecycle (draft/submitted/approved/declined/
   expired) plus insurance company, claim number, deductible, and estimated
-  total; number is system-generated (`EST-YYYY-NNNNNN`); does not affect invoice
-  behavior. An estimate may be an initial estimate or a supplement
+  total; number is system-generated (`EST-YYYY-NNNNNN`); status changes are
+  controlled by explicit shop-facing POST actions (`draft -> submitted`,
+  `submitted -> approved/declined/expired`), and submitted/final estimates are
+  read-only for normal estimate/detail and line-item mutation views; estimate
+  status does not affect invoice behavior. An estimate may be an initial
+  estimate or a supplement
   (`kind="supplement"`) that links back to a `parent_estimate` (`PROTECT`,
   self-FK) belonging to the same repair order; lineage rules are enforced in
   `Estimate.clean()`
@@ -203,15 +208,15 @@ Customer, Vehicle, Repair Order (with status history), Invoice, InvoiceLineItem,
 and Payment now exist. The Estimate spine now includes itemized estimate line
 items (which drive the estimated total) and a minimal supplement lineage
 (supplements are estimates with `kind="supplement"` and a parent estimate).
-Approval workflow, generated PDF output, invoice generation from estimates,
-conversion of estimate lines into invoice lines, and payment processor
-integration are planned for later slices.
+Generated PDF output, invoice generation from estimates, conversion of estimate
+lines into invoice lines, and payment processor integration are planned for
+later slices.
 
 Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimate records, estimate line items, supplement lineage, and browser-printable estimate output exist; still missing estimate approval, full estimate versioning, generated PDF output, and invoice generation from estimates |
+| Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, and a small approval status flow exist; still missing full estimate versioning, generated PDF output, and invoice generation from estimates |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

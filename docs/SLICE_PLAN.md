@@ -36,10 +36,11 @@ Planned slices:
 31. Slice 30: estimate line items and supplements (EstimateLineItem model with CASCADE to Estimate; line-item create/edit/POST-delete; estimated_total recalculated from line items when present, manual otherwise; estimate edit disables estimated_total when line items exist; supplement lineage via Estimate.kind=supplement + parent_estimate self-FK with clean() validation; supplement create workflow from estimate detail; line items and supplement links on estimate detail; admin inline + EstimateLineItem admin; estimates reuse repair-order permissions; invoice/billing behavior unchanged; one estimates migration)
 32. Slice 31: Docker smoke readiness hardening (CI/runtime readiness checks tightened; no domain changes)
 33. Slice 32: printable estimate output (read-only browser-printable estimate page; print link from estimate detail; print CSS; line-item totals, manual-total fallback, insurance, customer, vehicle, repair-order, supplement parent, and notes context; no PDF generation and no domain changes)
+34. Slice 33: estimate approval status flow (centralized estimate status transition service; explicit POST status action endpoint; draft -> submitted and submitted -> approved/declined/expired; submitted and terminal estimates are read-only for normal estimate edit and line-item mutation views; status removed from normal shop-facing forms; no migrations; no invoice/billing behavior changes)
 
 Likely next implementation slices:
 
-- Slice 33: estimate approval workflow, invoice generation from estimates, or advanced search/filtering
+- Slice 34: estimate-to-invoice planning, customer approval capture, or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
