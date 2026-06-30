@@ -156,7 +156,9 @@ class ShopFacingAuthorizationTests(TestCase):
         )
 
         self.client.logout()
-        self.login_as("technician-repair", ROLE_TECHNICIAN)
+        technician = self.login_as("technician-repair", ROLE_TECHNICIAN)
+        self.ro.assigned_to = technician
+        self.ro.save(update_fields=["assigned_to", "updated_at"])
         self.assertEqual(self.client.get(reverse("repair_orders:list")).status_code, 200)
         self.assertEqual(
             self.client.get(reverse("repair_orders:detail", args=[self.ro.pk])).status_code,

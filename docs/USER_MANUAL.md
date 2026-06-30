@@ -55,8 +55,7 @@ Be aware of these limitations before using Unicos in day-to-day operations.
 - **No estimate reopen or revision workflow.** Once an estimate leaves draft status, it cannot be reopened for editing through shop-facing views. A supplement can capture additional work.
 - **No digital approval artifacts.** Estimate approval records source, contact, optional reference, optional note, and timestamp only. There are no signatures, uploads, email approval links, or customer portal approvals yet.
 - **No email or PDF generation.** Estimate and invoice output uses the browser's built-in print function. There is no automated email sending or server-side PDF export.
-- **No object-level permissions.** All staff with a given role can see and act on all records of that type, regardless of who created them. There are no per-record access restrictions.
-- **No technician assignment constraints.** Technicians can view all repair orders, not just their assigned ones.
+- **Limited object-level permissions.** Shop-facing repair-order, estimate, and billing views now use object-level policy checks. Technician repair-order visibility is limited to assigned repair orders. Full customer/vehicle object policies, multi-shop tenancy, and Django admin object policies are not implemented.
 - **Django admin is separate.** The Django admin interface (if accessible) uses its own authorization system that is not connected to the shop-facing permission helpers described in this manual.
 - **Deployment is not production-ready.** See the README for production prerequisites.
 
@@ -74,7 +73,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 | Manager | All actions across all areas |
 | Front Desk | Customer intake, vehicle intake, repair order create/edit, estimate/supplement work, view invoices, record payments |
 | Estimator | View dashboard, view customers, view repair orders, change repair order status, view invoices |
-| Technician | View dashboard, view repair orders |
+| Technician | View dashboard, view assigned repair orders |
 | Read-only | View dashboard, view customers, view repair orders, view invoices |
 
 **Important notes on roles:**
@@ -89,7 +88,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 
 - **Front Desk** can create and edit estimates, supplements, and estimate line items because those actions currently use `repair_orders.manage`. Front Desk cannot change repair order status, issue or void invoices, or convert estimates to invoices. Front Desk can record payments.
 - **Estimator** cannot create or edit repair orders, estimates, supplements, or estimate line items. Cannot manage invoices or record payments. Can view all of the above and can change repair order status.
-- **Technician** cannot view customers or billing. Can only view the dashboard and repair order list/detail.
+- **Technician** cannot view customers or billing. Can only view the dashboard and assigned repair order list/detail.
 - **Read-only** cannot create or edit anything. Cannot record payments.
 
 ---
@@ -485,7 +484,7 @@ The invoice starts in Draft status.
 
 Go to `/billing/invoices/` to see all invoices. Filter by status using the tabs. Search by invoice number or repair order number. The list paginates at 25 per page.
 
-**Who can view invoices:** Owner/Admin, Manager, Front Desk, Estimator, Read-only (billing.view).
+**Who can view invoices:** Owner/Admin, Manager, Front Desk, Estimator, Read-only (billing.view), subject to repair-order object policy checks.
 
 ### Viewing an invoice
 

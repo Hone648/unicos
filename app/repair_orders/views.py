@@ -8,6 +8,15 @@ from accounts.authorization import (
     PERM_REPAIR_ORDERS_VIEW,
     app_permission_required,
 )
+from accounts.policies import (
+    can_change_repair_order_status,
+    can_edit_repair_order,
+    can_manage_estimate_for_repair_order,
+    can_manage_invoice_for_repair_order,
+    filter_repair_orders_for_user,
+    require_policy,
+)
+from accounts.policies import can_view_repair_order as policy_can_view_repair_order
 from core.document_numbers import generate_repair_order_number
 from core.pagination import paginate_queryset, pagination_querystring
 
@@ -23,7 +32,7 @@ _CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
 _VALID_STATUSES = set(RepairOrder.Status.values)
 
 
-def _repair_order_detail_context(ro):
+def _repair_order_detail_context(ro, user):
     """Build context shared by the full detail view and HTMX partial responses."""
     history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
     invoice = None
@@ -40,6 +49,25 @@ def _repair_order_detail_context(ro):
     estimates = list(
         ro.estimates.select_related("parent_estimate", "created_by", "updated_by").order_by("-updated_at", "-id")
     )
+    can_manage_invoice = False
+    can_record_payment = False
+    can_manage_invoice_line_items = False
+    from accounts.policies import can_view_invoice_for_repair_order
+
+    can_view_invoice = can_view_invoice_for_repair_order(user, ro)
+    if invoice is not None:
+        from accounts.policies import (
+            can_manage_invoice as policy_can_manage_invoice,
+            can_manage_invoice_line_items as policy_can_manage_invoice_line_items,
+            can_record_payment as policy_can_record_payment,
+            can_view_invoice as policy_can_view_invoice,
+        )
+
+        can_view_invoice = policy_can_view_invoice(user, invoice)
+        can_manage_invoice = policy_can_manage_invoice(user, invoice)
+        can_record_payment = policy_can_record_payment(user, invoice)
+        can_manage_invoice_line_items = policy_can_manage_invoice_line_items(user, invoice)
+
     return {
         "ro": ro,
         "history": history,
@@ -49,6 +77,14 @@ def _repair_order_detail_context(ro):
         "payments": payments,
         "estimates": estimates,
         "status_choices": RepairOrder.Status.choices,
+        "can_edit_repair_order": can_edit_repair_order(user, ro),
+        "can_change_repair_order_status": can_change_repair_order_status(user, ro),
+        "can_create_estimate": can_manage_estimate_for_repair_order(user, ro),
+        "can_view_invoice": can_view_invoice,
+        "can_manage_invoice": can_manage_invoice,
+        "can_create_invoice": can_manage_invoice_for_repair_order(user, ro),
+        "can_record_payment": can_record_payment,
+        "can_manage_invoice_line_items": can_manage_invoice_line_items,
     }
 
 
@@ -58,6 +94,7 @@ def repair_order_list(request):
         RepairOrder.objects.select_related("customer", "vehicle", "assigned_to")
         .order_by("-opened_at", "-id")
     )
+    qs = filter_repair_orders_for_user(request.user, qs)
 
     status_filter = request.GET.get("status", "")
     q = request.GET.get("q", "").strip()
@@ -113,8 +150,9 @@ def repair_order_detail(request, pk):
         ),
         pk=pk,
     )
+    require_policy(policy_can_view_repair_order(request.user, ro))
     return render(request, "repair_orders/repair_order_detail.html",
-                  _repair_order_detail_context(ro))
+                  _repair_order_detail_context(ro, request.user))
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_CHANGE_STATUS)
@@ -125,6 +163,7 @@ def repair_order_status_update(request, pk):
     is_htmx = request.headers.get("HX-Request") == "true"
 
     ro = get_object_or_404(RepairOrder, pk=pk)
+    require_policy(can_change_repair_order_status(request.user, ro))
     new_status = request.POST.get("new_status", "").strip()
     note = request.POST.get("note", "").strip()
 
@@ -133,14 +172,14 @@ def repair_order_status_update(request, pk):
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
         return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro))
+                      _repair_order_detail_context(ro, request.user))
 
     if new_status == ro.status:
         messages.info(request, "Status is already set to that value — no change made.")
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
         return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro))
+                      _repair_order_detail_context(ro, request.user))
 
     if not note:
         note = "Status changed from repair order workspace."
@@ -152,7 +191,7 @@ def repair_order_status_update(request, pk):
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
         return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro))
+                      _repair_order_detail_context(ro, request.user))
 
     label = dict(RepairOrder.Status.choices).get(new_status, new_status)
     messages.success(request, f"Status updated to \"{label}\".")
@@ -161,7 +200,7 @@ def repair_order_status_update(request, pk):
         return redirect("repair_orders:detail", pk=pk)
 
     return render(request, "repair_orders/partials/_status_update_response.html",
-                  _repair_order_detail_context(ro))
+                  _repair_order_detail_context(ro, request.user))
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -190,6 +229,7 @@ def repair_order_create(request):
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
 def repair_order_edit(request, pk):
     ro = get_object_or_404(RepairOrder, pk=pk)
+    require_policy(can_edit_repair_order(request.user, ro))
     if is_final_repair_order_status(ro.status):
         messages.error(
             request,

@@ -40,7 +40,7 @@
     <p class="muted-text">No estimates on file for this repair order.</p>
   {% endif %}
 
-  {% if user|has_app_permission:"repair_orders.manage" %}
+  {% if can_create_estimate %}
     <div class="action-row">
       <a class="button button-primary" href="{% url 'estimates:create' repair_order_pk=ro.pk %}">Create Estimate</a>
     </div>
