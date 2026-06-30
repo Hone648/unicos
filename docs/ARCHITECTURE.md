@@ -49,8 +49,8 @@ Architectural style:
   - Reports (`/reports/`): read-only server-rendered operational snapshot built
     from existing repair-order, billing, and estimate models. It is gated by
     the explicit `reports.view` app permission and currently exposes aggregate
-    counts plus limited attention queues; exports, date ranges, charts, and
-    per-object report scoping are future work
+    counts, limited attention queues, date/status filters, and CSV exports;
+    charts and per-object report scoping are future work
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
   frontend build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
@@ -163,7 +163,7 @@ Authorization:
 - `accounts.policies` adds object-level policy checks for repair-order,
   estimate, and billing views. App-level decorators remain the first gate.
 - Reporting currently uses report-level authorization only via `reports.view`;
-  per-object reporting scope and filtered exports are future work.
+  per-object reporting scope is future work.
 - Superusers and Owner/Admin retain full app-level access.
 - `is_staff` is not treated as a shop permission.
 - Templates may hide actions, but view checks are authoritative.
@@ -315,7 +315,7 @@ Missing body-shop workflow areas:
 | Attachments | basic repair-order file upload/download/delete implemented (Slice 42); still missing estimate/invoice-specific attachments, global attachment queue, thumbnails, image processing, production media serving, malware scanning, signed-form workflow |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
-| Reporting | read-only operational snapshot exists for key repair-order, invoice, and estimate counts; still missing scoped filters, date ranges, exports, charts, revenue, receivables, cycle time, and aging invoices |
+| Reporting | read-only operational snapshot exists for key repair-order, invoice, and estimate counts, with date/status filters and CSV exports; still missing scoped object filtering, charts, revenue, receivables, cycle time, and aging invoices |
 
 List scalability gap:
 
