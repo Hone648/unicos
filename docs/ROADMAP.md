@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 38. It should guide
+This roadmap reflects the current implementation after Slice 39. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -11,6 +11,8 @@ Implemented:
 - Custom user model, login/logout, and baseline role groups
 - Initial app-level permission helpers, role-based shop-facing view
   enforcement, and an object-level policy scaffold
+- Explicit Django admin policy decision: admin is an emergency/development
+  back-office console, not the primary shop-facing workflow
 - Customer and vehicle records
 - Repair orders, status history, create/edit workflow, and HTMX status updates
 - Dashboard workflow visibility
@@ -77,11 +79,12 @@ Remaining limits:
 
 ### Priority 3 - Centralized Lifecycle/Domain Services
 
-Status: partially implemented in Slices 26 and 37.
+Status: partially implemented in Slices 26, 37, and 39.
 
 ```text
 Slice 26: repair-order lifecycle service boundary
 Slice 37: billing service boundary and payment concurrency guarantee
+Slice 39: Django admin policy decision / ADR
 ```
 
 Repair-order status transitions are now centralized in
@@ -96,6 +99,9 @@ checking balance and saving the payment.
 Remaining service-layer gaps:
 
 - No admin override pathway exists for lifecycle rules.
+- Admin service alignment is partial: repair-order admin status changes route
+  through services, while billing and estimate admin still save directly in
+  places.
 
 Future service-layer direction:
 
@@ -215,8 +221,17 @@ Required later:
 - Configure secure cookies and HSTS.
 - Document backups and restore.
 - Lock down admin access.
+- Align admin mutations with domain services or require explicit audited
+  override reasons for production bypasses.
 - Design media storage for attachments/photos/documents.
 - Define deployment-specific environment management.
+
+Recommended next slices:
+
+- Quality gates foundation: Ruff/format/pre-commit.
+- Reporting foundation.
+- Attachments/media model.
+- Admin service-alignment and override audit later.
 
 ## Missing Body-Shop Workflow Areas
 
