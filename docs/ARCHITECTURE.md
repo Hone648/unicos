@@ -147,6 +147,8 @@ Authorization:
 - `accounts.authorization` maps those role groups to explicit app-level
   permissions.
 - Major shop-facing views require app permissions, not only login.
+- `accounts.policies` adds object-level policy checks for repair-order,
+  estimate, and billing views. App-level decorators remain the first gate.
 - Superusers and Owner/Admin retain full app-level access.
 - `is_staff` is not treated as a shop permission.
 - Templates may hide actions, but view checks are authoritative.
@@ -166,10 +168,12 @@ Current permission matrix:
 
 Remaining limitations:
 
-- No object-level permissions yet.
-- No technician assignment constraints yet.
-- Technician access is intentionally conservative until assigned-RO semantics
-  exist.
+- Technician access is intentionally conservative: technicians can view assigned
+  repair orders in shop-facing repair-order views but cannot view unrelated
+  repair orders, edit repair orders, change statuses, manage estimates, or
+  mutate billing.
+- Estimate and invoice object policies inherit repair-order object scope.
+- Full customer/vehicle object policies are not implemented yet.
 - Admin permissions are not unified with shop-facing helpers.
 
 Lifecycle service layer:

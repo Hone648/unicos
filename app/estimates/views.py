@@ -8,6 +8,13 @@ from accounts.authorization import (
     PERM_REPAIR_ORDERS_VIEW,
     app_permission_required,
 )
+from accounts.policies import (
+    can_convert_estimate_to_invoice,
+    can_manage_estimate,
+    can_manage_estimate_for_repair_order,
+    can_view_estimate,
+    require_policy,
+)
 from billing.services import (
     EstimateInvoiceConversionBlocked,
     convert_estimate_to_invoice,
@@ -63,12 +70,18 @@ def estimate_detail(request, pk):
         ),
         pk=pk,
     )
+    require_policy(can_view_estimate(request.user, estimate))
     line_items = list(estimate.line_items.all())
     supplements = list(
         estimate.supplements.order_by("-updated_at", "-id")
     )
     converted_invoice = estimate.converted_invoices.first()
     status_action_choices = _status_action_choices(estimate)
+    can_manage = can_manage_estimate(request.user, estimate)
+    can_convert = (
+        can_convert_estimate_to_invoice(request.user, estimate)
+        and estimate_can_convert_to_invoice(estimate)
+    )
     return render(request, "estimates/estimate_detail.html", {
         "estimate": estimate,
         "ro": estimate.repair_order,
@@ -78,9 +91,11 @@ def estimate_detail(request, pk):
         "is_editable": estimate_is_editable(estimate),
         "status_action_choices": status_action_choices,
         "approval_form": EstimateApprovalForm()
-        if Estimate.Status.APPROVED in {status for status, _label in status_action_choices}
+        if can_manage
+        and Estimate.Status.APPROVED in {status for status, _label in status_action_choices}
         else None,
-        "can_convert_to_invoice": estimate_can_convert_to_invoice(estimate),
+        "can_manage_estimate": can_manage,
+        "can_convert_to_invoice": can_convert,
         "converted_invoice": converted_invoice,
     })
 
@@ -96,6 +111,7 @@ def estimate_print(request, pk):
         ),
         pk=pk,
     )
+    require_policy(can_view_estimate(request.user, estimate))
     line_items = list(estimate.line_items.all())
     return render(request, "estimates/estimate_print.html", {
         "estimate": estimate,
@@ -109,6 +125,7 @@ def estimate_print(request, pk):
 @require_POST
 def estimate_status_update(request, pk):
     estimate = get_object_or_404(Estimate, pk=pk)
+    require_policy(can_manage_estimate(request.user, estimate))
     new_status = request.POST.get("status", "").strip()
     approval_data = None
 
@@ -149,6 +166,7 @@ def estimate_convert_to_invoice(request, pk):
         Estimate.objects.select_related("repair_order"),
         pk=pk,
     )
+    require_policy(can_convert_estimate_to_invoice(request.user, estimate))
 
     try:
         invoice = convert_estimate_to_invoice(estimate, created_by=request.user)
@@ -170,6 +188,7 @@ def estimate_create(request, repair_order_pk):
         RepairOrder.objects.select_related("customer", "vehicle"),
         pk=repair_order_pk,
     )
+    require_policy(can_manage_estimate_for_repair_order(request.user, ro))
 
     if request.method == "POST":
         form = EstimateForm(request.POST)
@@ -207,6 +226,7 @@ def estimate_edit(request, pk):
         pk=pk,
     )
     ro = estimate.repair_order
+    require_policy(can_manage_estimate(request.user, estimate))
 
     if not estimate_is_editable(estimate):
         messages.error(request, _estimate_locked_message(estimate))
@@ -245,6 +265,7 @@ def supplement_create(request, pk):
         pk=pk,
     )
     ro = parent.repair_order
+    require_policy(can_manage_estimate(request.user, parent))
 
     if request.method == "POST":
         form = EstimateForm(request.POST)
@@ -288,6 +309,7 @@ def line_item_create(request, estimate_pk):
         Estimate.objects.select_related("repair_order"),
         pk=estimate_pk,
     )
+    require_policy(can_manage_estimate(request.user, estimate))
 
     if not estimate_is_editable(estimate):
         messages.error(request, _estimate_locked_message(estimate))
@@ -325,6 +347,7 @@ def line_item_edit(request, pk):
         pk=pk,
     )
     estimate = line_item.estimate
+    require_policy(can_manage_estimate(request.user, estimate))
 
     if not estimate_is_editable(estimate):
         messages.error(request, _estimate_locked_message(estimate))
@@ -357,6 +380,7 @@ def line_item_delete(request, pk):
         pk=pk,
     )
     estimate = line_item.estimate
+    require_policy(can_manage_estimate(request.user, estimate))
 
     if not estimate_is_editable(estimate):
         messages.error(request, _estimate_locked_message(estimate))

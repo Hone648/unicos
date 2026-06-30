@@ -7,7 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from accounts.authorization import ROLE_MANAGER
+from accounts.authorization import ROLE_ESTIMATOR, ROLE_FRONT_DESK, ROLE_MANAGER
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder
@@ -595,6 +595,58 @@ class PaymentCreateAuthTests(TestCase):
         url = payment_create_url(self.invoice.pk)
         response = self.client.get(url)
         self.assertRedirects(response, f"/accounts/login/?next={url}")
+
+
+class BillingObjectPolicyViewTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-BILLING-POLICY",
+        )
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-BILLING-POLICY",
+            subtotal=Decimal("100.00"),
+            tax_amount=Decimal("0.00"),
+        )
+
+    def _payment_data(self, **overrides):
+        data = {
+            "payment_date": date.today().isoformat(),
+            "amount": "25.00",
+            "method": Payment.Method.CASH,
+            "reference": "",
+            "notes": "",
+        }
+        data.update(overrides)
+        return data
+
+    def test_front_desk_can_access_payment_form(self):
+        user = make_user(username="billing-policy-frontdesk", role_name=ROLE_FRONT_DESK)
+        self.client.force_login(user)
+        response = self.client.get(payment_create_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_front_desk_cannot_issue_invoice(self):
+        user = make_user(username="billing-policy-frontdesk-issue", role_name=ROLE_FRONT_DESK)
+        self.client.force_login(user)
+        response = self.client.post(invoice_issue_url(self.invoice.pk))
+        self.assertEqual(response.status_code, 403)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.DRAFT)
+
+    def test_estimator_cannot_record_payment(self):
+        user = make_user(username="billing-policy-estimator", role_name=ROLE_ESTIMATOR)
+        self.client.force_login(user)
+        response = self.client.post(
+            payment_create_url(self.invoice.pk),
+            self._payment_data(),
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertFalse(Payment.objects.filter(invoice=self.invoice).exists())
 
 
 class PaymentCreateTests(TestCase):

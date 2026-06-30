@@ -10,6 +10,14 @@ from accounts.authorization import (
     PERM_BILLING_VIEW,
     app_permission_required,
 )
+from accounts.policies import (
+    can_manage_invoice,
+    can_manage_invoice_for_repair_order,
+    can_manage_invoice_line_items,
+    can_record_payment,
+    can_view_invoice,
+    require_policy,
+)
 from core.document_numbers import generate_invoice_number
 from core.pagination import paginate_queryset, pagination_querystring
 from repair_orders.business_rules import is_final_repair_order_status
@@ -150,6 +158,7 @@ def invoice_detail(request, pk):
         pk=pk,
     )
     ro = invoice.repair_order
+    require_policy(can_view_invoice(request.user, invoice))
     line_items = list(invoice.line_items.all())
     payments = list(
         invoice.payments.select_related("received_by").order_by("-payment_date", "-created_at")
@@ -160,6 +169,9 @@ def invoice_detail(request, pk):
         "ro": ro,
         "line_items": line_items,
         "payments": payments,
+        "can_manage_invoice": can_manage_invoice(request.user, invoice),
+        "can_manage_invoice_line_items": can_manage_invoice_line_items(request.user, invoice),
+        "can_record_payment": can_record_payment(request.user, invoice),
     })
 
 
@@ -169,6 +181,7 @@ def invoice_create_for_repair_order(request, repair_order_pk):
         RepairOrder.objects.select_related("customer", "vehicle"),
         pk=repair_order_pk,
     )
+    require_policy(can_manage_invoice_for_repair_order(request.user, ro))
 
     if _repair_order_is_final(ro):
         messages.error(request, _final_repair_order_message(ro))
@@ -221,6 +234,7 @@ def invoice_edit(request, pk):
         pk=pk,
     )
     ro = invoice.repair_order
+    require_policy(can_manage_invoice(request.user, invoice))
 
     if _repair_order_is_final(ro):
         messages.error(request, _final_invoice_message(invoice))
@@ -258,6 +272,7 @@ def invoice_issue(request, pk):
 
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
+    require_policy(can_manage_invoice(request.user, invoice))
 
     try:
         issue_invoice(invoice, actor=request.user)
@@ -282,6 +297,7 @@ def invoice_void(request, pk):
 
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
+    require_policy(can_manage_invoice(request.user, invoice))
 
     try:
         void_invoice(invoice, actor=request.user)
@@ -310,6 +326,7 @@ def payment_create(request, invoice_pk):
         pk=invoice_pk,
     )
     ro = invoice.repair_order
+    require_policy(can_record_payment(request.user, invoice))
 
     try:
         ensure_payment_recordable(invoice)
@@ -350,6 +367,7 @@ def line_item_create(request, invoice_pk):
         pk=invoice_pk,
     )
     ro = invoice.repair_order
+    require_policy(can_manage_invoice_line_items(request.user, invoice))
 
     try:
         ensure_invoice_line_items_mutable(invoice)
@@ -398,6 +416,7 @@ def line_item_edit(request, pk):
     )
     invoice = line_item.invoice
     ro = invoice.repair_order
+    require_policy(can_manage_invoice_line_items(request.user, invoice))
 
     try:
         ensure_invoice_line_items_mutable(invoice)

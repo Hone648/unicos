@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 37. It should guide
+This roadmap reflects the current implementation after Slice 38. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -9,8 +9,8 @@ Implemented:
 
 - Django/PostgreSQL/Docker Compose scaffold
 - Custom user model, login/logout, and baseline role groups
-- Initial app-level permission helpers and role-based shop-facing view
-  enforcement
+- Initial app-level permission helpers, role-based shop-facing view
+  enforcement, and an object-level policy scaffold
 - Customer and vehicle records
 - Repair orders, status history, create/edit workflow, and HTMX status updates
 - Dashboard workflow visibility
@@ -41,14 +41,17 @@ manual (`docs/USER_MANUAL.md`) covering the full implemented workflow.
 
 ### Priority 2 - Real Role/Permission Enforcement
 
-Status: implemented in Slice 25 at an initial app-permission level.
+Status: implemented in Slice 25 at an initial app-permission level and extended
+with object-level policy scaffolding in Slice 38.
 
 ```text
 Slice 25: authorization matrix and permission helpers
+Slice 38: object-level authorization policy scaffold
 ```
 
 The app now defines a domain-specific permission matrix and enforces app-level
-permissions in major shop-facing views.
+permissions in major shop-facing views. `accounts.policies` adds object-level
+policy checks for repair orders, estimates, and billing objects.
 
 Proposed matrix:
 
@@ -63,8 +66,9 @@ Proposed matrix:
 
 Remaining limits:
 
-- No object-level permissions yet.
-- No technician assignment constraints yet.
+- Technician repair-order access is scoped to assigned repair orders in
+  shop-facing repair-order views.
+- Estimate and invoice policies inherit repair-order object scope.
 - Django admin still uses Django admin/staff/superuser authorization and is not
   unified with shop-facing helpers.
 - `is_staff` is not treated as a shop permission.

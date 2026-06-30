@@ -41,10 +41,12 @@ Planned slices:
 36. Slice 35: user manual and operator workflow guide (`docs/USER_MANUAL.md`; operator-facing guide covering customer, vehicle, repair order, estimate, supplement, print, approval lifecycle, estimate-to-invoice conversion, invoices, payments, closure rules, common workflows, troubleshooting FAQ, and glossary; role/permission table matching actual implemented matrix; honest limitation notes; README link; ADR 0038; docs-only, no app code changes)
 37. Slice 36: customer/insurer approval capture (Estimate approval source/contact/reference/note/approved_at fields; approval source/contact required when moving submitted -> approved through the shop-facing status action; detail and print show captured approval metadata; estimate-to-invoice conversion requires approval capture in addition to approved status, line items, no prior conversion, and no existing repair-order invoice; admin exposes approval fields; one estimates migration)
 38. Slice 37: billing service boundary and payment concurrency guarantee (`billing.services` owns invoice issue, invoice void, payment recording, and invoice line-item mutations; payment recording locks the invoice row with `select_for_update()`; views remain thin; no migrations)
+39. Slice 38: object-level authorization policy scaffold (`accounts.policies` object-policy layer; assigned technicians can view only assigned repair orders; repair-order, estimate, and billing views enforce app-level plus object-level authorization; no migrations)
 
 Likely next implementation slices:
 
-- Slice 38: supplement-to-invoice handling, approval artifact/signature planning, or advanced search/filtering
+- Slice 39: admin policy decision / ADR
+- Slice 40: quality gates, reporting foundation, attachments/media model, supplement-to-invoice handling, approval artifact/signature planning, or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

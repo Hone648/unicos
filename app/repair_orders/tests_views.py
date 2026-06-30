@@ -6,7 +6,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 
-from accounts.authorization import ROLE_MANAGER, ROLE_TECHNICIAN
+from accounts.authorization import ROLE_MANAGER, ROLE_READ_ONLY, ROLE_TECHNICIAN
 from billing.models import Invoice, Payment
 from customers.models import Customer
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
@@ -100,6 +100,58 @@ class RepairOrderListAuthTests(TestCase):
         self.client.force_login(make_user())
         response = self.client.get(LIST_URL)
         self.assertEqual(response.status_code, 200)
+
+
+class RepairOrderObjectPolicyViewTests(TestCase):
+    def setUp(self):
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.other_vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
+        self.technician = make_user(username="ro-policy-tech", role_name=ROLE_TECHNICIAN)
+        self.assigned_ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-POLICY-ASSIGNED",
+            assigned_to=self.technician,
+        )
+        self.unassigned_ro = make_repair_order(
+            self.customer,
+            self.other_vehicle,
+            number="RO-POLICY-UNASSIGNED",
+        )
+
+    def test_technician_can_open_assigned_repair_order_detail(self):
+        self.client.force_login(self.technician)
+        response = self.client.get(detail_url(self.assigned_ro.pk))
+        self.assertEqual(response.status_code, 200)
+
+    def test_technician_gets_403_for_unassigned_repair_order_detail(self):
+        self.client.force_login(self.technician)
+        response = self.client.get(detail_url(self.unassigned_ro.pk))
+        self.assertEqual(response.status_code, 403)
+
+    def test_technician_list_only_includes_assigned_repair_orders(self):
+        self.client.force_login(self.technician)
+        response = self.client.get(LIST_URL)
+        self.assertContains(response, "RO-POLICY-ASSIGNED")
+        self.assertNotContains(response, "RO-POLICY-UNASSIGNED")
+
+    def test_read_only_can_view_but_cannot_post_mutation_endpoint(self):
+        user = make_user(username="ro-policy-readonly", role_name=ROLE_READ_ONLY)
+        self.client.force_login(user)
+        self.assertEqual(self.client.get(detail_url(self.unassigned_ro.pk)).status_code, 200)
+        response = self.client.post(
+            edit_url(self.unassigned_ro.pk),
+            {
+                "customer": self.customer.pk,
+                "vehicle": self.other_vehicle.pk,
+                "assigned_to": "",
+                "promised_date": "",
+                "reported_problem": "No save",
+                "internal_notes": "",
+            },
+        )
+        self.assertEqual(response.status_code, 403)
 
 
 class RepairOrderListFilterTests(TestCase):
@@ -1034,6 +1086,10 @@ class InvoiceSummaryPermissionTests(TestCase):
     def _login(self, username, role_name):
         user = make_user(username=username, role_name=role_name)
         self.client.force_login(user)
+        if role_name == ROLE_TECHNICIAN:
+            self.ro.assigned_to = user
+            self.ro.save(update_fields=["assigned_to", "updated_at"])
+        return user
 
     def test_technician_can_load_ro_detail(self):
         self._login("tech-ro-load", ROLE_TECHNICIAN)

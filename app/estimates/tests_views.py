@@ -7,6 +7,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.authorization import (
+    ROLE_ESTIMATOR,
     ROLE_MANAGER,
     ROLE_READ_ONLY,
 )
@@ -197,6 +198,10 @@ class EstimatePermissionTests(TestCase):
 
     def test_view_permission_can_view_detail(self):
         self.client.force_login(make_user("ro-viewer", ROLE_READ_ONLY))
+        self.assertEqual(self.client.get(detail_url(self.estimate.pk)).status_code, 200)
+
+    def test_estimator_can_view_detail(self):
+        self.client.force_login(make_user("estimator-viewer", ROLE_ESTIMATOR))
         self.assertEqual(self.client.get(detail_url(self.estimate.pk)).status_code, 200)
 
     def test_view_permission_can_view_print_page(self):
