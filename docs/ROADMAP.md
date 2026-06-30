@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 41. It should guide
+This roadmap reflects the current implementation after Slice 43. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -29,6 +29,12 @@ Implemented:
   migrations, full tests, Docker build/runtime smoke, and `/healthz/`
 - Read-only reporting foundation at `/reports/` for repair-order, billing, and
   estimate operational snapshots, gated by `reports.view`
+- Repair-order file attachments (upload, download, delete; local `media/`
+  storage; policy-gated)
+- Admin service alignment: estimate status changes, invoice issue/void,
+  payment recording, and invoice line-item mutation in Django admin are
+  service-backed or read-only, matching the existing repair-order admin
+  pattern
 
 The app is local-development only and is not production-ready.
 
@@ -81,12 +87,13 @@ Remaining limits:
 
 ### Priority 3 - Centralized Lifecycle/Domain Services
 
-Status: partially implemented in Slices 26, 37, and 39.
+Status: implemented in Slices 26, 37, 39, and 43.
 
 ```text
 Slice 26: repair-order lifecycle service boundary
 Slice 37: billing service boundary and payment concurrency guarantee
 Slice 39: Django admin policy decision / ADR
+Slice 43: admin service-alignment / override audit
 ```
 
 Repair-order status transitions are now centralized in
@@ -98,12 +105,19 @@ issue, invoice void, payment recording, and invoice line-item create/edit.
 Payment recording locks the invoice row with `select_for_update()` before
 checking balance and saving the payment.
 
+Slice 43 closed the remaining admin gaps: estimate status changes, invoice
+issue/void, payment recording, and invoice line-item mutation now route
+through their respective services (or are made read-only in admin) instead of
+saving directly. See `DECISIONS/0046-admin-service-alignment.md`.
+
 Remaining service-layer gaps:
 
-- No admin override pathway exists for lifecycle rules.
-- Admin service alignment is partial: repair-order admin status changes route
-  through services, while billing and estimate admin still save directly in
-  places.
+- No admin override pathway exists for lifecycle rules; a blocked admin
+  action simply fails with an error message rather than offering an audited
+  override.
+- Full admin object-level permission integration (matching the shop-facing
+  policy layer) is not implemented; admin authorization is still Django's
+  own staff/superuser model.
 
 Future service-layer direction:
 
@@ -223,8 +237,9 @@ Required later:
 - Configure secure cookies and HSTS.
 - Document backups and restore.
 - Lock down admin access.
-- Align admin mutations with domain services or require explicit audited
-  override reasons for production bypasses.
+- Require explicit audited override reasons for production admin bypasses
+  (admin mutations are now service-backed or read-only as of Slice 43; an
+  audited override pathway for blocked actions is still future work).
 - Design media storage for attachments/photos/documents.
 - Define deployment-specific environment management.
 
@@ -248,11 +263,37 @@ Remaining attachment gaps:
 - No image thumbnails or preview.
 - Production media serving/storage/scanning/backup is future work.
 
+### Priority 9 - Admin Service Alignment
+
+Status: implemented in Slice 43.
+
+```text
+Slice 43: admin service-alignment / override audit
+```
+
+Django admin no longer silently bypasses domain services for high-risk
+mutations. Estimate status changes (including approval capture), invoice
+issue/void, payment recording, and invoice line-item create/edit are routed
+through their respective service functions or made read-only in admin.
+Attachment evidence/upload metadata is readonly after upload and delete is
+disabled. See `DECISIONS/0046-admin-service-alignment.md`.
+
+Remaining admin gaps:
+
+- No audited override pathway for blocked admin actions — a blocked action
+  simply fails with an error message.
+- No admin object-level permission framework; admin authorization is still
+  Django's own staff/superuser model, separate from the shop-facing policy
+  layer.
+- `EstimateAdmin` still allows direct editing of approval metadata text
+  fields (source/contact/reference/note) outside of a status transition;
+  only `approved_at` and the transition itself are service-controlled.
+
 Recommended next slices:
 
-- Admin service-alignment and override audit planning.
 - Reporting filters/date ranges or CSV export if prioritized.
 - Production media storage (named Docker volume for local dev; S3 for production).
+- Customer/insurer contact model or communication log.
 
 ## Missing Body-Shop Workflow Areas
 

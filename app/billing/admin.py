@@ -1,9 +1,23 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import Invoice, InvoiceLineItem, Payment
+from .services import (
+    InvoiceIssueBlocked,
+    InvoiceLineItemMutationBlocked,
+    InvoiceVoidBlocked,
+    PaymentRecordingBlocked,
+    create_invoice_line_item,
+    edit_invoice_line_item,
+    issue_invoice,
+    record_payment,
+    void_invoice,
+)
 
 
 class InvoiceLineItemInline(admin.TabularInline):
+    """Read-only: line-item mutation must go through InvoiceLineItemAdmin,
+    which routes saves through the billing service layer."""
+
     model = InvoiceLineItem
     fields = ("item_type", "description", "quantity", "unit_price", "line_total_display")
     readonly_fields = ("line_total_display",)
@@ -17,16 +31,34 @@ class InvoiceLineItemInline(admin.TabularInline):
             return None
         return obj.line_total
 
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
     def has_delete_permission(self, request, obj=None):
         return False
 
 
 class PaymentInline(admin.TabularInline):
+    """Read-only: payment creation must go through PaymentAdmin, which routes
+    saves through the billing service layer."""
+
     model = Payment
     fields = ("payment_date", "amount", "method", "reference", "received_by")
     raw_id_fields = ("received_by",)
     extra = 0
     show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Invoice)
@@ -64,6 +96,7 @@ class InvoiceAdmin(admin.ModelAdmin):
     )
     raw_id_fields = ("repair_order", "source_estimate", "created_by", "updated_by")
     readonly_fields = (
+        "status",
         "created_at",
         "updated_at",
         "created_by",
@@ -74,6 +107,7 @@ class InvoiceAdmin(admin.ModelAdmin):
         "is_paid_display",
     )
     inlines = [InvoiceLineItemInline, PaymentInline]
+    actions = ["issue_selected_invoices", "void_selected_invoices"]
     fieldsets = (
         (
             "Invoice",
@@ -129,11 +163,44 @@ class InvoiceAdmin(admin.ModelAdmin):
     def is_paid_display(self, obj):
         return obj.is_paid
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.line_items.exists():
+            readonly.append("subtotal")
+        return readonly
+
     def save_model(self, request, obj, form, change):
         if not change and not obj.created_by_id:
             obj.created_by = request.user
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
+
+    def _apply_invoice_action(self, request, queryset, service_fn, blocked_exc, label):
+        updated = 0
+        blocked = 0
+        for invoice in queryset:
+            try:
+                service_fn(invoice, actor=request.user)
+                updated += 1
+            except blocked_exc as exc:
+                blocked += 1
+                self.message_user(request, str(exc), level=messages.ERROR)
+        if updated:
+            self.message_user(request, f"{updated} invoice(s) {label}.")
+        if blocked:
+            self.message_user(
+                request,
+                f"{blocked} invoice(s) could not be {label} due to billing rules.",
+                level=messages.WARNING,
+            )
+
+    @admin.action(description="Issue selected invoices")
+    def issue_selected_invoices(self, request, queryset):
+        self._apply_invoice_action(request, queryset, issue_invoice, InvoiceIssueBlocked, "issued")
+
+    @admin.action(description="Void selected invoices")
+    def void_selected_invoices(self, request, queryset):
+        self._apply_invoice_action(request, queryset, void_invoice, InvoiceVoidBlocked, "voided")
 
 
 @admin.register(InvoiceLineItem)
@@ -174,6 +241,23 @@ class InvoiceLineItemAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
         return False
 
+    def save_model(self, request, obj, form, change):
+        data = {
+            "item_type": obj.item_type,
+            "description": obj.description,
+            "quantity": obj.quantity,
+            "unit_price": obj.unit_price,
+        }
+        try:
+            if change:
+                edit_invoice_line_item(obj, data, actor=request.user)
+            else:
+                created = create_invoice_line_item(obj.invoice, data, actor=request.user)
+                obj.pk = created.pk
+                obj.refresh_from_db()
+        except InvoiceLineItemMutationBlocked as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
+
 
 @admin.register(Payment)
 class PaymentAdmin(admin.ModelAdmin):
@@ -212,7 +296,31 @@ class PaymentAdmin(admin.ModelAdmin):
         ),
     )
 
+    def has_change_permission(self, request, obj=None):
+        if obj is not None:
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     def save_model(self, request, obj, form, change):
-        if not obj.received_by_id:
-            obj.received_by = request.user
-        super().save_model(request, obj, form, change)
+        if change:
+            # Existing payments are immutable through admin; has_change_permission
+            # already blocks reaching this point. Guard defensively against
+            # direct calls (e.g. from tests) that bypass the permission check.
+            return
+        data = {
+            "payment_date": obj.payment_date,
+            "amount": obj.amount,
+            "method": obj.method,
+            "reference": obj.reference,
+            "notes": obj.notes,
+        }
+        try:
+            created = record_payment(obj.invoice, data, actor=request.user)
+        except PaymentRecordingBlocked as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
+            return
+        obj.pk = created.pk
+        obj.refresh_from_db()

@@ -86,6 +86,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 - A user without any role assignment has no shop-facing access beyond login.
 - Roles stack: a user assigned to both Front Desk and Estimator gets the combined permissions of both.
 - Normal users should use the shop-facing app, not Django admin. Django admin is restricted to trusted superusers/staff for inspection, setup, repair, development support, and emergency correction.
+- Django admin is not a shortcut around shop-facing rules. Estimate status changes, invoice issue/void, payment recording, and invoice line-item edits in admin are routed through the same domain services as the shop-facing app (or made read-only) to protect data integrity. Attachment upload metadata is read-only in admin and cannot be deleted there.
 
 **What each role cannot do (key limits):**
 
