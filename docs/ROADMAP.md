@@ -1,7 +1,8 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 43. It should guide
-slice planning but can change after implementation review and user feedback.
+This roadmap reflects the current implementation after Slice 43 plus the
+unnumbered customer-scoped vehicle-dropdown UX fix. It should guide slice
+planning but can change after implementation review and user feedback.
 
 ## Current State
 
@@ -15,6 +16,8 @@ Implemented:
   back-office console, not the primary shop-facing workflow
 - Customer and vehicle records
 - Repair orders, status history, create/edit workflow, and HTMX status updates
+- New repair-order form vehicle selection is scoped by selected customer and
+  loads the vehicle field via HTMX
 - Dashboard workflow visibility
 - Billing foundation, invoices, payments, invoice line items, printable invoice
   detail, lifecycle actions, invoice queue, and a service boundary for billing
@@ -109,6 +112,15 @@ Slice 43 closed the remaining admin gaps: estimate status changes, invoice
 issue/void, payment recording, and invoice line-item mutation now route
 through their respective services (or are made read-only in admin) instead of
 saving directly. See `DECISIONS/0046-admin-service-alignment.md`.
+
+Slice-numbering note: the actual Git-backed sequence is canonical. The
+originally planned separate "billing views call services only" slice was
+absorbed into actual Slice 37 because billing services now own invoice
+issue/void, payment recording, and invoice line-item mutations while views call
+services. Actual Slice 43 was inserted as an admin service-alignment hardening
+slice. The post-Slice-43 customer-scoped vehicle-dropdown UX fix is unnumbered;
+the next planned product slice remains reporting filters/date ranges and CSV
+export unless reprioritized.
 
 Remaining service-layer gaps:
 
@@ -291,8 +303,9 @@ Remaining admin gaps:
 
 Recommended next slices:
 
-- Reporting filters/date ranges or CSV export if prioritized.
-- Production media storage (named Docker volume for local dev; S3 for production).
+- Next product slice: reporting filters/date ranges and CSV export.
+- Attachment hardening / media persistence (named Docker volume for local dev;
+  S3 for production).
 - Customer/insurer contact model or communication log.
 
 ## Missing Body-Shop Workflow Areas
