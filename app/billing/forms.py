@@ -18,6 +18,7 @@ class _InvoiceBaseForm(forms.ModelForm):
             "due_date": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
     # repair_order, invoice_number, status, created_by, updated_by, created_at,
     # updated_at are excluded. Invoice.clean() validates subtotal/tax >= 0 and
     # due_date >= issued_at via ModelForm._post_clean() -> instance.full_clean().
@@ -32,9 +33,7 @@ class InvoiceEditForm(_InvoiceBaseForm):
         super().__init__(*args, **kwargs)
         if self.instance.pk and self.instance.line_items.exists():
             self.fields["subtotal"].disabled = True
-            self.fields["subtotal"].help_text = (
-                "Subtotal is calculated from invoice line items."
-            )
+            self.fields["subtotal"].help_text = "Subtotal is calculated from invoice line items."
 
 
 class InvoiceLineItemForm(forms.ModelForm):
@@ -57,6 +56,7 @@ class InvoiceLineItemForm(forms.ModelForm):
             "quantity": forms.NumberInput(attrs={"min": "0.01", "step": "0.01"}),
             "unit_price": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
         }
+
     # invoice, created_at, and updated_at are excluded.
     # Quantity/unit price guards below fire at field-clean time (before _post_clean),
     # giving field-attached error messages instead of the generic MinValueValidator text.
@@ -88,6 +88,7 @@ class PaymentForm(forms.ModelForm):
             "payment_date": forms.DateInput(attrs={"type": "date"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
     # invoice, received_by, created_at are excluded.
     # Void and overpayment checks require invoice_id to be set; the view calls
     # payment.full_clean() after setting payment.invoice from the URL before saving.

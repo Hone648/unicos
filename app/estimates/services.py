@@ -40,9 +40,7 @@ def transition_estimate_status(
     approval_data=None,
 ):
     if new_status not in {value for value, _label in Estimate.Status.choices}:
-        raise EstimateStatusTransitionBlocked(
-            f"'{new_status}' is not a valid estimate status."
-        )
+        raise EstimateStatusTransitionBlocked(f"'{new_status}' is not a valid estimate status.")
 
     if new_status == estimate.status:
         raise EstimateStatusTransitionBlocked(
@@ -66,11 +64,7 @@ def transition_estimate_status(
         approval_source = approval_data.get("approval_source", "")
         approval_contact_name = (approval_data.get("approval_contact_name") or "").strip()
         valid_sources = {value for value, _label in Estimate.ApprovalSource.choices}
-        if (
-            not approval_source
-            or approval_source not in valid_sources
-            or not approval_contact_name
-        ):
+        if not approval_source or approval_source not in valid_sources or not approval_contact_name:
             raise EstimateStatusTransitionBlocked(
                 "Approval source and approval contact name are required before "
                 "an estimate can be approved."
@@ -78,18 +72,18 @@ def transition_estimate_status(
 
         estimate.approval_source = approval_source
         estimate.approval_contact_name = approval_contact_name
-        estimate.approval_reference = (
-            approval_data.get("approval_reference") or ""
-        ).strip()
+        estimate.approval_reference = (approval_data.get("approval_reference") or "").strip()
         estimate.approval_note = (approval_data.get("approval_note") or "").strip()
         estimate.approved_at = timezone.now()
-        update_fields.extend([
-            "approval_source",
-            "approval_contact_name",
-            "approval_reference",
-            "approval_note",
-            "approved_at",
-        ])
+        update_fields.extend(
+            [
+                "approval_source",
+                "approval_contact_name",
+                "approval_reference",
+                "approval_note",
+                "approved_at",
+            ]
+        )
 
     if updated_by is not None:
         estimate.updated_by = updated_by

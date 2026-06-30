@@ -1,11 +1,10 @@
 from datetime import date
 from decimal import Decimal
 
-from django.test import TestCase
-
 from billing.forms import InvoiceLineItemForm, PaymentForm
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
+from django.test import TestCase
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -16,6 +15,7 @@ VALID_VIN = "1HGBH41JXMN109186"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _make_invoice():
     customer = Customer.objects.create(
         customer_type=Customer.CustomerType.INDIVIDUAL,
@@ -23,20 +23,29 @@ def _make_invoice():
         last_name="Test",
     )
     vehicle = Vehicle.objects.create(
-        customer=customer, vin=VALID_VIN, make="Honda", model="Civic", year=2020,
+        customer=customer,
+        vin=VALID_VIN,
+        make="Honda",
+        model="Civic",
+        year=2020,
     )
     ro = RepairOrder.objects.create(
-        customer=customer, vehicle=vehicle, repair_order_number="RO-FORM-001",
+        customer=customer,
+        vehicle=vehicle,
+        repair_order_number="RO-FORM-001",
     )
     return Invoice.objects.create(
-        repair_order=ro, invoice_number="INV-FORM-001",
-        subtotal=Decimal("500.00"), tax_amount=Decimal("0.00"),
+        repair_order=ro,
+        invoice_number="INV-FORM-001",
+        subtotal=Decimal("500.00"),
+        tax_amount=Decimal("0.00"),
     )
 
 
 # ---------------------------------------------------------------------------
 # InvoiceLineItemForm — quantity validation
 # ---------------------------------------------------------------------------
+
 
 class LineItemQuantityValidationTests(TestCase):
     def setUp(self):
@@ -80,6 +89,7 @@ class LineItemQuantityValidationTests(TestCase):
 # InvoiceLineItemForm — unit price validation
 # ---------------------------------------------------------------------------
 
+
 class LineItemUnitPriceValidationTests(TestCase):
     def setUp(self):
         self.invoice = _make_invoice()
@@ -118,6 +128,7 @@ class LineItemUnitPriceValidationTests(TestCase):
 # InvoiceLineItemForm — description validation
 # ---------------------------------------------------------------------------
 
+
 class LineItemDescriptionValidationTests(TestCase):
     def setUp(self):
         self.invoice = _make_invoice()
@@ -147,6 +158,7 @@ class LineItemDescriptionValidationTests(TestCase):
 # ---------------------------------------------------------------------------
 # PaymentForm — amount validation
 # ---------------------------------------------------------------------------
+
 
 class PaymentAmountValidationTests(TestCase):
     def _data(self, **overrides):

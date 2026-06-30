@@ -297,11 +297,14 @@ Form validation:
 Remaining validation gaps: phone formatting, state normalization, VIN
 check-digit validation, optional uniqueness policies.
 
-Quality gate gap:
+Quality gates:
 
-CI currently runs Django checks, missing migration checks, migrations, tests,
-Docker build/runtime smoke, and `/healthz/`. Missing quality gates include Ruff
-or equivalent linting, Black formatting, mypy/type checking, coverage reporting
-and optional threshold, and pre-commit. These are useful next quality layers as
-the app grows, but they are less urgent than permissions and lifecycle-rule
-centralization.
+CI currently runs Ruff lint/format checks, Django checks, missing migration
+checks, migrations, tests, Docker build/runtime smoke, and `/healthz/`. Ruff is
+the first Python quality gate and is used for both linting and formatting.
+Development-only tooling lives in `requirements-dev.txt`, with local pre-commit
+hooks configured in `.pre-commit-config.yaml`.
+
+Deferred quality layers include mypy/Django typing evaluation, coverage
+reporting without an initial threshold, and broader Ruff rules after the baseline
+stabilizes. Black is intentionally not used so Ruff remains the only formatter.

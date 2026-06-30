@@ -1,6 +1,5 @@
-from django.test import RequestFactory, TestCase
-
 from core.pagination import DEFAULT_PAGE_SIZE, paginate_queryset, pagination_querystring
+from django.test import RequestFactory, TestCase
 
 
 class PaginateQuerysetTests(TestCase):

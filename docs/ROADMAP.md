@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 39. It should guide
+This roadmap reflects the current implementation after Slice 40. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -25,8 +25,8 @@ Implemented:
 - Generated repair-order and invoice numbers
 - Guards for void invoices, final repair-order edits, final repair-order billing
   mutations, and unpaid-invoice closure blocking
-- CI with Django checks, missing migration checks, migrations, full tests,
-  Docker build/runtime smoke, and `/healthz/`
+- CI with Ruff lint/format checks, Django checks, missing migration checks,
+  migrations, full tests, Docker build/runtime smoke, and `/healthz/`
 
 The app is local-development only and is not production-ready.
 
@@ -228,7 +228,6 @@ Required later:
 
 Recommended next slices:
 
-- Quality gates foundation: Ruff/format/pre-commit.
 - Reporting foundation.
 - Attachments/media model.
 - Admin service-alignment and override audit later.
@@ -271,6 +270,7 @@ Future improvements:
 
 Current CI runs:
 
+- Ruff lint and format checks
 - Django checks
 - Missing migration checks
 - Migrations
@@ -280,11 +280,9 @@ Current CI runs:
 
 Missing quality gates:
 
-- Ruff or equivalent linting
-- Black formatting
 - mypy/type checking
 - Coverage reporting and optional threshold
-- pre-commit
+- broader Ruff rules after the baseline stabilizes
 
-These are useful as the app grows, but permissions and lifecycle-rule
-centralization are higher architectural priorities.
+Ruff is the first quality gate and handles both linting and formatting. Black,
+mypy, and coverage thresholds remain deferred.

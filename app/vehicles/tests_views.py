@@ -1,10 +1,9 @@
+from accounts.authorization import ROLE_MANAGER
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
-
-from accounts.authorization import ROLE_MANAGER
-from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -69,6 +68,7 @@ def customer_detail_url(pk):
 # Vehicle create for customer
 # ---------------------------------------------------------------------------
 
+
 class VehicleCreateAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -119,7 +119,9 @@ class VehicleCreateTests(TestCase):
         self.assertRedirects(response, customer_detail_url(self.customer.pk))
 
     def test_invalid_vin_rerenders_with_errors(self):
-        response = self.client.post(vehicle_create_url(self.customer.pk), self._valid_data(vin="BAD"))
+        response = self.client.post(
+            vehicle_create_url(self.customer.pk), self._valid_data(vin="BAD")
+        )
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Vehicle.objects.exists())
 
@@ -132,6 +134,7 @@ class VehicleCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Vehicle detail
 # ---------------------------------------------------------------------------
+
 
 class VehicleDetailAuthTests(TestCase):
     def setUp(self):
@@ -172,6 +175,7 @@ class VehicleDetailTests(TestCase):
 # ---------------------------------------------------------------------------
 # Vehicle edit
 # ---------------------------------------------------------------------------
+
 
 class VehicleEditAuthTests(TestCase):
     def setUp(self):

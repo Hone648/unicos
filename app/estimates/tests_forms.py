@@ -1,8 +1,7 @@
 from decimal import Decimal
 
-from django.test import TestCase
-
 from customers.models import Customer
+from django.test import TestCase
 from estimates.forms import EstimateApprovalForm, EstimateForm, EstimateLineItemForm
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
@@ -125,20 +124,29 @@ class EstimateApprovalFormTests(TestCase):
 # EstimateForm estimated_total disabling
 # ---------------------------------------------------------------------------
 
+
 class EstimateFormTotalDisablingTests(TestCase):
     def setUp(self):
         customer = Customer.objects.create(
             customer_type=Customer.CustomerType.INDIVIDUAL,
-            first_name="Form", last_name="Total",
+            first_name="Form",
+            last_name="Total",
         )
         vehicle = Vehicle.objects.create(
-            customer=customer, vin=VALID_VIN, make="Honda", model="Civic", year=2020,
+            customer=customer,
+            vin=VALID_VIN,
+            make="Honda",
+            model="Civic",
+            year=2020,
         )
         self.ro = RepairOrder.objects.create(
-            customer=customer, vehicle=vehicle, repair_order_number="RO-FORM-TOTAL",
+            customer=customer,
+            vehicle=vehicle,
+            repair_order_number="RO-FORM-TOTAL",
         )
         self.estimate = Estimate.objects.create(
-            repair_order=self.ro, estimate_number="EST-FORM-TOTAL",
+            repair_order=self.ro,
+            estimate_number="EST-FORM-TOTAL",
         )
 
     def test_estimated_total_enabled_without_line_items(self):
@@ -148,7 +156,9 @@ class EstimateFormTotalDisablingTests(TestCase):
     def test_estimated_total_disabled_with_line_items(self):
         EstimateLineItem.objects.create(
             estimate=self.estimate,
-            description="Labor", quantity=Decimal("1.00"), unit_price=Decimal("100.00"),
+            description="Labor",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
         )
         form = EstimateForm(instance=self.estimate)
         self.assertTrue(form.fields["estimated_total"].disabled)
@@ -156,7 +166,9 @@ class EstimateFormTotalDisablingTests(TestCase):
     def test_disabled_total_has_help_text(self):
         EstimateLineItem.objects.create(
             estimate=self.estimate,
-            description="Labor", quantity=Decimal("1.00"), unit_price=Decimal("100.00"),
+            description="Labor",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
         )
         form = EstimateForm(instance=self.estimate)
         self.assertIn("calculated", form.fields["estimated_total"].help_text.lower())
@@ -165,6 +177,7 @@ class EstimateFormTotalDisablingTests(TestCase):
 # ---------------------------------------------------------------------------
 # EstimateLineItemForm
 # ---------------------------------------------------------------------------
+
 
 def _line_item_data(**overrides):
     data = {

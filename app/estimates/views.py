@@ -1,7 +1,3 @@
-from django.contrib import messages
-from django.shortcuts import get_object_or_404, redirect, render
-from django.views.decorators.http import require_POST
-
 from accounts.authorization import (
     PERM_BILLING_MANAGE,
     PERM_REPAIR_ORDERS_MANAGE,
@@ -21,6 +17,9 @@ from billing.services import (
     estimate_can_convert_to_invoice,
 )
 from core.document_numbers import generate_estimate_number
+from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect, render
+from django.views.decorators.http import require_POST
 from repair_orders.models import RepairOrder
 
 from .forms import EstimateApprovalForm, EstimateForm, EstimateLineItemForm
@@ -31,7 +30,6 @@ from .services import (
     get_available_estimate_status_transitions,
     transition_estimate_status,
 )
-
 
 _STATUS_ACTION_LABELS = {
     Estimate.Status.SUBMITTED: "Submit Estimate",
@@ -72,32 +70,33 @@ def estimate_detail(request, pk):
     )
     require_policy(can_view_estimate(request.user, estimate))
     line_items = list(estimate.line_items.all())
-    supplements = list(
-        estimate.supplements.order_by("-updated_at", "-id")
-    )
+    supplements = list(estimate.supplements.order_by("-updated_at", "-id"))
     converted_invoice = estimate.converted_invoices.first()
     status_action_choices = _status_action_choices(estimate)
     can_manage = can_manage_estimate(request.user, estimate)
-    can_convert = (
-        can_convert_estimate_to_invoice(request.user, estimate)
-        and estimate_can_convert_to_invoice(estimate)
+    can_convert = can_convert_estimate_to_invoice(
+        request.user, estimate
+    ) and estimate_can_convert_to_invoice(estimate)
+    return render(
+        request,
+        "estimates/estimate_detail.html",
+        {
+            "estimate": estimate,
+            "ro": estimate.repair_order,
+            "line_items": line_items,
+            "supplements": supplements,
+            "has_line_items": bool(line_items),
+            "is_editable": estimate_is_editable(estimate),
+            "status_action_choices": status_action_choices,
+            "approval_form": EstimateApprovalForm()
+            if can_manage
+            and Estimate.Status.APPROVED in {status for status, _label in status_action_choices}
+            else None,
+            "can_manage_estimate": can_manage,
+            "can_convert_to_invoice": can_convert,
+            "converted_invoice": converted_invoice,
+        },
     )
-    return render(request, "estimates/estimate_detail.html", {
-        "estimate": estimate,
-        "ro": estimate.repair_order,
-        "line_items": line_items,
-        "supplements": supplements,
-        "has_line_items": bool(line_items),
-        "is_editable": estimate_is_editable(estimate),
-        "status_action_choices": status_action_choices,
-        "approval_form": EstimateApprovalForm()
-        if can_manage
-        and Estimate.Status.APPROVED in {status for status, _label in status_action_choices}
-        else None,
-        "can_manage_estimate": can_manage,
-        "can_convert_to_invoice": can_convert,
-        "converted_invoice": converted_invoice,
-    })
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_VIEW)
@@ -113,12 +112,16 @@ def estimate_print(request, pk):
     )
     require_policy(can_view_estimate(request.user, estimate))
     line_items = list(estimate.line_items.all())
-    return render(request, "estimates/estimate_print.html", {
-        "estimate": estimate,
-        "ro": estimate.repair_order,
-        "line_items": line_items,
-        "has_line_items": bool(line_items),
-    })
+    return render(
+        request,
+        "estimates/estimate_print.html",
+        {
+            "estimate": estimate,
+            "ro": estimate.repair_order,
+            "line_items": line_items,
+            "has_line_items": bool(line_items),
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -153,8 +156,7 @@ def estimate_status_update(request, pk):
 
     messages.success(
         request,
-        f"Estimate {estimate.estimate_number} marked "
-        f"{estimate.get_status_display().lower()}.",
+        f"Estimate {estimate.estimate_number} marked {estimate.get_status_display().lower()}.",
     )
     return redirect("estimates:detail", pk=estimate.pk)
 
@@ -176,8 +178,7 @@ def estimate_convert_to_invoice(request, pk):
 
     messages.success(
         request,
-        f"Invoice {invoice.invoice_number} created from estimate "
-        f"{estimate.estimate_number}.",
+        f"Invoice {invoice.invoice_number} created from estimate {estimate.estimate_number}.",
     )
     return redirect("billing:invoice_detail", pk=invoice.pk)
 
@@ -204,15 +205,19 @@ def estimate_create(request, repair_order_pk):
     else:
         form = EstimateForm()
 
-    return render(request, "estimates/estimate_form.html", {
-        "form": form,
-        "ro": ro,
-        "estimate": None,
-        "supplement_parent": None,
-        "mode": "create",
-        "title": f"New Estimate for RO {ro.repair_order_number}",
-        "submit_label": "Create Estimate",
-    })
+    return render(
+        request,
+        "estimates/estimate_form.html",
+        {
+            "form": form,
+            "ro": ro,
+            "estimate": None,
+            "supplement_parent": None,
+            "mode": "create",
+            "title": f"New Estimate for RO {ro.repair_order_number}",
+            "submit_label": "Create Estimate",
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -243,15 +248,19 @@ def estimate_edit(request, pk):
     else:
         form = EstimateForm(instance=estimate)
 
-    return render(request, "estimates/estimate_form.html", {
-        "form": form,
-        "ro": ro,
-        "estimate": estimate,
-        "supplement_parent": None,
-        "mode": "edit",
-        "title": f"Edit Estimate {estimate.estimate_number}",
-        "submit_label": "Save Changes",
-    })
+    return render(
+        request,
+        "estimates/estimate_form.html",
+        {
+            "form": form,
+            "ro": ro,
+            "estimate": estimate,
+            "supplement_parent": None,
+            "mode": "edit",
+            "title": f"Edit Estimate {estimate.estimate_number}",
+            "submit_label": "Save Changes",
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -286,21 +295,27 @@ def supplement_create(request, pk):
             return redirect("estimates:detail", pk=supplement.pk)
     else:
         # Seed insurance/claim context from the parent as starting values.
-        form = EstimateForm(initial={
-            "insurance_company": parent.insurance_company,
-            "claim_number": parent.claim_number,
-            "deductible": parent.deductible,
-        })
+        form = EstimateForm(
+            initial={
+                "insurance_company": parent.insurance_company,
+                "claim_number": parent.claim_number,
+                "deductible": parent.deductible,
+            }
+        )
 
-    return render(request, "estimates/estimate_form.html", {
-        "form": form,
-        "ro": ro,
-        "estimate": None,
-        "supplement_parent": parent,
-        "mode": "create",
-        "title": f"New Supplement for Estimate {parent.estimate_number}",
-        "submit_label": "Create Supplement",
-    })
+    return render(
+        request,
+        "estimates/estimate_form.html",
+        {
+            "form": form,
+            "ro": ro,
+            "estimate": None,
+            "supplement_parent": parent,
+            "mode": "create",
+            "title": f"New Supplement for Estimate {parent.estimate_number}",
+            "submit_label": "Create Supplement",
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -326,15 +341,19 @@ def line_item_create(request, estimate_pk):
     else:
         form = EstimateLineItemForm()
 
-    return render(request, "estimates/estimate_line_item_form.html", {
-        "form": form,
-        "estimate": estimate,
-        "ro": estimate.repair_order,
-        "line_item": None,
-        "mode": "create",
-        "title": f"Add Line Item to Estimate {estimate.estimate_number}",
-        "submit_label": "Add Line Item",
-    })
+    return render(
+        request,
+        "estimates/estimate_line_item_form.html",
+        {
+            "form": form,
+            "estimate": estimate,
+            "ro": estimate.repair_order,
+            "line_item": None,
+            "mode": "create",
+            "title": f"Add Line Item to Estimate {estimate.estimate_number}",
+            "submit_label": "Add Line Item",
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -362,15 +381,19 @@ def line_item_edit(request, pk):
     else:
         form = EstimateLineItemForm(instance=line_item)
 
-    return render(request, "estimates/estimate_line_item_form.html", {
-        "form": form,
-        "estimate": estimate,
-        "ro": estimate.repair_order,
-        "line_item": line_item,
-        "mode": "edit",
-        "title": f"Edit Line Item for Estimate {estimate.estimate_number}",
-        "submit_label": "Save Changes",
-    })
+    return render(
+        request,
+        "estimates/estimate_line_item_form.html",
+        {
+            "form": form,
+            "estimate": estimate,
+            "ro": estimate.repair_order,
+            "line_item": line_item,
+            "mode": "edit",
+            "title": f"Edit Line Item for Estimate {estimate.estimate_number}",
+            "submit_label": "Save Changes",
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)

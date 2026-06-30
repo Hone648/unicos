@@ -1,17 +1,16 @@
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.test import TestCase
-from django.urls import reverse
-from django.utils import timezone
-
 from accounts.authorization import (
     ROLE_ESTIMATOR,
     ROLE_MANAGER,
     ROLE_READ_ONLY,
 )
 from customers.models import Customer
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.urls import reverse
+from django.utils import timezone
 from estimates.models import Estimate
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -23,6 +22,7 @@ VALID_VIN = "1HGBH41JXMN109186"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def assign_role(user, role_name):
     group, _created = Group.objects.get_or_create(name=role_name)
     user.groups.add(group)
@@ -30,9 +30,7 @@ def assign_role(user, role_name):
 
 
 def make_user(username="staffer", role_name=ROLE_MANAGER):
-    user = get_user_model().objects.create_user(
-        username=username, password="pw-test-12345"
-    )
+    user = get_user_model().objects.create_user(username=username, password="pw-test-12345")
     if role_name:
         assign_role(user, role_name)
     return user
@@ -61,9 +59,7 @@ def make_repair_order(customer, vehicle, number="RO-EST-V-001", **kwargs):
 
 
 def make_estimate(repair_order, number="EST-V-001", **kwargs):
-    return Estimate.objects.create(
-        repair_order=repair_order, estimate_number=number, **kwargs
-    )
+    return Estimate.objects.create(repair_order=repair_order, estimate_number=number, **kwargs)
 
 
 def create_url(ro_pk):
@@ -116,6 +112,7 @@ def invoice_detail_url(pk):
 
 def make_line_item(estimate, **kwargs):
     from estimates.models import EstimateLineItem
+
     defaults = {
         "item_type": EstimateLineItem.ItemType.LABOR,
         "description": "Labor",
@@ -156,6 +153,7 @@ def add_approval_capture(estimate, **overrides):
 # Authentication
 # ---------------------------------------------------------------------------
 
+
 class EstimateAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -188,6 +186,7 @@ class EstimateAuthTests(TestCase):
 # ---------------------------------------------------------------------------
 # Permissions
 # ---------------------------------------------------------------------------
+
 
 class EstimatePermissionTests(TestCase):
     def setUp(self):
@@ -244,6 +243,7 @@ class EstimatePermissionTests(TestCase):
 # ---------------------------------------------------------------------------
 # Create
 # ---------------------------------------------------------------------------
+
 
 class EstimateCreateTests(TestCase):
     def setUp(self):
@@ -317,9 +317,7 @@ class EstimateCreateTests(TestCase):
         self.assertEqual(Estimate.objects.filter(repair_order=self.ro).count(), 1)
 
     def test_invalid_post_does_not_create_estimate(self):
-        response = self.client.post(
-            create_url(self.ro.pk), self._valid_data(deductible="-1.00")
-        )
+        response = self.client.post(create_url(self.ro.pk), self._valid_data(deductible="-1.00"))
         self.assertEqual(response.status_code, 200)
         self.assertFalse(Estimate.objects.filter(repair_order=self.ro).exists())
 
@@ -338,6 +336,7 @@ class EstimateCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Detail
 # ---------------------------------------------------------------------------
+
 
 class EstimateDetailTests(TestCase):
     def setUp(self):
@@ -440,6 +439,7 @@ class EstimateDetailTests(TestCase):
 # ---------------------------------------------------------------------------
 # Print
 # ---------------------------------------------------------------------------
+
 
 class EstimatePrintTests(TestCase):
     def setUp(self):
@@ -554,6 +554,7 @@ class EstimatePrintTests(TestCase):
 # ---------------------------------------------------------------------------
 # Status actions
 # ---------------------------------------------------------------------------
+
 
 class EstimateStatusUpdateTests(TestCase):
     def setUp(self):
@@ -670,6 +671,7 @@ class EstimateStatusUpdateTests(TestCase):
 # Edit
 # ---------------------------------------------------------------------------
 
+
 class EstimateEditTests(TestCase):
     def setUp(self):
         self.user = make_user()
@@ -758,6 +760,7 @@ class EstimateEditTests(TestCase):
 # Repair-order detail integration
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderDetailEstimateIntegrationTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -770,9 +773,7 @@ class RepairOrderDetailEstimateIntegrationTests(TestCase):
         self.assertContains(response, "Estimates")
 
     def test_detail_lists_existing_estimate(self):
-        estimate = make_estimate(
-            self.ro, number="EST-SUMMARY", insurance_company="Allstate"
-        )
+        estimate = make_estimate(self.ro, number="EST-SUMMARY", insurance_company="Allstate")
         self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "EST-SUMMARY")
@@ -798,6 +799,7 @@ class RepairOrderDetailEstimateIntegrationTests(TestCase):
 # ---------------------------------------------------------------------------
 # Line item: authentication & permissions
 # ---------------------------------------------------------------------------
+
 
 class LineItemAuthTests(TestCase):
     def setUp(self):
@@ -836,6 +838,7 @@ class LineItemAuthTests(TestCase):
 # Line item: create / edit / delete
 # ---------------------------------------------------------------------------
 
+
 class LineItemCreateEditDeleteTests(TestCase):
     def setUp(self):
         self.user = make_user()
@@ -847,6 +850,7 @@ class LineItemCreateEditDeleteTests(TestCase):
 
     def _data(self, **overrides):
         from estimates.models import EstimateLineItem
+
         data = {
             "item_type": EstimateLineItem.ItemType.LABOR,
             "description": "Refinish labor",
@@ -909,7 +913,12 @@ class LineItemCreateEditDeleteTests(TestCase):
         self.assertTrue(self.estimate.line_items.filter(pk=item.pk).exists())
 
     def test_detail_shows_line_items_and_total(self):
-        make_line_item(self.estimate, description="Blend panel", quantity=Decimal("2.00"), unit_price=Decimal("60.00"))
+        make_line_item(
+            self.estimate,
+            description="Blend panel",
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("60.00"),
+        )
         response = self.client.get(detail_url(self.estimate.pk))
         self.assertContains(response, "Blend panel")
         self.assertContains(response, "120.00")
@@ -981,6 +990,7 @@ class LineItemCreateEditDeleteTests(TestCase):
 # Supplement create
 # ---------------------------------------------------------------------------
 
+
 class SupplementCreateTests(TestCase):
     def setUp(self):
         self.user = make_user()
@@ -988,8 +998,11 @@ class SupplementCreateTests(TestCase):
         self.vehicle = make_vehicle(self.customer)
         self.ro = make_repair_order(self.customer, self.vehicle)
         self.parent = make_estimate(
-            self.ro, number="EST-PARENT-V",
-            insurance_company="Acme", claim_number="CLM-P", deductible=Decimal("500.00"),
+            self.ro,
+            number="EST-PARENT-V",
+            insurance_company="Acme",
+            claim_number="CLM-P",
+            deductible=Decimal("500.00"),
         )
 
     def _data(self, **overrides):
@@ -1038,7 +1051,9 @@ class SupplementCreateTests(TestCase):
     def test_invalid_create_does_not_create(self):
         self.client.force_login(self.user)
         count_before = Estimate.objects.count()
-        response = self.client.post(supplement_create_url(self.parent.pk), self._data(deductible="-1.00"))
+        response = self.client.post(
+            supplement_create_url(self.parent.pk), self._data(deductible="-1.00")
+        )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(Estimate.objects.count(), count_before)
 
@@ -1062,6 +1077,7 @@ class SupplementCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Estimate-to-invoice conversion
 # ---------------------------------------------------------------------------
+
 
 def make_approved_estimate_with_line_item(ro, number="EST-CONV-V"):
     estimate = make_estimate(ro, number=number, status=Estimate.Status.APPROVED)

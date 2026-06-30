@@ -1,12 +1,11 @@
 from datetime import date
 from decimal import Decimal
 
+from billing.models import Invoice, Payment
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
-
-from billing.models import Invoice, Payment
-from customers.models import Customer
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
 from repair_orders.services import (
     RepairOrderLifecycleError,
@@ -22,6 +21,7 @@ VALID_VIN_2 = "2T1BURHE0JC043821"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_user(username="svc-user", **kwargs):
     return get_user_model().objects.create_user(
@@ -54,9 +54,7 @@ def make_repair_order(customer, vehicle, number="RO-SVC-001", **kwargs):
 def make_invoice(repair_order, number="INV-SVC-001", **kwargs):
     defaults = {"subtotal": Decimal("400.00"), "tax_amount": Decimal("40.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_payment(invoice, amount=Decimal("440.00"), **kwargs):
@@ -68,6 +66,7 @@ def make_payment(invoice, amount=Decimal("440.00"), **kwargs):
 # ---------------------------------------------------------------------------
 # transition_repair_order_status service tests
 # ---------------------------------------------------------------------------
+
 
 class TransitionRepairOrderStatusTests(TestCase):
     def setUp(self):
@@ -87,21 +86,13 @@ class TransitionRepairOrderStatusTests(TestCase):
         self.assertEqual(self.ro.status, RepairOrder.Status.IN_REPAIR)
 
     def test_successful_transition_creates_status_history(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
-        transition_repair_order_status(
-            self.ro, RepairOrder.Status.ESTIMATING, changed_by=self.user
-        )
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
+        transition_repair_order_status(self.ro, RepairOrder.Status.ESTIMATING, changed_by=self.user)
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_after, count_before + 1)
 
     def test_successful_transition_records_changed_by(self):
-        transition_repair_order_status(
-            self.ro, RepairOrder.Status.ESTIMATING, changed_by=self.user
-        )
+        transition_repair_order_status(self.ro, RepairOrder.Status.ESTIMATING, changed_by=self.user)
         latest = (
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
             .order_by("-changed_at", "-id")
@@ -157,16 +148,12 @@ class TransitionRepairOrderStatusTests(TestCase):
 
     def test_blocked_transition_does_not_create_history(self):
         make_invoice(self.ro)
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         try:
             transition_repair_order_status(self.ro, RepairOrder.Status.DELIVERED)
         except RepairOrderStatusTransitionBlocked:
             pass
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_before, count_after)
 
     def test_set_status_uses_lifecycle_rule_boundary(self):
@@ -203,7 +190,5 @@ class TransitionRepairOrderStatusTests(TestCase):
             transition_repair_order_status(self.ro, "not_a_real_status")
 
     def test_service_returns_repair_order_on_success(self):
-        result = transition_repair_order_status(
-            self.ro, RepairOrder.Status.ESTIMATING
-        )
+        result = transition_repair_order_status(self.ro, RepairOrder.Status.ESTIMATING)
         self.assertIs(result, self.ro)

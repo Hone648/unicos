@@ -1,9 +1,8 @@
+from customers.models import Customer
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.test import TestCase
-
-from customers.models import Customer
 from vehicles.models import Vehicle
 
 VALID_VIN = "1HGBH41JXMN109186"

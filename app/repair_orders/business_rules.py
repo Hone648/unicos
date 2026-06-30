@@ -2,11 +2,13 @@ from billing.models import Invoice
 
 from .models import RepairOrder
 
-FINAL_REPAIR_ORDER_STATUSES = frozenset({
-    RepairOrder.Status.DELIVERED,
-    RepairOrder.Status.CLOSED,
-    RepairOrder.Status.CANCELED,
-})
+FINAL_REPAIR_ORDER_STATUSES = frozenset(
+    {
+        RepairOrder.Status.DELIVERED,
+        RepairOrder.Status.CLOSED,
+        RepairOrder.Status.CANCELED,
+    }
+)
 
 
 def is_final_repair_order_status(status):

@@ -1,11 +1,14 @@
+from customers.models import Customer
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from customers.models import Customer
-
 
 def make_individual(**kwargs):
-    defaults = {"customer_type": Customer.CustomerType.INDIVIDUAL, "first_name": "Jane", "last_name": "Smith"}
+    defaults = {
+        "customer_type": Customer.CustomerType.INDIVIDUAL,
+        "first_name": "Jane",
+        "last_name": "Smith",
+    }
     defaults.update(kwargs)
     return Customer(**defaults)
 

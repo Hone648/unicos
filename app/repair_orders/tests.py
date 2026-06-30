@@ -1,11 +1,10 @@
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import ProtectedError
 from django.test import TestCase
-
-from customers.models import Customer
-from repair_orders.models import RepairOrder, RepairOrderStatusHistory
+from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
 VALID_VIN = "1HGBH41JXMN109186"
@@ -15,6 +14,7 @@ VALID_VIN_2 = "2T1BURHE0JC043821"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_user(username="staffuser", **kwargs):
     return get_user_model().objects.create_user(
@@ -50,6 +50,7 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
 # RepairOrder model tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderModelTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -83,9 +84,7 @@ class RepairOrderModelTests(TestCase):
 
     def test_created_by_and_updated_by_can_reference_user(self):
         user = make_user()
-        ro = make_repair_order(
-            self.customer, self.vehicle, created_by=user, updated_by=user
-        )
+        ro = make_repair_order(self.customer, self.vehicle, created_by=user, updated_by=user)
         self.assertEqual(ro.created_by, user)
         self.assertEqual(ro.updated_by, user)
 
@@ -122,6 +121,7 @@ class RepairOrderModelTests(TestCase):
 # ---------------------------------------------------------------------------
 # Status history tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderStatusHistoryTests(TestCase):
     def setUp(self):
@@ -197,6 +197,7 @@ class RepairOrderStatusHistoryTests(TestCase):
 # ---------------------------------------------------------------------------
 # set_status validation and transient-attribute leak tests
 # ---------------------------------------------------------------------------
+
 
 class SetStatusValidationTests(TestCase):
     def setUp(self):

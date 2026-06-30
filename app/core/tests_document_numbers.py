@@ -2,14 +2,13 @@ import datetime
 from decimal import Decimal
 from unittest.mock import patch
 
-from django.test import TestCase
-
 from core.document_numbers import (
     generate_estimate_number,
     generate_invoice_number,
     generate_repair_order_number,
 )
 from core.models import DocumentNumberSequence
+from django.test import TestCase
 
 # Use a far-future year so tests never clash with hand-typed existing records.
 _FIXED_DATE = datetime.date(2099, 1, 1)
@@ -38,8 +37,10 @@ def _gen_est():
 # Minimal helpers for objects that need full model chains
 # ---------------------------------------------------------------------------
 
+
 def _make_customer():
     from customers.models import Customer
+
     return Customer.objects.create(
         customer_type=Customer.CustomerType.INDIVIDUAL,
         first_name="Test",
@@ -49,6 +50,7 @@ def _make_customer():
 
 def _make_vehicle(customer, vin="1HGBH41JXMN109186"):
     from vehicles.models import Vehicle
+
     return Vehicle.objects.create(
         customer=customer, vin=vin, make="Honda", model="Civic", year=2021
     )
@@ -56,6 +58,7 @@ def _make_vehicle(customer, vin="1HGBH41JXMN109186"):
 
 def _make_ro(customer, vehicle, number="RO-TEST-001"):
     from repair_orders.models import RepairOrder
+
     return RepairOrder.objects.create(
         customer=customer, vehicle=vehicle, repair_order_number=number
     )
@@ -63,6 +66,7 @@ def _make_ro(customer, vehicle, number="RO-TEST-001"):
 
 def _make_invoice(ro, number="INV-TEST-001"):
     from billing.models import Invoice
+
     return Invoice.objects.create(
         repair_order=ro,
         invoice_number=number,
@@ -73,12 +77,14 @@ def _make_invoice(ro, number="INV-TEST-001"):
 
 def _make_estimate(ro, number="EST-TEST-001"):
     from estimates.models import Estimate
+
     return Estimate.objects.create(repair_order=ro, estimate_number=number)
 
 
 # ---------------------------------------------------------------------------
 # Repair order number generation
 # ---------------------------------------------------------------------------
+
 
 class GenerateRepairOrderNumberTests(TestCase):
     def test_first_call_returns_formatted_number(self):
@@ -125,6 +131,7 @@ class GenerateRepairOrderNumberTests(TestCase):
 # Invoice number generation
 # ---------------------------------------------------------------------------
 
+
 class GenerateInvoiceNumberTests(TestCase):
     def test_first_call_returns_formatted_number(self):
         num = _gen_inv()
@@ -165,6 +172,7 @@ class GenerateInvoiceNumberTests(TestCase):
 # Estimate number generation
 # ---------------------------------------------------------------------------
 
+
 class GenerateEstimateNumberTests(TestCase):
     def test_first_call_returns_formatted_number(self):
         num = _gen_est()
@@ -204,6 +212,7 @@ class GenerateEstimateNumberTests(TestCase):
 # ---------------------------------------------------------------------------
 # Sequence independence
 # ---------------------------------------------------------------------------
+
 
 class SequenceIndependenceTests(TestCase):
     def test_ro_and_invoice_sequences_are_independent(self):

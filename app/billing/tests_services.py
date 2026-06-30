@@ -2,10 +2,6 @@ from datetime import date
 from decimal import Decimal
 from unittest import mock
 
-from django.contrib.auth import get_user_model
-from django.test import TestCase
-from django.utils import timezone
-
 from billing.models import Invoice, InvoiceLineItem, Payment
 from billing.services import (
     EstimateInvoiceConversionBlocked,
@@ -13,8 +9,8 @@ from billing.services import (
     InvoiceLineItemMutationBlocked,
     InvoiceVoidBlocked,
     PaymentRecordingBlocked,
-    create_invoice_line_item,
     convert_estimate_to_invoice,
+    create_invoice_line_item,
     edit_invoice_line_item,
     estimate_can_convert_to_invoice,
     issue_invoice,
@@ -22,6 +18,9 @@ from billing.services import (
     void_invoice,
 )
 from customers.models import Customer
+from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.utils import timezone
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -92,14 +91,16 @@ def make_estimate(repair_order, number="EST-CONV-001", status=Estimate.Status.AP
         estimate.approval_reference = "APPROVAL-REF"
         estimate.approval_note = "Approved for conversion."
         estimate.approved_at = timezone.now()
-        estimate.save(update_fields=[
-            "approval_source",
-            "approval_contact_name",
-            "approval_reference",
-            "approval_note",
-            "approved_at",
-            "updated_at",
-        ])
+        estimate.save(
+            update_fields=[
+                "approval_source",
+                "approval_contact_name",
+                "approval_reference",
+                "approval_note",
+                "approved_at",
+                "updated_at",
+            ]
+        )
     return estimate
 
 
@@ -118,8 +119,19 @@ class ConvertEstimateToInvoiceTests(TestCase):
     def setUp(self):
         self.ro = make_repair_order()
         self.estimate = make_estimate(self.ro)
-        add_line_item(self.estimate, description="Body labor", quantity=Decimal("2.00"), unit_price=Decimal("75.00"))
-        add_line_item(self.estimate, item_type=EstimateLineItem.ItemType.PARTS, description="Bumper", quantity=Decimal("1.00"), unit_price=Decimal("300.00"))
+        add_line_item(
+            self.estimate,
+            description="Body labor",
+            quantity=Decimal("2.00"),
+            unit_price=Decimal("75.00"),
+        )
+        add_line_item(
+            self.estimate,
+            item_type=EstimateLineItem.ItemType.PARTS,
+            description="Bumper",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("300.00"),
+        )
         self.estimate.refresh_from_db()
         self.user = get_user_model().objects.create_user(
             username="conv-user", password="pw-test-12345"

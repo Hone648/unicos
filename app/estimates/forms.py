@@ -13,9 +13,9 @@ class EstimateForm(forms.ModelForm):
         # subtotal pattern). A disabled field keeps the instance value on POST.
         if self.instance.pk and self.instance.line_items.exists():
             self.fields["estimated_total"].disabled = True
-            self.fields["estimated_total"].help_text = (
-                "Estimated total is calculated from estimate line items."
-            )
+            self.fields[
+                "estimated_total"
+            ].help_text = "Estimated total is calculated from estimate line items."
 
     class Meta:
         model = Estimate
@@ -31,6 +31,7 @@ class EstimateForm(forms.ModelForm):
             "estimated_total": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
     # status, repair_order, estimate_number, kind, parent_estimate, created_by,
     # updated_by, and timestamps are excluded. Status changes use explicit
     # lifecycle actions; the view assigns repair_order, the generated
@@ -65,6 +66,7 @@ class EstimateLineItemForm(forms.ModelForm):
             "quantity": forms.NumberInput(attrs={"min": "0.01", "step": "0.01"}),
             "unit_price": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
         }
+
     # estimate, sort_order, and timestamps are excluded. The view assigns the
     # estimate from the URL; sort_order defaults to 0. Field-level clean methods
     # below give field-attached error messages.

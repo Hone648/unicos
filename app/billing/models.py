@@ -91,10 +91,7 @@ class Invoice(models.Model):
 
     @property
     def is_paid(self):
-        return (
-            self.balance_due == Decimal("0.00")
-            and self.total_amount > Decimal("0.00")
-        )
+        return self.balance_due == Decimal("0.00") and self.total_amount > Decimal("0.00")
 
     def sync_payment_status(self):
         """Update invoice status based on current payments. Void invoices are never touched."""
@@ -177,17 +174,15 @@ class InvoiceLineItem(models.Model):
             return
 
         existing_total = sum(
-            (
-                line_item.line_total
-                for line_item in self.invoice.line_items.exclude(pk=self.pk)
-            ),
+            (line_item.line_total for line_item in self.invoice.line_items.exclude(pk=self.pk)),
             Decimal("0.00"),
         )
-        projected_total = existing_total + self.line_total + (self.invoice.tax_amount or Decimal("0.00"))
+        projected_total = (
+            existing_total + self.line_total + (self.invoice.tax_amount or Decimal("0.00"))
+        )
         if self.invoice.amount_paid > projected_total:
             raise ValidationError(
-                "Line item changes cannot make the invoice total less than "
-                "the amount already paid."
+                "Line item changes cannot make the invoice total less than the amount already paid."
             )
 
     def save(self, *args, **kwargs):
@@ -239,9 +234,9 @@ class Payment(models.Model):
                 raise ValidationError("Cannot add a payment to a void invoice.")
 
             # Balance check: sum existing payments excluding this one (for updates).
-            existing = invoice.payments.exclude(pk=self.pk).aggregate(
-                total=models.Sum("amount")
-            )["total"] or Decimal("0.00")
+            existing = invoice.payments.exclude(pk=self.pk).aggregate(total=models.Sum("amount"))[
+                "total"
+            ] or Decimal("0.00")
             if self.amount is not None and existing + self.amount > invoice.total_amount:
                 raise ValidationError(
                     "Payment would exceed the invoice balance. "

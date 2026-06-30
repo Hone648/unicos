@@ -1,7 +1,3 @@
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import AnonymousUser, Group
-from django.test import TestCase
-
 from accounts.authorization import (
     ALL_APP_PERMISSIONS,
     PERM_BILLING_MANAGE,
@@ -22,6 +18,9 @@ from accounts.authorization import (
     user_has_app_permission,
     user_role_names,
 )
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser, Group
+from django.test import TestCase
 
 
 def make_user(username="auth-user", **kwargs):
@@ -88,18 +87,14 @@ class AuthorizationHelperTests(TestCase):
         self.assertTrue(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
         self.assertTrue(user_has_app_permission(user, PERM_BILLING_RECORD_PAYMENT))
         self.assertFalse(user_has_app_permission(user, PERM_BILLING_MANAGE))
-        self.assertFalse(
-            user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS)
-        )
+        self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS))
 
     def test_estimator_can_view_and_change_repair_order_status(self):
         user = assign_role(make_user(), ROLE_ESTIMATOR)
 
         self.assertTrue(user_has_app_permission(user, PERM_CUSTOMERS_VIEW))
         self.assertTrue(user_has_app_permission(user, PERM_REPAIR_ORDERS_VIEW))
-        self.assertTrue(
-            user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS)
-        )
+        self.assertTrue(user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS))
         self.assertTrue(user_has_app_permission(user, PERM_BILLING_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_BILLING_MANAGE))
@@ -111,9 +106,7 @@ class AuthorizationHelperTests(TestCase):
         self.assertTrue(user_has_app_permission(user, PERM_REPAIR_ORDERS_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_CUSTOMERS_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
-        self.assertFalse(
-            user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS)
-        )
+        self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS))
 
     def test_read_only_can_view_but_cannot_mutate(self):
         user = assign_role(make_user(), ROLE_READ_ONLY)

@@ -72,9 +72,7 @@ def _is_technician_only(user):
 
 def is_assigned_technician(user, repair_order):
     return bool(
-        _is_active_user(user)
-        and is_technician(user)
-        and repair_order.assigned_to_id == user.id
+        _is_active_user(user) and is_technician(user) and repair_order.assigned_to_id == user.id
     )
 
 

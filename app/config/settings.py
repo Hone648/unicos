@@ -22,9 +22,7 @@ def env_bool(name):
 
 def env_list(name):
     return [
-        item.strip()
-        for item in env_required(name).replace(" ", ",").split(",")
-        if item.strip()
+        item.strip() for item in env_required(name).replace(" ", ",").split(",") if item.strip()
     ]
 
 

@@ -1,13 +1,12 @@
-from decimal import Decimal
 from datetime import date
-
-from django.contrib import admin
-from django.contrib.messages.storage.fallback import FallbackStorage
-from django.test import RequestFactory, TestCase
-from django.contrib.auth import get_user_model
+from decimal import Decimal
 
 from billing.models import Invoice, Payment
 from customers.models import Customer
+from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.test import RequestFactory, TestCase
 from repair_orders.admin import RepairOrderAdmin, RepairOrderStatusHistoryAdmin
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
 from vehicles.models import Vehicle
@@ -20,6 +19,7 @@ VALID_VIN_3 = "5NPE24AF6FH002401"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_user(username="staffuser", **kwargs):
     return get_user_model().objects.create_user(
@@ -52,9 +52,7 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
 def make_invoice(repair_order, number="INV-0001", **kwargs):
     defaults = {"subtotal": Decimal("400.00"), "tax_amount": Decimal("40.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_payment(invoice, amount=Decimal("440.00"), **kwargs):
@@ -77,6 +75,7 @@ def make_request(user):
 # ---------------------------------------------------------------------------
 # RepairOrderAdmin.save_model tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderAdminSaveModelTests(TestCase):
     def setUp(self):
@@ -112,6 +111,7 @@ class RepairOrderAdminSaveModelTests(TestCase):
 # RepairOrderAdmin action tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderAdminActionTests(TestCase):
     def setUp(self):
         self.admin_instance = RepairOrderAdmin(RepairOrder, admin.site)
@@ -133,7 +133,9 @@ class RepairOrderAdminActionTests(TestCase):
 
     def test_action_skips_repair_order_already_in_target_status(self):
         ro = make_repair_order(
-            self.customer, self.vehicle, number="RO-ALREADY",
+            self.customer,
+            self.vehicle,
+            number="RO-ALREADY",
             status=RepairOrder.Status.ESTIMATING,
         )
         history_before = ro.status_history.count()
@@ -151,11 +153,10 @@ class RepairOrderAdminActionTests(TestCase):
 # RepairOrderStatusHistoryAdmin permission tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderStatusHistoryAdminPermissionTests(TestCase):
     def setUp(self):
-        self.admin_instance = RepairOrderStatusHistoryAdmin(
-            RepairOrderStatusHistory, admin.site
-        )
+        self.admin_instance = RepairOrderStatusHistoryAdmin(RepairOrderStatusHistory, admin.site)
         user = make_user()
         self.request = make_request(user)
 
@@ -172,6 +173,7 @@ class RepairOrderStatusHistoryAdminPermissionTests(TestCase):
 # ---------------------------------------------------------------------------
 # Admin action lifecycle-block tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderAdminActionLifecycleTests(TestCase):
     """Admin bulk status actions obey the unpaid-invoice final-status block."""
@@ -243,6 +245,7 @@ class RepairOrderAdminActionLifecycleTests(TestCase):
 # Admin save_model status routing tests
 # ---------------------------------------------------------------------------
 
+
 class MockStatusChangeForm:
     """Minimal form stub for save_model routing tests."""
 
@@ -277,9 +280,7 @@ class RepairOrderAdminSaveModelStatusRoutingTests(TestCase):
         self.assertNotEqual(ro.status, RepairOrder.Status.DELIVERED)
 
     def test_save_model_allows_non_final_status_change(self):
-        ro = make_repair_order(
-            self.customer, self.vehicle, number="RO-ADMIN-FORM-NON-FINAL"
-        )
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-ADMIN-FORM-NON-FINAL")
         form = MockStatusChangeForm(
             initial_status=RepairOrder.Status.INTAKE,
             new_status=RepairOrder.Status.IN_REPAIR,
@@ -290,9 +291,7 @@ class RepairOrderAdminSaveModelStatusRoutingTests(TestCase):
         self.assertEqual(ro.status, RepairOrder.Status.IN_REPAIR)
 
     def test_save_model_allows_final_status_when_no_invoice(self):
-        ro = make_repair_order(
-            self.customer, self.vehicle, number="RO-ADMIN-FORM-FINAL-OK"
-        )
+        ro = make_repair_order(self.customer, self.vehicle, number="RO-ADMIN-FORM-FINAL-OK")
         form = MockStatusChangeForm(
             initial_status=RepairOrder.Status.INTAKE,
             new_status=RepairOrder.Status.DELIVERED,

@@ -132,11 +132,7 @@ class Estimate(models.Model):
 
     @property
     def has_approval_capture(self):
-        return bool(
-            self.approval_source
-            and self.approval_contact_name
-            and self.approved_at
-        )
+        return bool(self.approval_source and self.approval_contact_name and self.approved_at)
 
     def recalculate_total(self):
         """Sum line items into estimated_total. Resets to 0.00 when none remain."""
