@@ -1,6 +1,11 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 
 from .models import Estimate, EstimateLineItem
+from .services import (
+    EstimateStatusTransitionBlocked,
+    estimate_is_editable,
+    transition_estimate_status,
+)
 
 
 class EstimateLineItemInline(admin.TabularInline):
@@ -22,6 +27,21 @@ class EstimateLineItemInline(admin.TabularInline):
         if not obj.pk:
             return None
         return obj.line_total
+
+    def has_add_permission(self, request, obj):
+        if obj is None:
+            return True
+        return estimate_is_editable(obj)
+
+    def has_change_permission(self, request, obj=None):
+        if obj is None:
+            return True
+        return estimate_is_editable(obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is None:
+            return True
+        return estimate_is_editable(obj)
 
 
 @admin.register(Estimate)
@@ -62,7 +82,7 @@ class EstimateAdmin(admin.ModelAdmin):
         "updated_by",
     )
     raw_id_fields = ("repair_order", "parent_estimate", "created_by", "updated_by")
-    readonly_fields = ("created_at", "updated_at", "created_by", "updated_by")
+    readonly_fields = ("created_at", "updated_at", "created_by", "updated_by", "approved_at")
     inlines = [EstimateLineItemInline]
     fieldsets = (
         (
@@ -106,9 +126,41 @@ class EstimateAdmin(admin.ModelAdmin):
     def customer_display(self, obj):
         return obj.repair_order.customer
 
+    def get_readonly_fields(self, request, obj=None):
+        readonly = list(super().get_readonly_fields(request, obj))
+        if obj is not None and obj.has_line_items:
+            readonly.append("estimated_total")
+        return readonly
+
     def save_model(self, request, obj, form, change):
         if not change and not obj.created_by_id:
             obj.created_by = request.user
+
+        if change and form is not None and "status" in form.changed_data:
+            # Route the status change through the lifecycle service so
+            # allowed-transition rules and approval-capture requirements are
+            # enforced uniformly with the shop-facing status action.
+            desired_status = obj.status
+            obj.status = form.initial["status"]
+            obj.updated_by = request.user
+            super().save_model(request, obj, form, change)
+            approval_data = {
+                "approval_source": form.cleaned_data.get("approval_source", ""),
+                "approval_contact_name": form.cleaned_data.get("approval_contact_name", ""),
+                "approval_reference": form.cleaned_data.get("approval_reference", ""),
+                "approval_note": form.cleaned_data.get("approval_note", ""),
+            }
+            try:
+                transition_estimate_status(
+                    obj,
+                    desired_status,
+                    updated_by=request.user,
+                    approval_data=approval_data,
+                )
+            except EstimateStatusTransitionBlocked as exc:
+                self.message_user(request, str(exc), level=messages.ERROR)
+            return
+
         obj.updated_by = request.user
         super().save_model(request, obj, form, change)
 
@@ -160,3 +212,24 @@ class EstimateLineItemAdmin(admin.ModelAdmin):
     @admin.display(description="Line total")
     def line_total_display(self, obj):
         return obj.line_total
+
+    def has_change_permission(self, request, obj=None):
+        if obj is not None and not estimate_is_editable(obj.estimate):
+            return False
+        return super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if obj is not None and not estimate_is_editable(obj.estimate):
+            return False
+        return super().has_delete_permission(request, obj)
+
+    def save_model(self, request, obj, form, change):
+        if not estimate_is_editable(obj.estimate):
+            self.message_user(
+                request,
+                f"Estimate {obj.estimate.estimate_number} is not in draft status; "
+                "line items cannot be changed.",
+                level=messages.ERROR,
+            )
+            return
+        super().save_model(request, obj, form, change)

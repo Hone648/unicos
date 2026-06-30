@@ -6,6 +6,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from estimates.admin import EstimateAdmin, EstimateLineItemAdmin, EstimateLineItemInline
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
@@ -215,3 +216,223 @@ class EstimateLineItemAdminChangeListTests(TestCase):
         response = self.client.get(url, {"q": "Frame pull"})
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Frame pull")
+
+
+# ---------------------------------------------------------------------------
+# Admin save_model status routing (Slice 43)
+# ---------------------------------------------------------------------------
+
+
+class MockEstimateStatusChangeForm:
+    """Minimal form stub for EstimateAdmin.save_model routing tests."""
+
+    def __init__(self, initial_status, new_status=None, cleaned_data=None):
+        self.initial = {"status": initial_status}
+        self.cleaned_data = cleaned_data or {}
+        if new_status is not None and new_status != initial_status:
+            self.changed_data = ["status"]
+        else:
+            self.changed_data = []
+
+
+class EstimateAdminSaveModelStatusRoutingTests(TestCase):
+    """Admin save_model routes status changes through transition_estimate_status."""
+
+    def setUp(self):
+        self.admin_instance = EstimateAdmin(Estimate, admin.site)
+        self.user = make_user(username="admin-status")
+        self.request = make_request(self.user)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+
+    def _estimate(self, number, status=Estimate.Status.DRAFT, **kwargs):
+        return Estimate.objects.create(
+            repair_order=self.ro, estimate_number=number, status=status, **kwargs
+        )
+
+    def test_save_model_allows_draft_to_submitted(self):
+        estimate = self._estimate("EST-ADM-SUB")
+        form = MockEstimateStatusChangeForm(
+            initial_status=Estimate.Status.DRAFT,
+            new_status=Estimate.Status.SUBMITTED,
+        )
+        estimate.status = Estimate.Status.SUBMITTED
+        self.admin_instance.save_model(self.request, estimate, form, change=True)
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.SUBMITTED)
+
+    def test_save_model_blocks_approval_without_approval_capture(self):
+        estimate = self._estimate("EST-ADM-NOCAP", status=Estimate.Status.SUBMITTED)
+        form = MockEstimateStatusChangeForm(
+            initial_status=Estimate.Status.SUBMITTED,
+            new_status=Estimate.Status.APPROVED,
+            cleaned_data={},
+        )
+        estimate.status = Estimate.Status.APPROVED
+        self.admin_instance.save_model(self.request, estimate, form, change=True)
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.SUBMITTED)
+        self.assertIsNone(estimate.approved_at)
+
+    def test_save_model_approves_with_valid_approval_capture(self):
+        estimate = self._estimate("EST-ADM-CAP", status=Estimate.Status.SUBMITTED)
+        form = MockEstimateStatusChangeForm(
+            initial_status=Estimate.Status.SUBMITTED,
+            new_status=Estimate.Status.APPROVED,
+            cleaned_data={
+                "approval_source": Estimate.ApprovalSource.CUSTOMER,
+                "approval_contact_name": "Jane Doe",
+            },
+        )
+        estimate.status = Estimate.Status.APPROVED
+        self.admin_instance.save_model(self.request, estimate, form, change=True)
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+        self.assertIsNotNone(estimate.approved_at)
+        self.assertEqual(estimate.approval_contact_name, "Jane Doe")
+
+    def test_save_model_blocks_approved_back_to_draft(self):
+        estimate = self._estimate(
+            "EST-ADM-BACK",
+            status=Estimate.Status.APPROVED,
+            approval_source=Estimate.ApprovalSource.CUSTOMER,
+            approval_contact_name="Jane Doe",
+        )
+        estimate.approved_at = timezone.now()
+        estimate.save(update_fields=["approved_at"])
+        form = MockEstimateStatusChangeForm(
+            initial_status=Estimate.Status.APPROVED,
+            new_status=Estimate.Status.DRAFT,
+        )
+        estimate.status = Estimate.Status.DRAFT
+        self.admin_instance.save_model(self.request, estimate, form, change=True)
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+
+    def test_approved_at_is_readonly(self):
+        self.assertIn("approved_at", self.admin_instance.readonly_fields)
+
+
+class EstimateAdminEstimatedTotalReadonlyTests(TestCase):
+    def setUp(self):
+        self.admin_instance = EstimateAdmin(Estimate, admin.site)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.request = make_request(make_user())
+
+    def test_estimated_total_editable_without_line_items(self):
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-ADM-NOITEMS")
+        readonly = self.admin_instance.get_readonly_fields(self.request, estimate)
+        self.assertNotIn("estimated_total", readonly)
+
+    def test_estimated_total_readonly_with_line_items(self):
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-ADM-ITEMS")
+        EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Paint",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+        )
+        readonly = self.admin_instance.get_readonly_fields(self.request, estimate)
+        self.assertIn("estimated_total", readonly)
+
+    def test_estimated_total_editable_on_add(self):
+        readonly = self.admin_instance.get_readonly_fields(self.request, None)
+        self.assertNotIn("estimated_total", readonly)
+
+
+class EstimateLineItemInlinePermissionTests(TestCase):
+    def setUp(self):
+        self.inline = EstimateLineItemInline(Estimate, admin.site)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        self.request = make_request(make_user())
+
+    def test_inline_allows_mutation_for_draft_estimate(self):
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-INL-DRAFT")
+        self.assertTrue(self.inline.has_add_permission(self.request, estimate))
+        self.assertTrue(self.inline.has_change_permission(self.request, estimate))
+        self.assertTrue(self.inline.has_delete_permission(self.request, estimate))
+
+    def test_inline_blocks_mutation_for_submitted_estimate(self):
+        estimate = Estimate.objects.create(
+            repair_order=self.ro, estimate_number="EST-INL-SUB", status=Estimate.Status.SUBMITTED
+        )
+        self.assertFalse(self.inline.has_add_permission(self.request, estimate))
+        self.assertFalse(self.inline.has_change_permission(self.request, estimate))
+        self.assertFalse(self.inline.has_delete_permission(self.request, estimate))
+
+    def test_inline_allows_add_when_no_parent_yet(self):
+        self.assertTrue(self.inline.has_add_permission(self.request, None))
+
+
+class EstimateLineItemAdminEditableGuardTests(TestCase):
+    def setUp(self):
+        self.admin_instance = EstimateLineItemAdmin(EstimateLineItem, admin.site)
+        self.customer = make_customer()
+        self.vehicle = make_vehicle(self.customer)
+        self.ro = make_repair_order(self.customer, self.vehicle)
+        # has_change_permission/has_delete_permission fall through to Django's
+        # standard permission check when the estimate is editable, so use a
+        # superuser here to isolate the draft-status gate under test.
+        self.request = make_request(make_superuser())
+
+    def test_change_permission_blocked_for_non_draft_estimate(self):
+        estimate = Estimate.objects.create(
+            repair_order=self.ro, estimate_number="EST-LI-PERM", status=Estimate.Status.SUBMITTED
+        )
+        item = EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Paint",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("50.00"),
+        )
+        self.assertFalse(self.admin_instance.has_change_permission(self.request, item))
+        self.assertFalse(self.admin_instance.has_delete_permission(self.request, item))
+
+    def test_change_permission_allowed_for_draft_estimate(self):
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-LI-PERM-OK")
+        item = EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Paint",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("50.00"),
+        )
+        self.assertTrue(self.admin_instance.has_change_permission(self.request, item))
+        self.assertTrue(self.admin_instance.has_delete_permission(self.request, item))
+
+    def test_save_model_blocks_edit_for_non_draft_estimate(self):
+        estimate = Estimate.objects.create(
+            repair_order=self.ro, estimate_number="EST-LI-SAVE", status=Estimate.Status.SUBMITTED
+        )
+        item = EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Paint",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("50.00"),
+        )
+        item.description = "Changed"
+        self.admin_instance.save_model(self.request, item, None, change=True)
+        item.refresh_from_db()
+        self.assertEqual(item.description, "Paint")
+
+    def test_save_model_allows_edit_for_draft_estimate(self):
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-LI-SAVE-OK")
+        item = EstimateLineItem.objects.create(
+            estimate=estimate,
+            item_type=EstimateLineItem.ItemType.LABOR,
+            description="Paint",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("50.00"),
+        )
+        item.description = "Changed"
+        self.admin_instance.save_model(self.request, item, None, change=True)
+        item.refresh_from_db()
+        self.assertEqual(item.description, "Changed")

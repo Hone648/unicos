@@ -198,13 +198,38 @@ Admin policy:
 - Shop-facing views are the authoritative operator workflow.
 - Admin may expose fields and mutation paths hidden by the shop-facing UI.
 - Services own lifecycle/business-state rules where implemented.
-- Admin service alignment is partial: repair-order admin status saves/actions
-  route through repair-order lifecycle services, while billing and estimate admin
-  still save directly in places.
+- Admin must not silently bypass domain services for lifecycle or financial
+  mutations. Repair-order status changes, estimate status changes, invoice
+  issue/void, payment recording, and invoice line-item mutations are either
+  routed through the relevant service or made read-only in admin:
+  - `RepairOrderAdmin.save_model()` and bulk status actions route through
+    `repair_orders.services.transition_repair_order_status()` /
+    `RepairOrder.set_status()`.
+  - `EstimateAdmin.save_model()` routes status changes through
+    `estimates.services.transition_estimate_status()`, including approval
+    capture; `approved_at` is readonly; `estimated_total` is readonly once
+    line items exist; line items on non-draft estimates are blocked from
+    admin add/change/delete.
+  - `InvoiceAdmin.status` is readonly; issue/void happen only through the
+    `issue_selected_invoices`/`void_selected_invoices` admin actions, backed
+    by `billing.services.issue_invoice()`/`void_invoice()`. `subtotal` is
+    readonly once line items exist.
+  - `InvoiceLineItemAdmin.save_model()` routes create/edit through
+    `billing.services.create_invoice_line_item()`/`edit_invoice_line_item()`.
+    The line-item and payment inlines on `InvoiceAdmin` are read-only
+    (display only; mutate via the standalone admin pages).
+  - `PaymentAdmin.save_model()` routes creation through
+    `billing.services.record_payment()`; existing payments cannot be changed
+    or deleted through admin.
+  - `AttachmentAdmin` keeps upload metadata (`repair_order`, `file`,
+    `original_filename`, `content_type`, `size_bytes`, `uploaded_by`,
+    `created_at`) readonly and disables delete; only `category` and
+    `description` remain editable after upload.
 - Future production admin bypasses must either call the same domain services as
   shop-facing workflows or record an explicit override reason/audit trail.
 - Full admin object-policy integration is future work. See
-  `DECISIONS/0042-django-admin-policy.md`.
+  `DECISIONS/0042-django-admin-policy.md` and
+  `DECISIONS/0046-admin-service-alignment.md`.
 
 Lifecycle service layer:
 

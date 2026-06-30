@@ -19,6 +19,16 @@ class AttachmentAdmin(admin.ModelAdmin):
         "description",
         "repair_order__repair_order_number",
     )
-    raw_id_fields = ("repair_order", "uploaded_by")
-    readonly_fields = ("original_filename", "content_type", "size_bytes", "created_at", "file")
+    readonly_fields = (
+        "repair_order",
+        "file",
+        "original_filename",
+        "content_type",
+        "size_bytes",
+        "uploaded_by",
+        "created_at",
+    )
     list_select_related = ("repair_order", "uploaded_by")
+
+    def has_delete_permission(self, request, obj=None):
+        return False

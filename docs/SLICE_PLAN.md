@@ -46,12 +46,13 @@ Planned slices:
 41. Slice 40: quality gates foundation (Ruff-only lint/format config, development requirements, pre-commit hooks, CI quality job, docs/ADR; no app behavior changes)
 42. Slice 41: reporting foundation (read-only `/reports/` page in `core`; `reports.view` permission for Owner/Admin, Manager, Read-only, and superusers; repair-order, invoice, and estimate operational counts; top unpaid invoices, ready-for-pickup ROs, and estimates needing attention; docs/ADR; no migrations)
 43. Slice 42: repair-order attachments/media foundation (new `attachments` app; `Attachment` model linked to `RepairOrder` via `PROTECT`; local `FileField` storage under `MEDIA_ROOT/repair_orders/<ro_id>/<uuid>_<basename>`; upload/download/delete views policy-gated; `MEDIA_URL`/`MEDIA_ROOT` configured; development-only media serving under `DEBUG`; allowed extensions jpg/jpeg/png/gif/webp/pdf/txt/csv; 25 MB limit; repair-order detail shows attachment list; admin registration; 26 tests; one attachments migration; ADR 0045)
+44. Slice 43: admin service-alignment / override audit (Django admin no longer silently bypasses domain services for high-risk mutations; `EstimateAdmin` routes status changes through `transition_estimate_status` including approval-capture enforcement, `approved_at` readonly, `estimated_total` readonly once line items exist, non-draft estimate line items blocked from admin add/change/delete; `InvoiceAdmin.status` readonly with new `issue_selected_invoices`/`void_selected_invoices` actions backed by `issue_invoice`/`void_invoice`, `subtotal` readonly once line items exist; `InvoiceLineItemAdmin` routes create/edit through `create_invoice_line_item`/`edit_invoice_line_item`; invoice line-item and payment inlines on `InvoiceAdmin` made read-only; `PaymentAdmin` routes creation through `record_payment`, existing payments immutable/non-deletable through admin; `AttachmentAdmin` keeps upload metadata readonly and disables delete; repair-order admin left unchanged (already aligned); admin/service-boundary tests added across `estimates`, `billing`, and `attachments`; no migrations; no user-facing feature changes; ADR 0046)
 
 Likely next implementation slices:
 
-- Slice 42: attachments/media model
-- Slice 43: admin service-alignment / override audit planning
 - Slice 44: reporting filters/date ranges or CSV export if prioritized
+- Slice 45: attachment hardening / media persistence (named Docker volume)
+- Slice 46: customer/insurer contact model or communication log
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
