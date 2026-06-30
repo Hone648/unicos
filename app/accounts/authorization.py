@@ -11,6 +11,7 @@ ROLE_TECHNICIAN = "Technician"
 ROLE_READ_ONLY = "Read-only"
 
 PERM_DASHBOARD_VIEW = "dashboard.view"
+PERM_REPORTS_VIEW = "reports.view"
 
 PERM_CUSTOMERS_VIEW = "customers.view"
 PERM_CUSTOMERS_MANAGE = "customers.manage"
@@ -26,6 +27,7 @@ PERM_BILLING_RECORD_PAYMENT = "billing.record_payment"
 ALL_APP_PERMISSIONS = frozenset(
     {
         PERM_DASHBOARD_VIEW,
+        PERM_REPORTS_VIEW,
         PERM_CUSTOMERS_VIEW,
         PERM_CUSTOMERS_MANAGE,
         PERM_REPAIR_ORDERS_VIEW,
@@ -69,6 +71,7 @@ ROLE_PERMISSION_MATRIX = {
     ROLE_READ_ONLY: frozenset(
         {
             PERM_DASHBOARD_VIEW,
+            PERM_REPORTS_VIEW,
             PERM_CUSTOMERS_VIEW,
             PERM_REPAIR_ORDERS_VIEW,
             PERM_BILLING_VIEW,

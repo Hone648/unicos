@@ -12,6 +12,7 @@ This manual describes the current implemented local-development version of Unico
 2. [Current Limitations](#2-current-limitations)
 3. [User Roles and Access](#3-user-roles-and-access)
 4. [Dashboard](#4-dashboard)
+4A. [Reports](#4a-reports)
 5. [Customers](#5-customers)
 6. [Vehicles](#6-vehicles)
 7. [Repair Orders](#7-repair-orders)
@@ -74,7 +75,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 | Front Desk | Customer intake, vehicle intake, repair order create/edit, estimate/supplement work, view invoices, record payments |
 | Estimator | View dashboard, view customers, view repair orders, change repair order status, view invoices |
 | Technician | View dashboard, view assigned repair orders |
-| Read-only | View dashboard, view customers, view repair orders, view invoices |
+| Read-only | View dashboard, reports, customers, repair orders, and invoices |
 
 **Important notes on roles:**
 
@@ -111,6 +112,33 @@ Sections:
 Each item links to the relevant repair order or invoice detail page. The dashboard is read-only; no actions are performed from here.
 
 **Who can see it:** All roles (dashboard.view permission).
+
+---
+
+## 4A. Reports
+
+**URL:** `/reports/`
+
+The reports page is a read-only operational snapshot for managers and reviewers.
+It shows current counts for active/final repair orders, ready-for-pickup work,
+unassigned active repair orders, invoice balances/statuses, and estimate
+status/conversion attention items.
+
+Tables currently include:
+
+- Top unpaid invoices, ordered by largest balance due.
+- Ready-for-pickup repair orders.
+- Submitted or approved estimates that still need attention.
+
+Each table links back to the relevant invoice, repair order, or estimate detail
+page. Reports do not currently include exports, charts, date ranges, aging
+analysis, revenue reporting, or per-object reporting scope beyond the detail
+links' normal authorization checks.
+
+**Who can see it:** Owner/Admin, Manager, Read-only, and superusers
+(`reports.view` permission). Front Desk, Estimator, and Technician roles do not
+see the Reports navigation link and receive a forbidden response if they open
+the URL directly.
 
 ---
 

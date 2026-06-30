@@ -44,6 +44,7 @@ screenshot set.
 - Closure rule blocking final RO statuses when active invoice has balance due
 - Generated document numbers
 - Billing invoice queue
+- Read-only reports snapshot for operational counts and attention queues
 - Hardened CI with Ruff quality checks, migration checks, Docker smoke, and healthz
 
 ## Stack
@@ -150,6 +151,9 @@ The app has a login/logout baseline backed by a custom user model
 
 - `/` is an authenticated dashboard. Unauthenticated visitors are redirected to
   `/accounts/login/?next=/`.
+- `/reports/` is a read-only operational report page. It requires
+  `reports.view`, currently granted to Owner/Admin, Manager, Read-only, and
+  superusers.
 - `/accounts/login/` and `/accounts/logout/` handle sign in and sign out.
 - `/healthz/` remains public.
 

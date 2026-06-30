@@ -26,6 +26,9 @@
             {% if user|has_app_permission:"billing.view" %}
               <a href="{% url 'billing:invoice_list' %}">Billing</a>
             {% endif %}
+            {% if user|has_app_permission:"reports.view" %}
+              <a href="{% url 'reports' %}">Reports</a>
+            {% endif %}
           </nav>
           <div class="user-bar">
             <span>{{ user.get_username }}</span>
