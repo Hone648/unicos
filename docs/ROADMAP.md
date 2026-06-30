@@ -17,7 +17,8 @@ Implemented:
 - Billing foundation, invoices, payments, invoice line items, printable invoice
   detail, lifecycle actions, and invoice queue
 - Estimate and insurance spine, estimate line items, supplement lineage,
-  browser-printable estimate output, and controlled approval status actions
+  browser-printable estimate output, controlled approval status actions, and
+  approval capture for approved estimates
 - Generated repair-order and invoice numbers
 - Guards for void invoices, final repair-order edits, final repair-order billing
   mutations, and unpaid-invoice closure blocking
@@ -133,7 +134,7 @@ check-digit validation, optional uniqueness policies.
 
 ### Priority 6 - Estimate/Insurance Spine
 
-Status: partially implemented in Slices 29, 30, 32, 33, and 34.
+Status: partially implemented in Slices 29, 30, 32, 33, 34, and 36.
 
 ```text
 Slice 29: estimate and insurance spine
@@ -141,6 +142,7 @@ Slice 30: estimate line items and supplements
 Slice 32: printable estimate output
 Slice 33: estimate approval status flow
 Slice 34: estimate-to-invoice draft conversion
+Slice 36: customer/insurer approval capture
 ```
 
 The `Estimate` model lives in the `estimates` app, linked to `RepairOrder` via
@@ -160,7 +162,10 @@ repair-order permissions. Slice 34 added a controlled conversion: an approved,
 itemized estimate can be turned into a *draft* invoice via `billing.services`,
 copying estimate line items into invoice line items and linking the invoice back
 to its source estimate (`Invoice.source_estimate`, with duplicate conversion
-blocked). Invoice issuing, voiding, and payment behavior are unchanged.
+blocked). Slice 36 added approval capture fields (source, contact, optional
+reference/note, timestamp) and requires captured approval before an approved
+estimate can be converted. Invoice issuing, voiding, and payment behavior are
+unchanged.
 
 Proposed remaining model direction:
 
@@ -179,7 +184,8 @@ Remaining estimate gaps:
   edits into an existing invoice and no "unconvert" action.
 - No supplement-to-invoice handling or multi-estimate invoice merging (a repair
   order still has a single one-to-one invoice).
-- No customer signatures or approval-capture artifacts.
+- No customer signatures, approval uploads, email approval links, or customer
+  portal approval.
 - No generated PDF estimate output.
 - No full estimate versioning engine (supplements are a minimal lineage only).
 - No estimate locking by repair-order final status (deferred).
@@ -208,7 +214,7 @@ Required later:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimates, supplements, browser-printable estimate output, controlled estimate approval status, estimate versions |
+| Estimating | estimates, supplements, browser-printable estimate output, controlled estimate approval status, approval capture, estimate versions |
 | Insurance | insurer, claim number, adjuster, deductible, DRP fields |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

@@ -26,6 +26,12 @@ class Estimate(models.Model):
         INITIAL = "initial", "Initial"
         SUPPLEMENT = "supplement", "Supplement"
 
+    class ApprovalSource(models.TextChoices):
+        CUSTOMER = "customer", "Customer"
+        INSURER = "insurer", "Insurer"
+        CUSTOMER_AND_INSURER = "customer_and_insurer", "Customer and insurer"
+        OTHER = "other", "Other"
+
     repair_order = models.ForeignKey(
         "repair_orders.RepairOrder",
         on_delete=models.PROTECT,
@@ -64,6 +70,15 @@ class Estimate(models.Model):
         default=Decimal("0.00"),
     )
     notes = models.TextField(blank=True)
+    approval_source = models.CharField(
+        max_length=30,
+        choices=ApprovalSource.choices,
+        blank=True,
+    )
+    approval_contact_name = models.CharField(max_length=200, blank=True)
+    approval_reference = models.CharField(max_length=200, blank=True)
+    approval_note = models.TextField(blank=True)
+    approved_at = models.DateTimeField(null=True, blank=True)
 
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -114,6 +129,14 @@ class Estimate(models.Model):
     @property
     def is_supplement(self):
         return self.kind == self.Kind.SUPPLEMENT
+
+    @property
+    def has_approval_capture(self):
+        return bool(
+            self.approval_source
+            and self.approval_contact_name
+            and self.approved_at
+        )
 
     def recalculate_total(self):
         """Sum line items into estimated_total. Resets to 0.00 when none remain."""

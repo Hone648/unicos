@@ -53,6 +53,7 @@ Be aware of these limitations before using Unicos in day-to-day operations.
 - **No multi-estimate invoice merging.** If a repair order has a primary estimate and one or more supplements, they cannot be merged into a single invoice automatically. Only one approved estimate can be converted to the repair order's invoice.
 - **No partial estimate conversion.** Conversion is all-or-nothing. You cannot convert only some line items from an estimate.
 - **No estimate reopen or revision workflow.** Once an estimate leaves draft status, it cannot be reopened for editing through shop-facing views. A supplement can capture additional work.
+- **No digital approval artifacts.** Estimate approval records source, contact, optional reference, optional note, and timestamp only. There are no signatures, uploads, email approval links, or customer portal approvals yet.
 - **No email or PDF generation.** Estimate and invoice output uses the browser's built-in print function. There is no automated email sending or server-side PDF export.
 - **No object-level permissions.** All staff with a given role can see and act on all records of that type, regardless of who created them. There are no per-record access restrictions.
 - **No technician assignment constraints.** Technicians can view all repair orders, not just their assigned ones.
@@ -245,7 +246,7 @@ Estimate numbers are system-generated in the format `EST-YYYY-NNNNNN`.
 |---|---|
 | Draft | Working estimate; can be edited |
 | Submitted | Sent for approval; editing is locked |
-| Approved | Approved; can be converted to invoice |
+| Approved | Approved with captured approval evidence; can be converted to invoice if all conversion rules are met |
 | Declined | Not approved; terminal |
 | Expired | Time-lapsed; terminal |
 
@@ -349,6 +350,7 @@ Each estimate has a browser-printable output page.
    - Insurance information (if present)
    - Line items with individual totals
    - Estimated total (from line items or manual)
+   - Approval metadata if approval has been captured
    - Notes
    - Supplement parent reference (if a supplement)
 4. Use the browser's print function (`Ctrl+P` / `Cmd+P`) to print or save as PDF.
@@ -380,8 +382,15 @@ Approved, Declined, and Expired are terminal. An estimate cannot be moved backwa
 ### Approving or declining an estimate
 
 1. Open the estimate detail page (must be Submitted).
-2. Click **Approve Estimate** or **Decline Estimate** as appropriate.
-3. The estimate moves to the selected terminal status.
+2. To approve, complete the approval capture fields:
+   - Approval source: Customer, Insurer, Customer and insurer, or Other.
+   - Approval contact: required person/contact name.
+   - Approval reference: optional reference such as email, claim, or authorization number.
+   - Approval note: optional free-text context.
+3. Click **Approve Estimate**.
+4. The app records the approval timestamp automatically and moves the estimate to Approved.
+
+To decline, click **Decline Estimate**. Decline does not require approval capture.
 
 ### Expiring an estimate
 
@@ -395,6 +404,7 @@ Approved, Declined, and Expired are terminal. An estimate cannot be moved backwa
 
 - **Draft** estimates: full editing of estimate fields and line items is available.
 - **Submitted / Approved / Declined / Expired** estimates: estimate field editing and line item add/edit/delete are blocked. Print and view remain available.
+- **Approved** estimates show captured approval metadata on the detail and print pages.
 
 ---
 
@@ -407,10 +417,11 @@ An approved estimate with line items can be converted into a draft invoice in on
 All of the following must be true:
 
 1. The estimate status is **Approved**.
-2. The estimate has **at least one line item**.
-3. The estimate has **not already been converted** to an invoice.
-4. The repair order does **not already have an invoice**.
-5. The user has the **billing.manage** permission (Owner/Admin or Manager).
+2. Approval capture is complete: approval source, approval contact, and approval timestamp are present.
+3. The estimate has **at least one line item**.
+4. The estimate has **not already been converted** to an invoice.
+5. The repair order does **not already have an invoice**.
+6. The user has the **billing.manage** permission (Owner/Admin or Manager).
 
 If any condition is not met, the "Create Invoice Draft" button does not appear, or the action is blocked with an error message.
 
@@ -616,7 +627,7 @@ Once a repair order is Delivered, Closed, or Canceled:
 5. **Add estimate line items** — from the estimate detail page, click Add Line Item for each charge.
 6. **Print estimate** — click Print Estimate, use the browser print function.
 7. **Submit estimate** — from the estimate detail page, click Submit Estimate.
-8. **Approve estimate** — click Approve Estimate once approval is confirmed.
+8. **Approve estimate** — choose approval source, enter the approval contact, optionally add a reference/note, then click Approve Estimate once approval is confirmed.
 9. **Create invoice draft** — click Create Invoice Draft. The app creates a draft invoice with copied line items.
 10. **Review invoice** — open the invoice detail, verify line items and total.
 11. **Issue invoice** — click Issue Invoice.
@@ -667,6 +678,7 @@ The estimate is no longer in Draft status. Once submitted, approved, declined, o
 **Why don't I see the "Create Invoice Draft" button?**
 One or more conditions are not met. The button appears only when:
 - The estimate is Approved.
+- Approval source and approval contact have been captured.
 - The estimate has at least one line item.
 - The estimate has not already been converted.
 - The repair order does not already have an invoice.
@@ -678,6 +690,7 @@ Check each condition. If the repair order already has an invoice, navigate to it
 If the button was present but the conversion failed, the most likely causes are:
 - The repair order already has an invoice (possibly created manually).
 - Another user converted the estimate at the same time (duplicate blocked).
+- The estimate was approved before approval capture existed and is missing approval source/contact metadata.
 The error message will state the specific reason.
 
 **Why is the invoice button missing?**

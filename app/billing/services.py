@@ -27,6 +27,12 @@ def _conversion_block_reason(estimate):
     if estimate.status != Estimate.Status.APPROVED:
         return "Only approved estimates can be converted to an invoice."
 
+    if not estimate.has_approval_capture:
+        return (
+            "This estimate is approved but has no approval capture. Record "
+            "customer or insurer approval before creating an invoice."
+        )
+
     if not estimate.line_items.exists():
         return (
             "This estimate has no line items, so there is nothing to convert "

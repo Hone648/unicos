@@ -3,6 +3,7 @@ from decimal import Decimal
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
+from django.utils import timezone
 
 from customers.models import Customer
 from estimates.models import Estimate, EstimateLineItem
@@ -108,6 +109,25 @@ class EstimateModelTests(TestCase):
     def test_str_includes_estimate_number(self):
         estimate = make_estimate(self.ro, number="EST-STR")
         self.assertEqual(str(estimate), "Estimate EST-STR")
+
+    def test_has_approval_capture_false_without_metadata(self):
+        estimate = make_estimate(
+            self.ro,
+            number="EST-NO-APP",
+            status=Estimate.Status.APPROVED,
+        )
+        self.assertFalse(estimate.has_approval_capture)
+
+    def test_has_approval_capture_true_with_required_metadata(self):
+        estimate = make_estimate(
+            self.ro,
+            number="EST-HAS-APP",
+            status=Estimate.Status.APPROVED,
+            approval_source=Estimate.ApprovalSource.CUSTOMER,
+            approval_contact_name="Jane Smith",
+            approved_at=timezone.now(),
+        )
+        self.assertTrue(estimate.has_approval_capture)
 
     def test_repair_order_is_protected_from_delete_when_estimates_exist(self):
         from django.db.models import ProtectedError
