@@ -17,6 +17,7 @@ VALID_VIN_3 = "5NPE24AF6FH002401"
 
 LIST_URL = reverse("repair_orders:list")
 CREATE_URL = reverse("repair_orders:create")
+VEHICLE_FIELD_URL = reverse("repair_orders:vehicle_field")
 
 
 # ---------------------------------------------------------------------------
@@ -618,6 +619,40 @@ class RepairOrderCreateTests(TestCase):
         self.assertContains(response, 'name="customer"')
         self.assertContains(response, 'name="vehicle"')
 
+    def test_create_get_vehicle_select_starts_disabled_until_customer_selected(self):
+        response = self.client.get(CREATE_URL)
+
+        self.assertContains(response, "Select a customer first")
+        self.assertContains(response, "disabled")
+        self.assertContains(response, "Select a customer to load that customer's vehicles.")
+        self.assertNotContains(response, VALID_VIN)
+        self.assertNotContains(response, VALID_VIN_3)
+
+    def test_create_customer_select_loads_vehicle_field_with_htmx(self):
+        response = self.client.get(CREATE_URL)
+
+        self.assertContains(response, f'hx-get="{VEHICLE_FIELD_URL}"')
+        self.assertContains(response, 'hx-target="#vehicle-field"')
+        self.assertContains(response, 'hx-trigger="change"')
+
+    def test_vehicle_field_partial_filters_vehicles_to_selected_customer(self):
+        response = self.client.get(VEHICLE_FIELD_URL, {"customer": self.customer.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a vehicle")
+        self.assertContains(response, VALID_VIN)
+        self.assertNotContains(response, VALID_VIN_3)
+        self.assertNotContains(response, "disabled")
+
+    def test_vehicle_field_partial_disables_select_when_customer_has_no_vehicles(self):
+        empty_customer = make_customer(first_name="No", last_name="Vehicles")
+
+        response = self.client.get(VEHICLE_FIELD_URL, {"customer": empty_customer.pk})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "No vehicles found for this customer")
+        self.assertContains(response, "disabled")
+
     def test_create_form_does_not_expose_status_field(self):
         response = self.client.get(CREATE_URL)
         self.assertNotContains(response, 'name="status"')
@@ -670,7 +705,20 @@ class RepairOrderCreateTests(TestCase):
             ),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "does not belong to the selected customer")
+        self.assertContains(response, "Select a valid choice")
+
+    def test_invalid_create_post_preserves_customer_and_scoped_valid_vehicle_choice(self):
+        response = self.client.post(
+            CREATE_URL,
+            self._valid_post_data(promised_date="not-a-date"),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid date.")
+        self.assertContains(response, f'value="{self.customer.pk}" selected')
+        self.assertContains(response, f'value="{self.vehicle.pk}" selected')
+        self.assertContains(response, VALID_VIN)
+        self.assertNotContains(response, VALID_VIN_3)
 
 
 # ---------------------------------------------------------------------------
@@ -723,6 +771,14 @@ class RepairOrderEditTests(TestCase):
         response = self.client.get(edit_url(self.ro.pk))
         self.assertContains(response, "RO-EDIT-01")
         self.assertContains(response, "Original problem")
+        self.assertContains(response, VALID_VIN)
+
+    def test_edit_get_scopes_vehicle_choices_to_existing_customer(self):
+        response = self.client.get(edit_url(self.ro.pk))
+
+        self.assertContains(response, f'value="{self.vehicle.pk}" selected')
+        self.assertContains(response, VALID_VIN)
+        self.assertNotContains(response, VALID_VIN_3)
 
     def test_edit_form_does_not_expose_status_field(self):
         response = self.client.get(edit_url(self.ro.pk))
@@ -766,7 +822,7 @@ class RepairOrderEditTests(TestCase):
             ),
         )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "does not belong to the selected customer")
+        self.assertContains(response, "Select a valid choice")
 
     def test_edit_form_does_not_expose_editable_ro_number(self):
         response = self.client.get(edit_url(self.ro.pk))

@@ -1,0 +1,13 @@
+<div class="form-field" id="vehicle-field">
+  <label for="{{ form.vehicle.id_for_label }}">Vehicle</label>
+  {{ form.vehicle }}
+  {% if form.vehicle.errors %}
+    <ul class="field-errors">
+      {% for error in form.vehicle.errors %}<li>{{ error }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+  <p class="form-field-hint">
+    Select a customer to load that customer's vehicles.
+    Need a new vehicle? <a href="{% url 'customers:list' %}">Open Customers</a> to add one.
+  </p>
+</div>

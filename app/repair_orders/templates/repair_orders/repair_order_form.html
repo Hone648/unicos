@@ -47,16 +47,7 @@
         <p class="form-field-hint">Need a new customer? <a href="{% url 'customers:create' %}">Add customer</a></p>
       </div>
 
-      <div class="form-field">
-        <label for="{{ form.vehicle.id_for_label }}">Vehicle</label>
-        {{ form.vehicle }}
-        {% if form.vehicle.errors %}
-          <ul class="field-errors">
-            {% for error in form.vehicle.errors %}<li>{{ error }}</li>{% endfor %}
-          </ul>
-        {% endif %}
-        <p class="form-field-hint">Need a new vehicle? <a href="{% url 'customers:list' %}">Open Customers</a> to add one.</p>
-      </div>
+      {% include "repair_orders/partials/_vehicle_field.html" %}
 
       <div class="form-field">
         <label for="{{ form.assigned_to.id_for_label }}">Assigned to</label>
