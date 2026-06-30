@@ -228,11 +228,31 @@ Required later:
 - Design media storage for attachments/photos/documents.
 - Define deployment-specific environment management.
 
+### Priority 8 - Attachments / Media Foundation
+
+Status: implemented in Slice 42.
+
+```text
+Slice 42: repair-order attachments/media model
+```
+
+Repair orders can now have file attachments (photos, signed estimates, documents).
+Upload, download, and delete are policy-gated. Files are stored under local `media/`
+using Django `FileField`. Media is served in development only (`DEBUG=True`).
+
+Remaining attachment gaps:
+
+- Media files do not survive container recreation (no Docker volume mount yet).
+- Estimate-specific, invoice-specific, or customer-level attachments not yet scoped.
+- No global attachment queue or search.
+- No image thumbnails or preview.
+- Production media serving/storage/scanning/backup is future work.
+
 Recommended next slices:
 
-- Attachments/media model.
 - Admin service-alignment and override audit planning.
 - Reporting filters/date ranges or CSV export if prioritized.
+- Production media storage (named Docker volume for local dev; S3 for production).
 
 ## Missing Body-Shop Workflow Areas
 
@@ -242,7 +262,7 @@ Recommended next slices:
 | Insurance | insurer, claim number, adjuster, deductible, DRP fields |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
-| Attachments | photos, PDFs, signed forms, invoices, intake images |
+| Attachments | basic repair-order file upload/download/delete implemented; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
 | Reporting | basic read-only operational snapshot exists; still missing filters, date ranges, CSV/export, charts, revenue, receivables, cycle time, and aging invoices |

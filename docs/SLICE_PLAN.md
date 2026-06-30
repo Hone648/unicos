@@ -45,6 +45,7 @@ Planned slices:
 40. Slice 39: Django admin policy decision / ADR (Django admin explicitly defined as an emergency/development back-office console; shop-facing views remain authoritative operator workflow; admin service alignment and audited override path deferred; no migrations)
 41. Slice 40: quality gates foundation (Ruff-only lint/format config, development requirements, pre-commit hooks, CI quality job, docs/ADR; no app behavior changes)
 42. Slice 41: reporting foundation (read-only `/reports/` page in `core`; `reports.view` permission for Owner/Admin, Manager, Read-only, and superusers; repair-order, invoice, and estimate operational counts; top unpaid invoices, ready-for-pickup ROs, and estimates needing attention; docs/ADR; no migrations)
+43. Slice 42: repair-order attachments/media foundation (new `attachments` app; `Attachment` model linked to `RepairOrder` via `PROTECT`; local `FileField` storage under `MEDIA_ROOT/repair_orders/<ro_id>/<uuid>_<basename>`; upload/download/delete views policy-gated; `MEDIA_URL`/`MEDIA_ROOT` configured; development-only media serving under `DEBUG`; allowed extensions jpg/jpeg/png/gif/webp/pdf/txt/csv; 25 MB limit; repair-order detail shows attachment list; admin registration; 26 tests; one attachments migration; ADR 0045)
 
 Likely next implementation slices:
 

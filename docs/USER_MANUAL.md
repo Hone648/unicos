@@ -28,6 +28,7 @@ This manual describes the current implemented local-development version of Unico
 17. [Issuing and Voiding Invoices](#17-issuing-and-voiding-invoices)
 18. [Recording Payments](#18-recording-payments)
 19. [Repair Order Closure Rules](#19-repair-order-closure-rules)
+19A. [Attachments](#19a-attachments)
 20. [Common Workflows](#20-common-workflows)
 21. [Troubleshooting / FAQ](#21-troubleshooting--faq)
 22. [Glossary](#22-glossary)
@@ -641,6 +642,62 @@ Once a repair order is Delivered, Closed, or Canceled:
 - Invoice edits, line item changes, and payment recording are blocked in shop-facing views.
 - The repair order detail, status history, invoice detail, printable invoice, and estimate/print views remain visible.
 - Some status transitions may still be allowed (for example, Delivered → Closed is supported).
+
+---
+
+## 19A. Attachments
+
+Attachments associate files with a repair order. Supported file types are photos and
+documents that staff need to keep on record alongside the repair order.
+
+### Uploading an attachment
+
+1. Open the repair order detail page.
+2. Scroll to the **Attachments** section.
+3. Click **Add Attachment**.
+4. Choose a file, select a category, and optionally add a description.
+5. Click **Upload**.
+
+The attachment appears in the table on the repair order detail page. The filename is
+preserved for display and download.
+
+**Allowed file types:** JPG, JPEG, PNG, GIF, WEBP, PDF, TXT, CSV.
+
+**Maximum file size:** 25 MB.
+
+**Who can upload:** Owner/Admin, Manager, Front Desk (repair_orders.manage permission).
+Estimators, Technicians, and Read-only users cannot upload.
+
+Note: File type validation is extension-only. Production deployments require server-side
+content verification, malware scanning, and private media serving.
+
+### Viewing and downloading attachments
+
+All staff who can view the repair order can see the attachment list and download files.
+This follows the same repair-order visibility rules: Technicians can only see attachments
+on repair orders they are assigned to.
+
+Click any filename in the attachment table to download the file.
+
+### Deleting an attachment
+
+1. Open the repair order detail page.
+2. Find the attachment in the Attachments table.
+3. Click **Delete** next to the file (only visible to Owner/Admin and Manager).
+4. The file and its record are removed immediately. This action cannot be undone.
+
+**Who can delete:** Owner/Admin and Manager only. Front Desk can upload but cannot delete.
+
+### Attachment limitations
+
+- Attachments are scoped to repair orders only. Estimate-specific, invoice-specific, and
+  customer-level attachments are not yet implemented.
+- There is no global attachment queue or search across the shop.
+- Uploaded files are stored locally on the development machine. Files are lost if the
+  Docker container is recreated without a data volume. Back up the `media/` directory
+  regularly in development.
+- No image thumbnails or in-browser preview — files are download-only.
+- Production media serving, cloud storage, and malware scanning are future work.
 
 ---
 

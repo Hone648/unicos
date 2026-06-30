@@ -115,6 +115,13 @@ Current domain models:
   form disables manual editing (mirrors the billing invoice subtotal pattern);
   estimates with no line items keep a manual `estimated_total`. Estimate line
   items are separate from `billing.InvoiceLineItem` and do not feed invoices
+- `attachments.Attachment`: a file attached to a repair order; stored under
+  `MEDIA_ROOT/repair_orders/<ro_id>/<uuid>_<safe_basename>`; `original_filename`
+  preserves the user-supplied name; `category` (photo/estimate/invoice/authorization/other),
+  `description`, `size_bytes`, and `uploaded_by` are recorded at upload time; access is
+  gated by the repair-order object policy (`can_view_repair_order` for download,
+  `can_upload_attachment_for_repair_order` for upload, `can_delete_attachment` for delete);
+  local `FileField` storage only — production storage/serving/scanning/backup is future work
 - `core.DocumentNumberSequence`: tracks the last-used sequence value per
   `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN`,
   `INV-YYYY-NNNNNN`, and `EST-YYYY-NNNNNN` generators in
@@ -259,7 +266,18 @@ approved, itemized estimate can be converted into a draft invoice
 into invoice line items and linking the invoice to its source estimate.
 Generated PDF output, re-sync of estimate edits into an existing invoice,
 supplement-to-invoice handling, and payment processor integration are planned for
-later slices.
+later slices. Repair-order file attachments (photos, documents, signed forms) are
+implemented via the `attachments` app using local `FileField` storage.
+
+Media / attachments:
+
+- `MEDIA_URL = "media/"`, `MEDIA_ROOT = REPO_ROOT / "media"` configured in settings.
+- Django serves media files in `DEBUG` mode only (development-only `static()` handler).
+- Production media serving (nginx, S3, presigned URLs) is future work.
+- `media/` is in `.gitignore` and `.dockerignore`; files do not survive container
+  recreation without a named volume or bind mount.
+- `attachments.Attachment` upload path: `repair_orders/<ro_id>/<uuid>_<safe_basename>`.
+- Access gated by existing repair-order object policies (no new permission primitives).
 
 Missing body-shop workflow areas:
 
@@ -269,7 +287,7 @@ Missing body-shop workflow areas:
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
-| Attachments | photos, PDFs, signed forms, invoices, intake images |
+| Attachments | basic repair-order file upload/download/delete implemented (Slice 42); still missing estimate/invoice-specific attachments, global attachment queue, thumbnails, image processing, production media serving, malware scanning, signed-form workflow |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
 | Reporting | read-only operational snapshot exists for key repair-order, invoice, and estimate counts; still missing scoped filters, date ranges, exports, charts, revenue, receivables, cycle time, and aging invoices |

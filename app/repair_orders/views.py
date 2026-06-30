@@ -9,7 +9,9 @@ from accounts.policies import (
     can_edit_repair_order,
     can_manage_estimate_for_repair_order,
     can_manage_invoice_for_repair_order,
+    can_upload_attachment_for_repair_order,
     filter_repair_orders_for_user,
+    is_owner_admin_or_manager,
     require_policy,
 )
 from accounts.policies import can_view_repair_order as policy_can_view_repair_order
@@ -50,6 +52,9 @@ def _repair_order_detail_context(ro, user):
             "-updated_at", "-id"
         )
     )
+    attachments = list(ro.attachments.select_related("uploaded_by").order_by("-created_at", "-id"))
+    can_upload_attachments = can_upload_attachment_for_repair_order(user, ro)
+    can_delete_attachments = is_owner_admin_or_manager(user)
     can_manage_invoice = False
     can_record_payment = False
     can_manage_invoice_line_items = False
@@ -92,6 +97,9 @@ def _repair_order_detail_context(ro, user):
         "can_create_invoice": can_manage_invoice_for_repair_order(user, ro),
         "can_record_payment": can_record_payment,
         "can_manage_invoice_line_items": can_manage_invoice_line_items,
+        "attachments": attachments,
+        "can_upload_attachments": can_upload_attachments,
+        "can_delete_attachments": can_delete_attachments,
     }
 
 

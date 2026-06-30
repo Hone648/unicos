@@ -39,6 +39,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "accounts",
+    "attachments",
     "customers",
     "vehicles",
     "repair_orders",
@@ -94,6 +95,9 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
+
+MEDIA_URL = "media/"
+MEDIA_ROOT = REPO_ROOT / "media"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 

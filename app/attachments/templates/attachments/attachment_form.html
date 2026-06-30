@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}Upload Attachment — {{ ro.repair_order_number }} - Unicos{% endblock %}
+
+{% block content %}
+<a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to {{ ro.repair_order_number }}</a>
+
+<div class="page-header">
+  <h1>Upload Attachment</h1>
+  <p class="muted-text">Repair order {{ ro.repair_order_number }} &mdash; {{ ro.customer }}</p>
+</div>
+
+<div class="card">
+  <form method="post" enctype="multipart/form-data">
+    {% csrf_token %}
+    {% for field in form %}
+      <div class="field-row">
+        {{ field.label_tag }}
+        {{ field }}
+        {% if field.help_text %}
+          <p class="help-text">{{ field.help_text }}</p>
+        {% endif %}
+        {% for error in field.errors %}
+          <p class="field-error">{{ error }}</p>
+        {% endfor %}
+      </div>
+    {% endfor %}
+    <div class="action-row">
+      <button type="submit" class="button button-primary">Upload</button>
+      <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+    </div>
+  </form>
+  <p class="muted-text" style="margin-top: 1rem;">
+    Allowed file types: JPG, JPEG, PNG, GIF, WEBP, PDF, TXT, CSV. Maximum file size: 25 MB.
+  </p>
+  <p class="muted-text">
+    File validation is a basic local-development guard only. Production requires storage
+    hardening, malware scanning, and private media serving.
+  </p>
+</div>
+{% endblock %}

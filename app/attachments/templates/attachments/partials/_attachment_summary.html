@@ -1,0 +1,51 @@
+<div class="card">
+  <h2>Attachments</h2>
+  {% if attachments %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>File</th>
+            <th>Category</th>
+            <th>Description</th>
+            <th>Size</th>
+            <th>Uploaded by</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for attachment in attachments %}
+            <tr>
+              <td>
+                <a href="{% url 'attachments:download' attachment.pk %}">{{ attachment.original_filename }}</a>
+              </td>
+              <td>{{ attachment.get_category_display }}</td>
+              <td>{{ attachment.description|default:"—" }}</td>
+              <td>{{ attachment.size_bytes|filesizeformat }}</td>
+              <td>{{ attachment.uploaded_by.get_username|default:"—" }}</td>
+              <td>{{ attachment.created_at|date:"Y-m-d" }}</td>
+              <td>
+                {% if can_delete_attachments %}
+                  <form method="post" action="{% url 'attachments:delete' attachment.pk %}" class="inline-form">
+                    {% csrf_token %}
+                    <button type="submit" class="button button-secondary button-sm">Delete</button>
+                  </form>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No attachments yet.</p>
+  {% endif %}
+
+  {% if can_upload_attachments %}
+    <div class="action-row">
+      <a class="button button-primary"
+         href="{% url 'attachments:upload_for_repair_order' repair_order_pk=ro.pk %}">Add Attachment</a>
+    </div>
+  {% endif %}
+</div>
