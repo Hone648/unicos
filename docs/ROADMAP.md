@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 40. It should guide
+This roadmap reflects the current implementation after Slice 41. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -27,6 +27,8 @@ Implemented:
   mutations, and unpaid-invoice closure blocking
 - CI with Ruff lint/format checks, Django checks, missing migration checks,
   migrations, full tests, Docker build/runtime smoke, and `/healthz/`
+- Read-only reporting foundation at `/reports/` for repair-order, billing, and
+  estimate operational snapshots, gated by `reports.view`
 
 The app is local-development only and is not production-ready.
 
@@ -228,9 +230,9 @@ Required later:
 
 Recommended next slices:
 
-- Reporting foundation.
 - Attachments/media model.
-- Admin service-alignment and override audit later.
+- Admin service-alignment and override audit planning.
+- Reporting filters/date ranges or CSV export if prioritized.
 
 ## Missing Body-Shop Workflow Areas
 
@@ -243,7 +245,7 @@ Recommended next slices:
 | Attachments | photos, PDFs, signed forms, invoices, intake images |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
-| Reporting | revenue, receivables, cycle time, open ROs, aging invoices |
+| Reporting | basic read-only operational snapshot exists; still missing filters, date ranges, CSV/export, charts, revenue, receivables, cycle time, and aging invoices |
 
 ## Validation Roadmap
 

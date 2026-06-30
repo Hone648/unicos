@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Reports - Unicos{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Reports</h1>
+</div>
+
+<p class="muted-text">
+  Read-only operational snapshot. Exports, charts, date ranges, and deeper analytics are future work.
+</p>
+
+<div class="card-grid">
+  <div class="card">
+    <h2>Repair Orders</h2>
+    <dl>
+      <dt>Active repair orders</dt><dd>{{ active_repair_order_count }}</dd>
+      <dt>Ready for pickup</dt><dd>{{ ready_for_pickup_count }}</dd>
+      <dt>Final repair orders</dt><dd>{{ final_repair_order_count }}</dd>
+      <dt>Unassigned active repair orders</dt><dd>{{ unassigned_active_repair_order_count }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Billing</h2>
+    <dl>
+      <dt>Non-void invoices</dt><dd>{{ non_void_invoice_count }}</dd>
+      <dt>Unpaid invoices</dt><dd>{{ unpaid_invoice_count }}</dd>
+      <dt>Total balance due</dt><dd>${{ total_balance_due }}</dd>
+      <dt>Draft invoices</dt><dd>{{ draft_invoice_count }}</dd>
+      <dt>Issued/partially paid invoices</dt><dd>{{ issued_or_partially_paid_invoice_count }}</dd>
+      <dt>Paid invoices</dt><dd>{{ paid_invoice_count }}</dd>
+      <dt>Void invoices</dt><dd>{{ void_invoice_count }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <h2>Estimates</h2>
+    <dl>
+      <dt>Draft estimates</dt><dd>{{ draft_estimate_count }}</dd>
+      <dt>Submitted awaiting decision</dt><dd>{{ submitted_estimate_count }}</dd>
+      <dt>Approved estimates</dt><dd>{{ approved_estimate_count }}</dd>
+      <dt>Approved with approval capture</dt><dd>{{ approved_with_capture_count }}</dd>
+      <dt>Approved missing approval capture</dt><dd>{{ approved_missing_capture_count }}</dd>
+      <dt>Approved converted to invoice</dt><dd>{{ approved_converted_count }}</dd>
+      <dt>Approved not yet converted</dt><dd>{{ approved_not_converted_count }}</dd>
+    </dl>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Top Unpaid Invoices</h2>
+  {% if top_unpaid_invoices %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Invoice #</th>
+            <th>Repair order #</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Balance due</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for invoice in top_unpaid_invoices %}
+            <tr>
+              <td><a href="{% url 'billing:invoice_detail' invoice.pk %}">{{ invoice.invoice_number }}</a></td>
+              <td><a href="{% url 'repair_orders:detail' invoice.repair_order.pk %}">{{ invoice.repair_order.repair_order_number }}</a></td>
+              <td>{{ invoice.repair_order.customer.display_name }}</td>
+              <td>{{ invoice.get_status_display }}</td>
+              <td>${{ invoice.balance_due_amount }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No unpaid invoices.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Ready For Pickup Repair Orders</h2>
+  {% if ready_for_pickup_repair_orders %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>RO #</th>
+            <th>Customer</th>
+            <th>Vehicle</th>
+            <th>Assigned to</th>
+            <th>Promised date</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for ro in ready_for_pickup_repair_orders %}
+            <tr>
+              <td><a href="{% url 'repair_orders:detail' ro.pk %}">{{ ro.repair_order_number }}</a></td>
+              <td>{{ ro.customer.display_name }}</td>
+              <td>{{ ro.vehicle }}</td>
+              <td>{% if ro.assigned_to %}{{ ro.assigned_to.get_username }}{% else %}-{% endif %}</td>
+              <td>{% if ro.promised_date %}{{ ro.promised_date|date:"Y-m-d" }}{% else %}-{% endif %}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No ready-for-pickup repair orders.</p>
+  {% endif %}
+</div>
+
+<div class="card">
+  <h2>Estimates Needing Attention</h2>
+  {% if estimates_needing_attention %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Estimate #</th>
+            <th>RO #</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Reason</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in estimates_needing_attention %}
+            <tr>
+              <td><a href="{% url 'estimates:detail' row.estimate.pk %}">{{ row.estimate.estimate_number }}</a></td>
+              <td><a href="{% url 'repair_orders:detail' row.estimate.repair_order.pk %}">{{ row.estimate.repair_order.repair_order_number }}</a></td>
+              <td>{{ row.estimate.repair_order.customer.display_name }}</td>
+              <td>{{ row.estimate.get_status_display }}</td>
+              <td>{{ row.reason }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No estimates need attention.</p>
+  {% endif %}
+</div>
+{% endblock %}

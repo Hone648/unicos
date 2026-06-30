@@ -46,6 +46,11 @@ Architectural style:
   - Dashboard (`/`): read-only workflow overview for active repair orders,
     ready-for-pickup work, unpaid invoices, closure blockers, and recently
     updated repair orders
+  - Reports (`/reports/`): read-only server-rendered operational snapshot built
+    from existing repair-order, billing, and estimate models. It is gated by
+    the explicit `reports.view` app permission and currently exposes aggregate
+    counts plus limited attention queues; exports, date ranges, charts, and
+    per-object report scoping are future work
 - UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
   frontend build tooling, no Tailwind
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
@@ -150,6 +155,8 @@ Authorization:
 - Major shop-facing views require app permissions, not only login.
 - `accounts.policies` adds object-level policy checks for repair-order,
   estimate, and billing views. App-level decorators remain the first gate.
+- Reporting currently uses report-level authorization only via `reports.view`;
+  per-object reporting scope and filtered exports are future work.
 - Superusers and Owner/Admin retain full app-level access.
 - `is_staff` is not treated as a shop permission.
 - Templates may hide actions, but view checks are authoritative.
@@ -265,7 +272,7 @@ Missing body-shop workflow areas:
 | Attachments | photos, PDFs, signed forms, invoices, intake images |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
-| Reporting | revenue, receivables, cycle time, open ROs, aging invoices |
+| Reporting | read-only operational snapshot exists for key repair-order, invoice, and estimate counts; still missing scoped filters, date ranges, exports, charts, revenue, receivables, cycle time, and aging invoices |
 
 List scalability gap:
 

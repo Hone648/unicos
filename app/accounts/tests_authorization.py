@@ -9,6 +9,7 @@ from accounts.authorization import (
     PERM_REPAIR_ORDERS_CHANGE_STATUS,
     PERM_REPAIR_ORDERS_MANAGE,
     PERM_REPAIR_ORDERS_VIEW,
+    PERM_REPORTS_VIEW,
     ROLE_ESTIMATOR,
     ROLE_FRONT_DESK,
     ROLE_MANAGER,
@@ -88,6 +89,7 @@ class AuthorizationHelperTests(TestCase):
         self.assertTrue(user_has_app_permission(user, PERM_BILLING_RECORD_PAYMENT))
         self.assertFalse(user_has_app_permission(user, PERM_BILLING_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS))
+        self.assertFalse(user_has_app_permission(user, PERM_REPORTS_VIEW))
 
     def test_estimator_can_view_and_change_repair_order_status(self):
         user = assign_role(make_user(), ROLE_ESTIMATOR)
@@ -98,6 +100,7 @@ class AuthorizationHelperTests(TestCase):
         self.assertTrue(user_has_app_permission(user, PERM_BILLING_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_BILLING_MANAGE))
+        self.assertFalse(user_has_app_permission(user, PERM_REPORTS_VIEW))
 
     def test_technician_can_view_repair_orders_but_cannot_mutate(self):
         user = assign_role(make_user(), ROLE_TECHNICIAN)
@@ -107,6 +110,7 @@ class AuthorizationHelperTests(TestCase):
         self.assertFalse(user_has_app_permission(user, PERM_CUSTOMERS_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS))
+        self.assertFalse(user_has_app_permission(user, PERM_REPORTS_VIEW))
 
     def test_read_only_can_view_but_cannot_mutate(self):
         user = assign_role(make_user(), ROLE_READ_ONLY)
@@ -115,6 +119,7 @@ class AuthorizationHelperTests(TestCase):
         self.assertTrue(user_has_app_permission(user, PERM_CUSTOMERS_VIEW))
         self.assertTrue(user_has_app_permission(user, PERM_REPAIR_ORDERS_VIEW))
         self.assertTrue(user_has_app_permission(user, PERM_BILLING_VIEW))
+        self.assertTrue(user_has_app_permission(user, PERM_REPORTS_VIEW))
         self.assertFalse(user_has_app_permission(user, PERM_CUSTOMERS_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE))
         self.assertFalse(user_has_app_permission(user, PERM_BILLING_MANAGE))
