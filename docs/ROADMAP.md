@@ -30,11 +30,12 @@ The app is local-development only and is not production-ready.
 
 ### Priority 1 - README / Docs Reality Check
 
-Status: this slice.
+Status: implemented in Slices 24 and 35.
 
 Keep the README, architecture docs, roadmap, and ADRs aligned with the real
 state of the app. The docs should distinguish implemented features from
-readiness gaps and future direction.
+readiness gaps and future direction. Slice 35 added a user-facing operator
+manual (`docs/USER_MANUAL.md`) covering the full implemented workflow.
 
 ### Priority 2 - Real Role/Permission Enforcement
 

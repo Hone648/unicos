@@ -137,3 +137,5 @@ Current authorization limits:
 
 See `docs/ROADMAP.md` for the current readiness roadmap and `docs/ARCHITECTURE.md`
 for architectural context, current gaps, and future direction.
+
+See [docs/USER_MANUAL.md](docs/USER_MANUAL.md) for the operator-facing workflow guide.

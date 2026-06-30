@@ -38,10 +38,11 @@ Planned slices:
 33. Slice 32: printable estimate output (read-only browser-printable estimate page; print link from estimate detail; print CSS; line-item totals, manual-total fallback, insurance, customer, vehicle, repair-order, supplement parent, and notes context; no PDF generation and no domain changes)
 34. Slice 33: estimate approval status flow (centralized estimate status transition service; explicit POST status action endpoint; draft -> submitted and submitted -> approved/declined/expired; submitted and terminal estimates are read-only for normal estimate edit and line-item mutation views; status removed from normal shop-facing forms; no migrations; no invoice/billing behavior changes)
 35. Slice 34: estimate-to-invoice draft conversion (billing conversion service `convert_estimate_to_invoice`; POST `/estimates/<pk>/convert-to-invoice/` action requiring `billing.manage`; only approved estimates with line items and no existing converted invoice can convert; creates a draft invoice on the same repair order, copies estimate line items into invoice line items, and the invoice total matches the estimate total; nullable `Invoice.source_estimate` FK with partial unique constraint for traceability and duplicate prevention; estimate detail shows "Create Invoice Draft" when convertible and links to the converted invoice otherwise; invoice detail shows a source-estimate reference; invoice issue/void/payment behavior unchanged; one billing migration)
+36. Slice 35: user manual and operator workflow guide (`docs/USER_MANUAL.md`; operator-facing guide covering customer, vehicle, repair order, estimate, supplement, print, approval lifecycle, estimate-to-invoice conversion, invoices, payments, closure rules, common workflows, troubleshooting FAQ, and glossary; role/permission table matching actual implemented matrix; honest limitation notes; README link; ADR 0038; docs-only, no app code changes)
 
 Likely next implementation slices:
 
-- Slice 35: customer/insurer approval capture, supplement-to-invoice handling, or advanced search/filtering
+- Slice 36: customer/insurer approval capture, supplement-to-invoice handling, or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
