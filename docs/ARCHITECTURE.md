@@ -16,8 +16,8 @@ Architectural style:
   shop-facing app permission helpers in `accounts.authorization`
 - Browser-based access
 - Current operational interfaces:
-  - Django admin: full back-office operations for customer, vehicle, repair
-    order, and billing records
+  - Django admin: emergency/development back-office console for trusted
+    superusers/staff; not the primary shop-facing workflow
   - Repair-order workspace (`/repair-orders/`): shop-facing list, detail,
     create, and edit views; staff can search, filter, view, create, edit, and
     change repair order status without using Django admin
@@ -136,7 +136,8 @@ Deployment:
 - Production settings are not split/hardened yet.
 - HTTPS/proxy/security settings are not configured for deployment.
 - Backups/restore are not specified.
-- Admin hardening is incomplete.
+- Admin hardening is incomplete. Django admin is currently an
+  emergency/development console, not a production operator workflow.
 - Media storage for attachments/photos/documents is not designed yet.
 
 Authorization:
@@ -175,6 +176,21 @@ Remaining limitations:
 - Estimate and invoice object policies inherit repair-order object scope.
 - Full customer/vehicle object policies are not implemented yet.
 - Admin permissions are not unified with shop-facing helpers.
+
+Admin policy:
+
+- Django admin is an emergency/development back-office console for trusted
+  superusers/staff.
+- Shop-facing views are the authoritative operator workflow.
+- Admin may expose fields and mutation paths hidden by the shop-facing UI.
+- Services own lifecycle/business-state rules where implemented.
+- Admin service alignment is partial: repair-order admin status saves/actions
+  route through repair-order lifecycle services, while billing and estimate admin
+  still save directly in places.
+- Future production admin bypasses must either call the same domain services as
+  shop-facing workflows or record an explicit override reason/audit trail.
+- Full admin object-policy integration is future work. See
+  `DECISIONS/0042-django-admin-policy.md`.
 
 Lifecycle service layer:
 

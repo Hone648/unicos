@@ -85,6 +85,10 @@ Create a superuser to sign in and reach the dashboard or Django admin:
 docker compose exec web python app/manage.py createsuperuser
 ```
 
+Django admin is an emergency/development back-office console for trusted
+superusers/staff. Normal operators should use the shop-facing app, not admin, and
+admin should not be used as a routine production workflow.
+
 ## Default Validation Commands
 
 ```powershell
@@ -125,12 +129,14 @@ from `accounts.authorization`.
 
 Current authorization limits:
 
-- No object-level permissions yet.
-- No technician assignment constraints yet.
+- Object-level policies currently cover high-value repair-order, estimate, and
+  billing views; full customer/vehicle object policies remain future work.
+- Technician repair-order access is scoped to assigned repair orders in
+  shop-facing views.
 - `is_staff` is not treated as a shop permission.
-- Django admin still uses Django admin authorization and is not unified with the
-  shop-facing helpers.
-- Lifecycle service-layer centralization remains future work.
+- Django admin still uses Django admin authorization and is intentionally
+  separate from shop-facing authorization policy.
+- Admin service alignment is partial and remains future work.
 - Production hardening remains future work.
 
 ## Roadmap And Readiness

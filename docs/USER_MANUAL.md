@@ -56,7 +56,7 @@ Be aware of these limitations before using Unicos in day-to-day operations.
 - **No digital approval artifacts.** Estimate approval records source, contact, optional reference, optional note, and timestamp only. There are no signatures, uploads, email approval links, or customer portal approvals yet.
 - **No email or PDF generation.** Estimate and invoice output uses the browser's built-in print function. There is no automated email sending or server-side PDF export.
 - **Limited object-level permissions.** Shop-facing repair-order, estimate, and billing views now use object-level policy checks. Technician repair-order visibility is limited to assigned repair orders. Full customer/vehicle object policies, multi-shop tenancy, and Django admin object policies are not implemented.
-- **Django admin is separate.** The Django admin interface (if accessible) uses its own authorization system that is not connected to the shop-facing permission helpers described in this manual.
+- **Django admin is separate.** The Django admin interface is an emergency/development back-office console for trusted superusers/staff. It is not a normal production workflow and should not be used to bypass workflow rules except for emergency/development correction.
 - **Deployment is not production-ready.** See the README for production prerequisites.
 
 ---
@@ -83,6 +83,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 - `is_staff` (Django admin staff flag) does not grant shop-facing permissions.
 - A user without any role assignment has no shop-facing access beyond login.
 - Roles stack: a user assigned to both Front Desk and Estimator gets the combined permissions of both.
+- Normal users should use the shop-facing app, not Django admin. Django admin is restricted to trusted superusers/staff for inspection, setup, repair, development support, and emergency correction.
 
 **What each role cannot do (key limits):**
 
