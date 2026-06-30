@@ -1,7 +1,6 @@
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.test import TestCase
-
-from customers.models import Customer
 from estimates.models import Estimate
 from estimates.services import (
     EstimateStatusTransitionBlocked,

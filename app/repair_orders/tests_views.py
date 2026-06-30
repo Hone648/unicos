@@ -1,14 +1,13 @@
-from decimal import Decimal
 from datetime import date
-
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.test import TestCase
-from django.urls import reverse
+from decimal import Decimal
 
 from accounts.authorization import ROLE_MANAGER, ROLE_READ_ONLY, ROLE_TECHNICIAN
 from billing.models import Invoice, Payment
 from customers.models import Customer
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.urls import reverse
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
 from vehicles.models import Vehicle
 
@@ -23,6 +22,7 @@ CREATE_URL = reverse("repair_orders:create")
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def assign_role(user, role_name):
     group, _created = Group.objects.get_or_create(name=role_name)
@@ -64,9 +64,7 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
 def make_invoice(repair_order, number="INV-001", **kwargs):
     defaults = {"subtotal": Decimal("400.00"), "tax_amount": Decimal("40.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
@@ -90,6 +88,7 @@ def edit_url(pk):
 # ---------------------------------------------------------------------------
 # List view tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderListAuthTests(TestCase):
     def test_unauthenticated_redirects_to_login(self):
@@ -168,17 +167,17 @@ class RepairOrderListFilterTests(TestCase):
         return ro
 
     def test_list_shows_open_repair_orders_by_default(self):
-        ro = self._make_ro("RO-OPEN")
+        self._make_ro("RO-OPEN")
         response = self.client.get(LIST_URL)
         self.assertContains(response, "RO-OPEN")
 
     def test_list_excludes_closed_by_default(self):
-        ro = self._make_ro("RO-CLOSED", RepairOrder.Status.CLOSED)
+        self._make_ro("RO-CLOSED", RepairOrder.Status.CLOSED)
         response = self.client.get(LIST_URL)
         self.assertNotContains(response, "RO-CLOSED")
 
     def test_list_excludes_canceled_by_default(self):
-        ro = self._make_ro("RO-CANCELED", RepairOrder.Status.CANCELED)
+        self._make_ro("RO-CANCELED", RepairOrder.Status.CANCELED)
         response = self.client.get(LIST_URL)
         self.assertNotContains(response, "RO-CANCELED")
 
@@ -208,9 +207,7 @@ class RepairOrderListSearchTests(TestCase):
         self.user = make_user()
         self.client.force_login(self.user)
         self.customer = make_customer(first_name="Alice", last_name="Brown")
-        self.vehicle = make_vehicle(
-            self.customer, vin=VALID_VIN, license_plate="XYZ999"
-        )
+        self.vehicle = make_vehicle(self.customer, vin=VALID_VIN, license_plate="XYZ999")
         make_repair_order(self.customer, self.vehicle, number="RO-SEARCH-01")
 
     def test_search_by_repair_order_number(self):
@@ -250,9 +247,7 @@ class RepairOrderListPaginationTests(TestCase):
         self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
         # Create PAGE_SIZE + 3 open repair orders so two pages exist.
         for i in range(self.PAGE_SIZE + 3):
-            make_repair_order(
-                self.customer, self.vehicle, number=f"RO-PAG-{i:03d}"
-            )
+            make_repair_order(self.customer, self.vehicle, number=f"RO-PAG-{i:03d}")
 
     def test_first_page_returns_page_size_results(self):
         response = self.client.get(LIST_URL)
@@ -295,6 +290,7 @@ class RepairOrderListPaginationTests(TestCase):
 # Detail view tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderDetailAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -319,7 +315,8 @@ class RepairOrderDetailContentTests(TestCase):
         self.customer = make_customer(first_name="Bob", last_name="Jones")
         self.vehicle = make_vehicle(self.customer)
         self.ro = make_repair_order(
-            self.customer, self.vehicle,
+            self.customer,
+            self.vehicle,
             number="RO-DETAIL-01",
             reported_problem="Bumper crack",
         )
@@ -418,6 +415,7 @@ class FinalRepairOrderDetailTests(TestCase):
 # Status update view tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderStatusUpdateAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -444,9 +442,7 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
 
     def test_post_creates_history_with_changed_by(self):
-        history_count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        history_count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
         entries = RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
         self.assertEqual(entries.count(), history_count_before + 1)
@@ -455,16 +451,12 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertEqual(latest.new_status, RepairOrder.Status.ESTIMATING)
 
     def test_post_redirects_to_detail(self):
-        response = self.client.post(
-            status_url(self.ro.pk), {"new_status": "estimating"}
-        )
+        response = self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_same_status_does_not_create_duplicate_history(self):
         # RO starts at INTAKE — posting INTAKE again should be a no-op
-        history_count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        history_count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.client.post(status_url(self.ro.pk), {"new_status": "intake"})
         self.assertEqual(
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count(),
@@ -478,9 +470,7 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertEqual(self.ro.status, original_status)
 
     def test_invalid_status_redirects_to_detail(self):
-        response = self.client.post(
-            status_url(self.ro.pk), {"new_status": "not_a_real_status"}
-        )
+        response = self.client.post(status_url(self.ro.pk), {"new_status": "not_a_real_status"})
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_get_to_status_update_url_redirects_to_detail(self):
@@ -488,12 +478,12 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_default_note_applied_when_note_blank(self):
-        self.client.post(
-            status_url(self.ro.pk), {"new_status": "estimating", "note": ""}
+        self.client.post(status_url(self.ro.pk), {"new_status": "estimating", "note": ""})
+        latest = (
+            RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
+            .order_by("-changed_at")
+            .first()
         )
-        latest = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).order_by("-changed_at").first()
         self.assertEqual(latest.note, "Status changed from repair order workspace.")
 
     def test_custom_note_is_preserved(self):
@@ -501,15 +491,18 @@ class RepairOrderStatusUpdateTests(TestCase):
             status_url(self.ro.pk),
             {"new_status": "estimating", "note": "Customer approved estimate"},
         )
-        latest = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).order_by("-changed_at").first()
+        latest = (
+            RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
+            .order_by("-changed_at")
+            .first()
+        )
         self.assertEqual(latest.note, "Customer approved estimate")
 
 
 # ---------------------------------------------------------------------------
 # HTMX status update tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderStatusUpdateHTMXTests(TestCase):
     def setUp(self):
@@ -536,9 +529,7 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
         self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
 
     def test_htmx_post_valid_status_creates_history_with_changed_by(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self._htmx_post({"new_status": "estimating"})
         entries = RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
         self.assertEqual(entries.count(), count_before + 1)
@@ -556,9 +547,7 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
 
     def test_htmx_post_same_status_does_not_create_duplicate_history(self):
         # RO starts at INTAKE — posting INTAKE again is a no-op
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self._htmx_post({"new_status": "intake"})
         self.assertEqual(
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count(),
@@ -577,9 +566,7 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
         self.assertContains(response, "not a valid repair order status")
 
     def test_non_htmx_post_still_redirects(self):
-        response = self.client.post(
-            status_url(self.ro.pk), {"new_status": "estimating"}
-        )
+        response = self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_non_htmx_post_still_updates_status(self):
@@ -591,6 +578,7 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
 # ---------------------------------------------------------------------------
 # Create view tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderCreateAuthTests(TestCase):
     def setUp(self):
@@ -666,15 +654,21 @@ class RepairOrderCreateTests(TestCase):
 
     def test_customer_vehicle_mismatch_does_not_create_repair_order(self):
         count_before = RepairOrder.objects.count()
-        self.client.post(CREATE_URL, self._valid_post_data(
-            vehicle=self.other_vehicle.pk,
-        ))
+        self.client.post(
+            CREATE_URL,
+            self._valid_post_data(
+                vehicle=self.other_vehicle.pk,
+            ),
+        )
         self.assertEqual(RepairOrder.objects.count(), count_before)
 
     def test_customer_vehicle_mismatch_displays_form_error(self):
-        response = self.client.post(CREATE_URL, self._valid_post_data(
-            vehicle=self.other_vehicle.pk,
-        ))
+        response = self.client.post(
+            CREATE_URL,
+            self._valid_post_data(
+                vehicle=self.other_vehicle.pk,
+            ),
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "does not belong to the selected customer")
 
@@ -682,6 +676,7 @@ class RepairOrderCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Edit view tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderEditAuthTests(TestCase):
     def setUp(self):
@@ -702,7 +697,8 @@ class RepairOrderEditTests(TestCase):
         self.customer = make_customer()
         self.vehicle = make_vehicle(self.customer, vin=VALID_VIN)
         self.ro = make_repair_order(
-            self.customer, self.vehicle,
+            self.customer,
+            self.vehicle,
             number="RO-EDIT-01",
             reported_problem="Original problem",
         )
@@ -747,26 +743,28 @@ class RepairOrderEditTests(TestCase):
         self.assertEqual(self.ro.updated_by, self.user)
 
     def test_edit_does_not_create_status_history_for_basic_field_changes(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.client.post(edit_url(self.ro.pk), self._valid_post_data())
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_before, count_after)
 
     def test_customer_vehicle_mismatch_does_not_update_repair_order(self):
-        self.client.post(edit_url(self.ro.pk), self._valid_post_data(
-            vehicle=self.other_vehicle.pk,
-        ))
+        self.client.post(
+            edit_url(self.ro.pk),
+            self._valid_post_data(
+                vehicle=self.other_vehicle.pk,
+            ),
+        )
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.reported_problem, "Original problem")
 
     def test_customer_vehicle_mismatch_displays_form_error(self):
-        response = self.client.post(edit_url(self.ro.pk), self._valid_post_data(
-            vehicle=self.other_vehicle.pk,
-        ))
+        response = self.client.post(
+            edit_url(self.ro.pk),
+            self._valid_post_data(
+                vehicle=self.other_vehicle.pk,
+            ),
+        )
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "does not belong to the selected customer")
 
@@ -836,13 +834,9 @@ class FinalRepairOrderEditGuardTests(TestCase):
 
     def test_delivered_repair_order_edit_post_does_not_create_status_history_row(self):
         self._set_status(RepairOrder.Status.DELIVERED)
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.client.post(edit_url(self.ro.pk), self._valid_post_data())
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_before, count_after)
 
     def test_closed_repair_order_edit_get_redirects_to_detail(self):
@@ -877,6 +871,7 @@ class FinalRepairOrderEditGuardTests(TestCase):
 # Navigation link tests
 # ---------------------------------------------------------------------------
 
+
 class RepairOrderNavigationTests(TestCase):
     def setUp(self):
         self.user = make_user(username="nav_user")
@@ -897,6 +892,7 @@ class RepairOrderNavigationTests(TestCase):
 # ---------------------------------------------------------------------------
 # Closure rule tests (non-HTMX)
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderClosureRuleTests(TestCase):
     """Final-status transitions are blocked when a non-void invoice has balance due."""
@@ -919,7 +915,7 @@ class RepairOrderClosureRuleTests(TestCase):
     # --- blocking behavior ---
 
     def test_cannot_transition_to_delivered_with_balance_due(self):
-        response = self._post_status("delivered")
+        self._post_status("delivered")
         self.ro.refresh_from_db()
         self.assertNotEqual(self.ro.status, RepairOrder.Status.DELIVERED)
 
@@ -940,13 +936,9 @@ class RepairOrderClosureRuleTests(TestCase):
         self.assertEqual(self.ro.status, original_status)
 
     def test_blocked_transition_does_not_create_history(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self._post_status("delivered")
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_before, count_after)
 
     def test_blocked_transition_redirects_to_detail(self):
@@ -988,13 +980,9 @@ class RepairOrderClosureRuleTests(TestCase):
         self.assertEqual(self.ro.status, RepairOrder.Status.IN_REPAIR)
 
     def test_non_final_transition_still_creates_history(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self._post_status("in_repair")
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_after, count_before + 1)
 
     def test_delivered_to_closed_still_succeeds_when_invoice_rule_allows_it(self):
@@ -1016,6 +1004,7 @@ class RepairOrderClosureRuleTests(TestCase):
 # ---------------------------------------------------------------------------
 # Closure rule HTMX tests
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderClosureRuleHTMXTests(TestCase):
     def setUp(self):
@@ -1049,13 +1038,9 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
         self.assertEqual(self.ro.status, original_status)
 
     def test_htmx_blocked_transition_does_not_create_history(self):
-        count_before = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self._htmx_post("delivered")
-        count_after = RepairOrderStatusHistory.objects.filter(
-            repair_order=self.ro
-        ).count()
+        count_after = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
         self.assertEqual(count_before, count_after)
 
     def test_htmx_allowed_transition_still_updates_status(self):
@@ -1073,6 +1058,7 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice summary billing permission tests
 # ---------------------------------------------------------------------------
+
 
 class InvoiceSummaryPermissionTests(TestCase):
     """RO detail invoice card: billing.view gate; Technician sees neutral message."""

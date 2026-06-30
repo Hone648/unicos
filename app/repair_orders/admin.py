@@ -107,7 +107,8 @@ class RepairOrderAdmin(admin.ModelAdmin):
             super().save_model(request, obj, form, change)
             try:
                 transition_repair_order_status(
-                    obj, desired_status,
+                    obj,
+                    desired_status,
                     changed_by=request.user,
                     note="Status changed from Django admin.",
                 )

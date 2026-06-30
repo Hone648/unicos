@@ -1,15 +1,14 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from accounts.authorization import ROLE_ESTIMATOR, ROLE_FRONT_DESK, ROLE_MANAGER
+from billing.models import Invoice, InvoiceLineItem, Payment
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-
-from accounts.authorization import ROLE_ESTIMATOR, ROLE_FRONT_DESK, ROLE_MANAGER
-from billing.models import Invoice, InvoiceLineItem, Payment
-from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -20,6 +19,7 @@ VALID_VIN_2 = "2T1BURHE0JC043821"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def assign_role(user, role_name):
     group, _created = Group.objects.get_or_create(name=role_name)
@@ -61,9 +61,7 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
 def make_invoice(repair_order, number="INV-001", **kwargs):
     defaults = {"subtotal": Decimal("500.00"), "tax_amount": Decimal("50.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
@@ -133,12 +131,11 @@ def ro_detail_url(pk):
 # Invoice list
 # ---------------------------------------------------------------------------
 
+
 class InvoiceListAuthTests(TestCase):
     def test_login_required(self):
         response = self.client.get(invoice_list_url())
-        self.assertRedirects(
-            response, f"/accounts/login/?next={invoice_list_url()}"
-        )
+        self.assertRedirects(response, f"/accounts/login/?next={invoice_list_url()}")
 
     def test_authenticated_user_can_load_list(self):
         self.client.force_login(make_user())
@@ -184,9 +181,7 @@ class InvoiceListTests(TestCase):
         newer = self._invoice("INV-NEWER", ro_number="RO-NEWER")
         now = timezone.now()
         Invoice.objects.filter(pk=older.pk).update(updated_at=now)
-        Invoice.objects.filter(pk=newer.pk).update(
-            updated_at=now + timedelta(minutes=1)
-        )
+        Invoice.objects.filter(pk=newer.pk).update(updated_at=now + timedelta(minutes=1))
 
         response = self.client.get(invoice_list_url())
 
@@ -309,9 +304,7 @@ class InvoiceListTests(TestCase):
         self.assertContains(response, "No invoices found.")
 
         self._invoice("INV-EMPTY", status=Invoice.Status.DRAFT)
-        filter_response = self.client.get(
-            invoice_list_url(), {"status": Invoice.Status.VOID}
-        )
+        filter_response = self.client.get(invoice_list_url(), {"status": Invoice.Status.VOID})
         self.assertContains(filter_response, "No invoices match this filter.")
 
         search_response = self.client.get(invoice_list_url(), {"q": "missing"})
@@ -355,9 +348,7 @@ class InvoiceListPaginationTests(TestCase):
         self.vehicle = make_vehicle(self.customer)
         # Create PAGE_SIZE + 4 invoices so two pages exist.
         for i in range(self.PAGE_SIZE + 4):
-            ro = make_repair_order(
-                self.customer, self.vehicle, number=f"RO-INV-PAG-{i:03d}"
-            )
+            ro = make_repair_order(self.customer, self.vehicle, number=f"RO-INV-PAG-{i:03d}")
             make_invoice(ro, number=f"INV-PAG-{i:03d}")
 
     def test_first_page_returns_page_size_results(self):
@@ -397,6 +388,7 @@ class InvoiceListPaginationTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice create
 # ---------------------------------------------------------------------------
+
 
 class InvoiceCreateAuthTests(TestCase):
     def setUp(self):
@@ -484,6 +476,7 @@ class InvoiceCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice edit
 # ---------------------------------------------------------------------------
+
 
 class InvoiceEditAuthTests(TestCase):
     def setUp(self):
@@ -583,6 +576,7 @@ class InvoiceEditTests(TestCase):
 # ---------------------------------------------------------------------------
 # Payment create
 # ---------------------------------------------------------------------------
+
 
 class PaymentCreateAuthTests(TestCase):
     def setUp(self):
@@ -728,9 +722,7 @@ class PaymentCreateTests(TestCase):
     def test_payment_against_void_invoice_is_rejected(self):
         self.invoice.status = Invoice.Status.VOID
         self.invoice.save(update_fields=["status", "updated_at"])
-        response = self.client.post(
-            payment_create_url(self.invoice.pk), self._valid_data()
-        )
+        response = self.client.post(payment_create_url(self.invoice.pk), self._valid_data())
         self.assertRedirects(response, ro_detail_url(self.ro.pk))
         self.assertFalse(Payment.objects.filter(invoice=self.invoice).exists())
 
@@ -744,6 +736,7 @@ class PaymentCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice line item create
 # ---------------------------------------------------------------------------
+
 
 class LineItemCreateAuthTests(TestCase):
     def setUp(self):
@@ -822,6 +815,7 @@ class LineItemCreateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice line item edit
 # ---------------------------------------------------------------------------
+
 
 class LineItemEditAuthTests(TestCase):
     def setUp(self):
@@ -920,6 +914,7 @@ class LineItemEditTests(TestCase):
 # ---------------------------------------------------------------------------
 # Repair-order detail billing display
 # ---------------------------------------------------------------------------
+
 
 class RepairOrderDetailBillingDisplayTests(TestCase):
     def setUp(self):
@@ -1025,6 +1020,7 @@ class RepairOrderDetailBillingDisplayTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice detail / print view
 # ---------------------------------------------------------------------------
+
 
 class InvoiceDetailAuthTests(TestCase):
     def setUp(self):
@@ -1203,6 +1199,7 @@ class InvoiceDetailScopeTests(TestCase):
 # Invoice issue action
 # ---------------------------------------------------------------------------
 
+
 class InvoiceIssueAuthTests(TestCase):
     def setUp(self):
         customer = make_customer()
@@ -1275,6 +1272,7 @@ class InvoiceIssueTests(TestCase):
 # Invoice void action
 # ---------------------------------------------------------------------------
 
+
 class InvoiceVoidAuthTests(TestCase):
     def setUp(self):
         customer = make_customer()
@@ -1346,6 +1344,7 @@ class InvoiceVoidTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice lifecycle UI rendering
 # ---------------------------------------------------------------------------
+
 
 class InvoiceLifecycleUITests(TestCase):
     def setUp(self):
@@ -1432,6 +1431,7 @@ class InvoiceLifecycleUITests(TestCase):
 # Void invoice edit guards
 # ---------------------------------------------------------------------------
 
+
 class VoidInvoiceEditGuardTests(TestCase):
     def setUp(self):
         self.user = make_user(username="guard_edit_user")
@@ -1470,9 +1470,7 @@ class VoidInvoiceEditGuardTests(TestCase):
         self.assertRedirects(response, invoice_detail_url(self.invoice.pk))
 
     def test_post_does_not_update_invoice(self):
-        self.client.post(
-            invoice_edit_url(self.invoice.pk), self._valid_data(subtotal="999.00")
-        )
+        self.client.post(invoice_edit_url(self.invoice.pk), self._valid_data(subtotal="999.00"))
         self.invoice.refresh_from_db()
         self.assertEqual(self.invoice.subtotal, Decimal("200.00"))
 
@@ -1486,6 +1484,7 @@ class VoidInvoiceEditGuardTests(TestCase):
 # ---------------------------------------------------------------------------
 # Void invoice line-item create guard
 # ---------------------------------------------------------------------------
+
 
 class VoidInvoiceLineItemCreateGuardTests(TestCase):
     def setUp(self):
@@ -1535,6 +1534,7 @@ class VoidInvoiceLineItemCreateGuardTests(TestCase):
 # ---------------------------------------------------------------------------
 # Void invoice line-item edit guard
 # ---------------------------------------------------------------------------
+
 
 class VoidInvoiceLineItemEditGuardTests(TestCase):
     def setUp(self):
@@ -1593,6 +1593,7 @@ class VoidInvoiceLineItemEditGuardTests(TestCase):
 # Void invoice UI rendering
 # ---------------------------------------------------------------------------
 
+
 class VoidInvoiceUIRenderingTests(TestCase):
     def setUp(self):
         self.user = make_user(username="void_ui_user")
@@ -1633,7 +1634,7 @@ class VoidInvoiceUIRenderingTests(TestCase):
     def test_void_invoice_detail_shows_totals(self):
         response = self.client.get(invoice_detail_url(self.invoice.pk))
         self.assertContains(response, "120.00")  # subtotal from line item
-        self.assertContains(response, "15.00")   # tax
+        self.assertContains(response, "15.00")  # tax
 
     def test_void_invoice_detail_hides_edit_invoice(self):
         response = self.client.get(invoice_detail_url(self.invoice.pk))
@@ -1674,6 +1675,7 @@ class VoidInvoiceUIRenderingTests(TestCase):
 # ---------------------------------------------------------------------------
 # Final repair-order billing guards
 # ---------------------------------------------------------------------------
+
 
 class FinalRepairOrderBillingGuardTests(TestCase):
     def setUp(self):

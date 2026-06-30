@@ -1,10 +1,9 @@
+from accounts.authorization import ROLE_MANAGER
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
-
-from accounts.authorization import ROLE_MANAGER
-from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -66,6 +65,7 @@ def vehicle_create_url(customer_pk):
 # ---------------------------------------------------------------------------
 # Customer list
 # ---------------------------------------------------------------------------
+
 
 class CustomerListAuthTests(TestCase):
     def test_login_required(self):
@@ -144,6 +144,7 @@ class CustomerListPaginationTests(TestCase):
 # Customer detail
 # ---------------------------------------------------------------------------
 
+
 class CustomerDetailAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -182,6 +183,7 @@ class CustomerDetailTests(TestCase):
 # ---------------------------------------------------------------------------
 # Customer create
 # ---------------------------------------------------------------------------
+
 
 class CustomerCreateAuthTests(TestCase):
     def test_login_required(self):
@@ -244,6 +246,7 @@ class CustomerCreateTests(TestCase):
 # Customer edit
 # ---------------------------------------------------------------------------
 
+
 class CustomerEditAuthTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -301,6 +304,7 @@ class CustomerEditTests(TestCase):
 # ---------------------------------------------------------------------------
 # Navigation
 # ---------------------------------------------------------------------------
+
 
 class NavigationTests(TestCase):
     def setUp(self):

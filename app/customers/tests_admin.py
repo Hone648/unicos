@@ -1,8 +1,7 @@
-from django.contrib import admin
-from django.test import TestCase
-
 from customers.admin import CustomerAdmin
 from customers.models import Customer
+from django.contrib import admin
+from django.test import TestCase
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 

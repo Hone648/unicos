@@ -1,10 +1,9 @@
 from unittest.mock import patch
 
+from accounts.authorization import ROLE_MANAGER
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import SimpleTestCase, TestCase
-
-from accounts.authorization import ROLE_MANAGER
 
 
 def assign_role(user, role_name):
@@ -59,9 +58,7 @@ class DashboardAccessTests(TestCase):
         self.assertEqual(response.url, "/accounts/login/?next=/")
 
     def test_authenticated_user_can_access_dashboard(self):
-        user = get_user_model().objects.create_user(
-            username="tech", password=self.PASSWORD
-        )
+        user = get_user_model().objects.create_user(username="tech", password=self.PASSWORD)
         assign_role(user, ROLE_MANAGER)
         self.client.login(username="tech", password=self.PASSWORD)
         response = self.client.get("/")
@@ -87,6 +84,4 @@ class LoginLogoutTests(TestCase):
         get_user_model().objects.create_user(username="mgr", password=self.PASSWORD)
         self.client.login(username="mgr", password=self.PASSWORD)
         response = self.client.post("/accounts/logout/")
-        self.assertRedirects(
-            response, "/accounts/login/", fetch_redirect_response=False
-        )
+        self.assertRedirects(response, "/accounts/login/", fetch_redirect_response=False)

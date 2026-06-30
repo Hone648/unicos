@@ -1,5 +1,4 @@
 from django.urls import path
-
 from vehicles import views as vehicle_views
 
 from . import views
@@ -11,5 +10,7 @@ urlpatterns = [
     path("new/", views.customer_create, name="create"),
     path("<int:pk>/", views.customer_detail, name="detail"),
     path("<int:pk>/edit/", views.customer_edit, name="edit"),
-    path("<int:pk>/vehicles/new/", vehicle_views.vehicle_create_for_customer, name="vehicle_create"),
+    path(
+        "<int:pk>/vehicles/new/", vehicle_views.vehicle_create_for_customer, name="vehicle_create"
+    ),
 ]

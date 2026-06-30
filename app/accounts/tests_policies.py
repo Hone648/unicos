@@ -1,9 +1,5 @@
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.test import TestCase
-
 from accounts.authorization import (
     ROLE_ESTIMATOR,
     ROLE_FRONT_DESK,
@@ -27,10 +23,12 @@ from accounts.policies import (
 )
 from billing.models import Invoice
 from customers.models import Customer
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.test import TestCase
 from estimates.models import Estimate
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
-
 
 VALID_VIN = "1HGBH41JXMN109186"
 VALID_VIN_2 = "2T1BURHE0JC043821"
@@ -159,9 +157,7 @@ class ObjectPolicyTests(TestCase):
 
     def test_technician_cannot_edit_assigned_repair_order(self):
         self.assertFalse(can_edit_repair_order(self.technician, self.assigned_ro))
-        self.assertFalse(
-            can_change_repair_order_status(self.technician, self.assigned_ro)
-        )
+        self.assertFalse(can_change_repair_order_status(self.technician, self.assigned_ro))
 
     def test_technician_queryset_is_limited_to_assigned_repair_orders(self):
         qs = filter_repair_orders_for_user(self.technician, RepairOrder.objects.all())

@@ -44,7 +44,7 @@ screenshot set.
 - Closure rule blocking final RO statuses when active invoice has balance due
 - Generated document numbers
 - Billing invoice queue
-- Hardened CI with migration checks, Docker smoke, and healthz
+- Hardened CI with Ruff quality checks, migration checks, Docker smoke, and healthz
 
 ## Stack
 
@@ -92,6 +92,9 @@ admin should not be used as a routine production workflow.
 ## Default Validation Commands
 
 ```powershell
+python -m pip install -r requirements-dev.txt
+ruff check .
+ruff format --check .
 docker compose build
 docker compose up -d
 docker compose exec web python app/manage.py check
@@ -105,12 +108,40 @@ docker compose down
 For non-Docker local runs, install `requirements.txt` and provide the same
 environment variables shown in `.env.example`.
 
+## Development Quality Checks
+
+Install development tooling:
+
+```powershell
+python -m pip install -r requirements-dev.txt
+```
+
+Run local quality checks:
+
+```powershell
+ruff check .
+ruff format --check .
+```
+
+Format Python files when needed:
+
+```powershell
+ruff format .
+```
+
+Set up pre-commit hooks:
+
+```powershell
+pre-commit install
+pre-commit run --all-files
+```
+
 ## CI Validation
 
-GitHub Actions runs a PostgreSQL-backed Django test job and a separate Docker
-smoke job. CI checks Django system checks, missing migrations, migration
-application, the full test suite, Docker image build, Docker Compose startup,
-and `/healthz/`.
+GitHub Actions runs a Ruff quality job, a PostgreSQL-backed Django test job, and
+a separate Docker smoke job. CI checks Ruff linting/formatting, Django system
+checks, missing migrations, migration application, the full test suite, Docker
+image build, Docker Compose startup, and `/healthz/`.
 
 ## Authentication And Authorization
 

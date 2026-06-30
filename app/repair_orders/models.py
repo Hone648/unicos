@@ -93,9 +93,7 @@ class RepairOrder(models.Model):
         rules must be intentionally bypassed (e.g. test setup or migrations).
         """
         if new_status not in self.Status.values:
-            raise ValidationError(
-                f"'{new_status}' is not a valid repair order status."
-            )
+            raise ValidationError(f"'{new_status}' is not a valid repair order status.")
         if new_status == self.status:
             return
         # _status_changed_by / _status_change_note are read by save() to
@@ -115,6 +113,7 @@ class RepairOrder(models.Model):
                 the transition (e.g. unpaid-invoice final-status block).
         """
         from .services import transition_repair_order_status  # local import
+
         transition_repair_order_status(self, new_status, changed_by=changed_by, note=note)
 
     def _clear_status_change_context(self):
@@ -129,9 +128,7 @@ class RepairOrder(models.Model):
 
             if not is_new:
                 old_status = (
-                    RepairOrder.objects.filter(pk=self.pk)
-                    .values_list("status", flat=True)
-                    .first()
+                    RepairOrder.objects.filter(pk=self.pk).values_list("status", flat=True).first()
                 )
 
             super().save(*args, **kwargs)
@@ -146,7 +143,9 @@ class RepairOrder(models.Model):
                         repair_order=self,
                         previous_status=None,
                         new_status=self.status,
-                        changed_by=explicit_changer if explicit_changer is not None else self.created_by,
+                        changed_by=explicit_changer
+                        if explicit_changer is not None
+                        else self.created_by,
                         note=explicit_note,
                     )
                 elif old_status is not None and old_status != self.status:
@@ -154,7 +153,9 @@ class RepairOrder(models.Model):
                         repair_order=self,
                         previous_status=old_status,
                         new_status=self.status,
-                        changed_by=explicit_changer if explicit_changer is not None else self.updated_by,
+                        changed_by=explicit_changer
+                        if explicit_changer is not None
+                        else self.updated_by,
                         note=explicit_note,
                     )
             finally:

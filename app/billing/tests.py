@@ -1,11 +1,9 @@
 from decimal import Decimal
 
-from django.core.exceptions import ValidationError
-from django.test import TestCase
-from django.utils import timezone
-
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
+from django.core.exceptions import ValidationError
+from django.test import TestCase
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -15,6 +13,7 @@ VALID_VIN = "1HGBH41JXMN109186"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_customer(**kwargs):
     defaults = {
@@ -41,13 +40,12 @@ def make_repair_order(customer, vehicle, number="RO-0001", **kwargs):
 def make_invoice(repair_order, number="INV-001", **kwargs):
     defaults = {"subtotal": Decimal("500.00"), "tax_amount": Decimal("50.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_payment(invoice, amount=Decimal("100.00"), **kwargs):
     from datetime import date
+
     defaults = {"payment_date": date.today(), "method": Payment.Method.CASH}
     defaults.update(kwargs)
     return Payment.objects.create(invoice=invoice, amount=amount, **defaults)
@@ -74,6 +72,7 @@ def make_line_item(
 # Invoice model tests
 # ---------------------------------------------------------------------------
 
+
 class InvoiceModelTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -88,6 +87,7 @@ class InvoiceModelTests(TestCase):
     def test_one_repair_order_cannot_have_two_invoices(self):
         make_invoice(self.ro)
         from django.db import IntegrityError
+
         with self.assertRaises(IntegrityError):
             Invoice.objects.create(
                 repair_order=self.ro,
@@ -143,6 +143,7 @@ class InvoiceModelTests(TestCase):
 
     def test_due_date_before_issued_at_fails_validation(self):
         from datetime import date
+
         inv = Invoice(
             repair_order=self.ro,
             invoice_number="INV-DATE",
@@ -158,6 +159,7 @@ class InvoiceModelTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice source-estimate traceability
 # ---------------------------------------------------------------------------
+
 
 class InvoiceSourceEstimateTests(TestCase):
     def setUp(self):
@@ -199,9 +201,7 @@ class InvoiceSourceEstimateTests(TestCase):
             model="Accord",
             year=2022,
         )
-        other_ro = make_repair_order(
-            other_customer, other_vehicle, number="RO-SRC-B"
-        )
+        other_ro = make_repair_order(other_customer, other_vehicle, number="RO-SRC-B")
         with self.assertRaises(IntegrityError):
             Invoice.objects.create(
                 repair_order=other_ro,
@@ -219,9 +219,7 @@ class InvoiceSourceEstimateTests(TestCase):
             model="Fit",
             year=2023,
         )
-        other_ro = make_repair_order(
-            other_customer, other_vehicle, number="RO-NULL-B"
-        )
+        other_ro = make_repair_order(other_customer, other_vehicle, number="RO-NULL-B")
         make_invoice(other_ro, number="INV-NULL-B")
         self.assertEqual(Invoice.objects.filter(source_estimate__isnull=True).count(), 2)
 
@@ -229,6 +227,7 @@ class InvoiceSourceEstimateTests(TestCase):
 # ---------------------------------------------------------------------------
 # Invoice line item model tests
 # ---------------------------------------------------------------------------
+
 
 class InvoiceLineItemModelTests(TestCase):
     def setUp(self):
@@ -332,6 +331,7 @@ class InvoiceLineItemModelTests(TestCase):
 # Payment model tests
 # ---------------------------------------------------------------------------
 
+
 class PaymentModelTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -388,6 +388,7 @@ class PaymentModelTests(TestCase):
 
     def test_deleting_payment_from_paid_invoice_with_issued_at_returns_to_issued(self):
         from datetime import date
+
         self.invoice.issued_at = date.today()
         self.invoice.save(update_fields=["issued_at", "updated_at"])
         p = make_payment(self.invoice, Decimal("500.00"))
@@ -399,6 +400,7 @@ class PaymentModelTests(TestCase):
 
     def test_deleting_payment_from_partially_paid_invoice_with_issued_at_returns_to_issued(self):
         from datetime import date
+
         self.invoice.issued_at = date.today()
         self.invoice.save(update_fields=["issued_at", "updated_at"])
         p = make_payment(self.invoice, Decimal("250.00"))

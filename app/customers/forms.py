@@ -25,5 +25,6 @@ class CustomerForm(forms.ModelForm):
         widgets = {
             "notes": forms.Textarea(attrs={"rows": 3}),
         }
+
     # Individual/business name validation is handled by Customer.clean(), which
     # Django's ModelForm calls automatically via _post_clean() -> instance.full_clean().

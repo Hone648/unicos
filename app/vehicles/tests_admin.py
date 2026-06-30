@@ -1,7 +1,6 @@
+from customers.models import Customer
 from django.contrib import admin
 from django.test import TestCase
-
-from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.admin import VehicleAdmin
 from vehicles.models import Vehicle

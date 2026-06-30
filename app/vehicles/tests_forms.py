@@ -1,7 +1,6 @@
 import datetime
 
 from django.test import TestCase
-
 from vehicles.forms import VehicleForm
 
 VALID_VIN = "1HGBH41JXMN109186"
@@ -29,6 +28,7 @@ def _form_data(**overrides):
 # ---------------------------------------------------------------------------
 # Vehicle year validation
 # ---------------------------------------------------------------------------
+
 
 class VehicleYearValidationTests(TestCase):
     def test_valid_year_is_accepted(self):

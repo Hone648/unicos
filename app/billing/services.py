@@ -1,10 +1,9 @@
 """Billing service boundary."""
 
+from core.document_numbers import generate_invoice_number
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
-
-from core.document_numbers import generate_invoice_number
 from estimates.models import Estimate
 from repair_orders.business_rules import is_final_repair_order_status
 
@@ -49,8 +48,7 @@ _LINE_ITEM_FIELDS = ["item_type", "description", "quantity", "unit_price"]
 
 def _final_invoice_message(invoice):
     return (
-        f"Invoice {invoice.invoice_number} belongs to a final repair order "
-        "and cannot be changed."
+        f"Invoice {invoice.invoice_number} belongs to a final repair order and cannot be changed."
     )
 
 
@@ -59,11 +57,7 @@ def _invoice_void_message(invoice):
 
 
 def _lock_invoice(invoice):
-    return (
-        Invoice.objects.select_for_update()
-        .select_related("repair_order")
-        .get(pk=invoice.pk)
-    )
+    return Invoice.objects.select_for_update().select_related("repair_order").get(pk=invoice.pk)
 
 
 def _ensure_repair_order_allows_billing(invoice, exception_cls):
@@ -109,10 +103,7 @@ def _conversion_block_reason(estimate):
         )
 
     if not estimate.line_items.exists():
-        return (
-            "This estimate has no line items, so there is nothing to convert "
-            "into an invoice."
-        )
+        return "This estimate has no line items, so there is nothing to convert into an invoice."
 
     existing = estimate.converted_invoices.first()
     if existing is not None:
@@ -149,9 +140,7 @@ def convert_estimate_to_invoice(estimate, *, created_by=None):
     # Lock the estimate row so concurrent conversion attempts serialize; the
     # second one then sees the first invoice and is blocked below.
     locked_estimate = (
-        Estimate.objects.select_for_update()
-        .select_related("repair_order")
-        .get(pk=estimate.pk)
+        Estimate.objects.select_for_update().select_related("repair_order").get(pk=estimate.pk)
     )
 
     reason = _conversion_block_reason(locked_estimate)

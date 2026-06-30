@@ -49,9 +49,7 @@ class Customer(models.Model):
                 )
         elif self.customer_type == self.CustomerType.BUSINESS:
             if not self.business_name.strip():
-                raise ValidationError(
-                    "Business customers must have a business name."
-                )
+                raise ValidationError("Business customers must have a business name.")
 
     @property
     def display_name(self):

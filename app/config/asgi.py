@@ -1,4 +1,5 @@
 """ASGI config for the Unicos project."""
+
 import os
 
 from django.core.asgi import get_asgi_application

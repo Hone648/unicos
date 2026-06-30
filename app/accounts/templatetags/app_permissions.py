@@ -1,6 +1,5 @@
-from django import template
-
 from accounts.authorization import user_has_app_permission
+from django import template
 
 register = template.Library()
 

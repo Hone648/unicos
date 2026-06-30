@@ -43,12 +43,13 @@ Planned slices:
 38. Slice 37: billing service boundary and payment concurrency guarantee (`billing.services` owns invoice issue, invoice void, payment recording, and invoice line-item mutations; payment recording locks the invoice row with `select_for_update()`; views remain thin; no migrations)
 39. Slice 38: object-level authorization policy scaffold (`accounts.policies` object-policy layer; assigned technicians can view only assigned repair orders; repair-order, estimate, and billing views enforce app-level plus object-level authorization; no migrations)
 40. Slice 39: Django admin policy decision / ADR (Django admin explicitly defined as an emergency/development back-office console; shop-facing views remain authoritative operator workflow; admin service alignment and audited override path deferred; no migrations)
+41. Slice 40: quality gates foundation (Ruff-only lint/format config, development requirements, pre-commit hooks, CI quality job, docs/ADR; no app behavior changes)
 
 Likely next implementation slices:
 
-- Slice 40: quality gates foundation
 - Slice 41: reporting foundation
 - Slice 42: attachments/media model
+- Slice 43: admin service-alignment / override audit planning
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

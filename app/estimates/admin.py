@@ -5,7 +5,14 @@ from .models import Estimate, EstimateLineItem
 
 class EstimateLineItemInline(admin.TabularInline):
     model = EstimateLineItem
-    fields = ("item_type", "description", "quantity", "unit_price", "line_total_display", "sort_order")
+    fields = (
+        "item_type",
+        "description",
+        "quantity",
+        "unit_price",
+        "line_total_display",
+        "sort_order",
+    )
     readonly_fields = ("line_total_display",)
     extra = 0
     show_change_link = True
@@ -129,7 +136,16 @@ class EstimateLineItemAdmin(admin.ModelAdmin):
     fieldsets = (
         (
             "Line item",
-            {"fields": ("estimate", "item_type", "description", "quantity", "unit_price", "sort_order")},
+            {
+                "fields": (
+                    "estimate",
+                    "item_type",
+                    "description",
+                    "quantity",
+                    "unit_price",
+                    "sort_order",
+                )
+            },
         ),
         (
             "Calculated",

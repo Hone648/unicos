@@ -1,14 +1,13 @@
-from decimal import Decimal
 from datetime import date
-
-from django.contrib import admin
-from django.contrib.messages.storage.fallback import FallbackStorage
-from django.contrib.auth import get_user_model
-from django.test import RequestFactory, TestCase
+from decimal import Decimal
 
 from billing.admin import InvoiceAdmin, InvoiceLineItemAdmin, InvoiceLineItemInline, PaymentAdmin
 from billing.models import Invoice, InvoiceLineItem, Payment
 from customers.models import Customer
+from django.contrib import admin
+from django.contrib.auth import get_user_model
+from django.contrib.messages.storage.fallback import FallbackStorage
+from django.test import RequestFactory, TestCase
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -18,6 +17,7 @@ VALID_VIN = "1HGBH41JXMN109186"
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_user(username="staffer", **kwargs):
     return get_user_model().objects.create_user(
@@ -48,9 +48,7 @@ def make_repair_order(customer, vehicle):
 def make_invoice(repair_order, number="INV-001", **kwargs):
     defaults = {"subtotal": Decimal("500.00"), "tax_amount": Decimal("50.00")}
     defaults.update(kwargs)
-    return Invoice.objects.create(
-        repair_order=repair_order, invoice_number=number, **defaults
-    )
+    return Invoice.objects.create(repair_order=repair_order, invoice_number=number, **defaults)
 
 
 def make_request(user):
@@ -65,6 +63,7 @@ def make_request(user):
 # ---------------------------------------------------------------------------
 # InvoiceAdmin tests
 # ---------------------------------------------------------------------------
+
 
 class InvoiceAdminSaveModelTests(TestCase):
     def setUp(self):
@@ -111,9 +110,7 @@ class InvoiceAdminDisplayMethodTests(TestCase):
         customer = make_customer()
         vehicle = make_vehicle(customer)
         ro = make_repair_order(customer, vehicle)
-        self.invoice = make_invoice(
-            ro, subtotal=Decimal("400.00"), tax_amount=Decimal("40.00")
-        )
+        self.invoice = make_invoice(ro, subtotal=Decimal("400.00"), tax_amount=Decimal("40.00"))
 
     def test_total_amount_display(self):
         self.assertEqual(
@@ -150,6 +147,7 @@ class InvoiceAdminDisplayMethodTests(TestCase):
 # InvoiceLineItemAdmin tests
 # ---------------------------------------------------------------------------
 
+
 class InvoiceLineItemAdminTests(TestCase):
     def setUp(self):
         self.admin_instance = InvoiceLineItemAdmin(InvoiceLineItem, admin.site)
@@ -182,6 +180,7 @@ class InvoiceLineItemAdminTests(TestCase):
 # ---------------------------------------------------------------------------
 # PaymentAdmin tests
 # ---------------------------------------------------------------------------
+
 
 class PaymentAdminSaveModelTests(TestCase):
     def setUp(self):

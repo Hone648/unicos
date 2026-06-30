@@ -1,10 +1,4 @@
-from datetime import date
 from decimal import Decimal
-
-from django.contrib.auth import get_user_model
-from django.contrib.auth.models import Group
-from django.test import TestCase
-from django.urls import reverse
 
 from accounts.authorization import (
     ROLE_ESTIMATOR,
@@ -15,6 +9,10 @@ from accounts.authorization import (
 )
 from billing.models import Invoice, InvoiceLineItem
 from customers.models import Customer
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
+from django.test import TestCase
+from django.urls import reverse
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -117,7 +115,9 @@ class ShopFacingAuthorizationTests(TestCase):
             403,
         )
         self.assertEqual(
-            self.client.get(reverse("customers:vehicle_create", args=[self.customer.pk])).status_code,
+            self.client.get(
+                reverse("customers:vehicle_create", args=[self.customer.pk])
+            ).status_code,
             403,
         )
         self.assertEqual(
@@ -133,7 +133,9 @@ class ShopFacingAuthorizationTests(TestCase):
             200,
         )
         self.assertEqual(
-            self.client.get(reverse("customers:vehicle_create", args=[self.customer.pk])).status_code,
+            self.client.get(
+                reverse("customers:vehicle_create", args=[self.customer.pk])
+            ).status_code,
             200,
         )
         self.assertEqual(
@@ -214,11 +216,15 @@ class ShopFacingAuthorizationTests(TestCase):
             403,
         )
         self.assertEqual(
-            self.client.get(reverse("billing:line_item_create", args=[self.invoice.pk])).status_code,
+            self.client.get(
+                reverse("billing:line_item_create", args=[self.invoice.pk])
+            ).status_code,
             403,
         )
         self.assertEqual(
-            self.client.get(reverse("billing:line_item_edit", args=[self.line_item.pk])).status_code,
+            self.client.get(
+                reverse("billing:line_item_edit", args=[self.line_item.pk])
+            ).status_code,
             403,
         )
         self.assertEqual(

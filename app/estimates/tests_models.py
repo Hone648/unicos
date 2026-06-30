@@ -1,11 +1,10 @@
 from decimal import Decimal
 
+from customers.models import Customer
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
-
-from customers.models import Customer
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -37,9 +36,7 @@ def make_repair_order(customer, vehicle, number="RO-EST-001", **kwargs):
 
 
 def make_estimate(repair_order, number="EST-001", **kwargs):
-    return Estimate.objects.create(
-        repair_order=repair_order, estimate_number=number, **kwargs
-    )
+    return Estimate.objects.create(repair_order=repair_order, estimate_number=number, **kwargs)
 
 
 class EstimateModelTests(TestCase):
@@ -152,6 +149,7 @@ def make_line_item(estimate, **kwargs):
 # Supplement lineage
 # ---------------------------------------------------------------------------
 
+
 class EstimateSupplementTests(TestCase):
     def setUp(self):
         self.customer = make_customer()
@@ -217,12 +215,16 @@ class EstimateSupplementTests(TestCase):
 
     def test_parent_exposes_supplements_relation(self):
         make_estimate(
-            self.ro, number="EST-SUP-1",
-            kind=Estimate.Kind.SUPPLEMENT, parent_estimate=self.parent,
+            self.ro,
+            number="EST-SUP-1",
+            kind=Estimate.Kind.SUPPLEMENT,
+            parent_estimate=self.parent,
         )
         make_estimate(
-            self.ro, number="EST-SUP-2",
-            kind=Estimate.Kind.SUPPLEMENT, parent_estimate=self.parent,
+            self.ro,
+            number="EST-SUP-2",
+            kind=Estimate.Kind.SUPPLEMENT,
+            parent_estimate=self.parent,
         )
         self.assertEqual(self.parent.supplements.count(), 2)
 
@@ -230,8 +232,10 @@ class EstimateSupplementTests(TestCase):
         from django.db.models import ProtectedError
 
         make_estimate(
-            self.ro, number="EST-SUP-PROTECT",
-            kind=Estimate.Kind.SUPPLEMENT, parent_estimate=self.parent,
+            self.ro,
+            number="EST-SUP-PROTECT",
+            kind=Estimate.Kind.SUPPLEMENT,
+            parent_estimate=self.parent,
         )
         with self.assertRaises(ProtectedError):
             self.parent.delete()
@@ -240,6 +244,7 @@ class EstimateSupplementTests(TestCase):
 # ---------------------------------------------------------------------------
 # Estimate line items
 # ---------------------------------------------------------------------------
+
 
 class EstimateLineItemModelTests(TestCase):
     def setUp(self):
@@ -258,40 +263,50 @@ class EstimateLineItemModelTests(TestCase):
 
     def test_quantity_zero_rejected(self):
         item = EstimateLineItem(
-            estimate=self.estimate, description="x",
-            quantity=Decimal("0.00"), unit_price=Decimal("10.00"),
+            estimate=self.estimate,
+            description="x",
+            quantity=Decimal("0.00"),
+            unit_price=Decimal("10.00"),
         )
         with self.assertRaises(ValidationError):
             item.full_clean()
 
     def test_quantity_negative_rejected(self):
         item = EstimateLineItem(
-            estimate=self.estimate, description="x",
-            quantity=Decimal("-1.00"), unit_price=Decimal("10.00"),
+            estimate=self.estimate,
+            description="x",
+            quantity=Decimal("-1.00"),
+            unit_price=Decimal("10.00"),
         )
         with self.assertRaises(ValidationError):
             item.full_clean()
 
     def test_unit_price_negative_rejected(self):
         item = EstimateLineItem(
-            estimate=self.estimate, description="x",
-            quantity=Decimal("1.00"), unit_price=Decimal("-1.00"),
+            estimate=self.estimate,
+            description="x",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("-1.00"),
         )
         with self.assertRaises(ValidationError):
             item.full_clean()
 
     def test_blank_description_rejected(self):
         item = EstimateLineItem(
-            estimate=self.estimate, description="",
-            quantity=Decimal("1.00"), unit_price=Decimal("10.00"),
+            estimate=self.estimate,
+            description="",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("10.00"),
         )
         with self.assertRaises(ValidationError):
             item.full_clean()
 
     def test_whitespace_description_rejected(self):
         item = EstimateLineItem(
-            estimate=self.estimate, description="   ",
-            quantity=Decimal("1.00"), unit_price=Decimal("10.00"),
+            estimate=self.estimate,
+            description="   ",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("10.00"),
         )
         with self.assertRaises(ValidationError):
             item.full_clean()
@@ -313,7 +328,9 @@ class EstimateLineItemModelTests(TestCase):
         self.assertEqual(self.estimate.estimated_total, Decimal("250.00"))
 
     def test_deleting_line_item_recalculates_total(self):
-        first = make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("100.00"))
+        first = make_line_item(
+            self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("100.00")
+        )
         make_line_item(self.estimate, quantity=Decimal("1.00"), unit_price=Decimal("40.00"))
         self.estimate.refresh_from_db()
         self.assertEqual(self.estimate.estimated_total, Decimal("140.00"))
@@ -323,8 +340,13 @@ class EstimateLineItemModelTests(TestCase):
 
     def test_multiple_line_items_sum_correctly(self):
         make_line_item(self.estimate, quantity=Decimal("2.00"), unit_price=Decimal("50.00"))
-        make_line_item(self.estimate, item_type=EstimateLineItem.ItemType.PARTS,
-                       description="Bumper", quantity=Decimal("1.00"), unit_price=Decimal("300.00"))
+        make_line_item(
+            self.estimate,
+            item_type=EstimateLineItem.ItemType.PARTS,
+            description="Bumper",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("300.00"),
+        )
         self.estimate.refresh_from_db()
         self.assertEqual(self.estimate.estimated_total, Decimal("400.00"))
 

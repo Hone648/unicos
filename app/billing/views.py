@@ -1,9 +1,5 @@
 from urllib.parse import urlencode
 
-from django.contrib import messages
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
-
 from accounts.authorization import (
     PERM_BILLING_MANAGE,
     PERM_BILLING_RECORD_PAYMENT,
@@ -20,6 +16,9 @@ from accounts.policies import (
 )
 from core.document_numbers import generate_invoice_number
 from core.pagination import paginate_queryset, pagination_querystring
+from django.contrib import messages
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 
@@ -39,7 +38,6 @@ from .services import (
     void_invoice,
 )
 
-
 _VALID_INVOICE_STATUSES = set(Invoice.Status.values)
 
 
@@ -53,8 +51,7 @@ def _final_repair_order_message(ro):
 
 def _final_invoice_message(invoice):
     return (
-        f"Invoice {invoice.invoice_number} belongs to a final repair order "
-        "and cannot be changed."
+        f"Invoice {invoice.invoice_number} belongs to a final repair order and cannot be changed."
     )
 
 
@@ -92,14 +89,11 @@ def invoice_list(request):
     if status_filter not in _VALID_INVOICE_STATUSES:
         status_filter = ""
 
-    invoices = (
-        Invoice.objects.select_related(
-            "repair_order",
-            "repair_order__customer",
-            "repair_order__vehicle",
-        )
-        .order_by("-updated_at", "-id")
-    )
+    invoices = Invoice.objects.select_related(
+        "repair_order",
+        "repair_order__customer",
+        "repair_order__vehicle",
+    ).order_by("-updated_at", "-id")
 
     if status_filter:
         invoices = invoices.filter(status=status_filter)
@@ -163,16 +157,20 @@ def invoice_detail(request, pk):
     payments = list(
         invoice.payments.select_related("received_by").order_by("-payment_date", "-created_at")
     )
-    return render(request, "billing/invoice_detail.html", {
-        "invoice": invoice,
-        "is_final_repair_order": _repair_order_is_final(ro),
-        "ro": ro,
-        "line_items": line_items,
-        "payments": payments,
-        "can_manage_invoice": can_manage_invoice(request.user, invoice),
-        "can_manage_invoice_line_items": can_manage_invoice_line_items(request.user, invoice),
-        "can_record_payment": can_record_payment(request.user, invoice),
-    })
+    return render(
+        request,
+        "billing/invoice_detail.html",
+        {
+            "invoice": invoice,
+            "is_final_repair_order": _repair_order_is_final(ro),
+            "ro": ro,
+            "line_items": line_items,
+            "payments": payments,
+            "can_manage_invoice": can_manage_invoice(request.user, invoice),
+            "can_manage_invoice_line_items": can_manage_invoice_line_items(request.user, invoice),
+            "can_record_payment": can_record_payment(request.user, invoice),
+        },
+    )
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
@@ -192,8 +190,7 @@ def invoice_create_for_repair_order(request, repair_order_pk):
         existing = ro.invoice
         messages.info(
             request,
-            f"Repair order {ro.repair_order_number} already has "
-            f"invoice {existing.invoice_number}.",
+            f"Repair order {ro.repair_order_number} already has invoice {existing.invoice_number}.",
         )
         return redirect("repair_orders:detail", pk=ro.pk)
     except RepairOrder.invoice.RelatedObjectDoesNotExist:
@@ -213,14 +210,18 @@ def invoice_create_for_repair_order(request, repair_order_pk):
     else:
         form = InvoiceCreateForm()
 
-    return render(request, "billing/invoice_form.html", {
-        "form": form,
-        "ro": ro,
-        "invoice": None,
-        "mode": "create",
-        "title": f"New Invoice for RO {ro.repair_order_number}",
-        "submit_label": "Create Invoice",
-    })
+    return render(
+        request,
+        "billing/invoice_form.html",
+        {
+            "form": form,
+            "ro": ro,
+            "invoice": None,
+            "mode": "create",
+            "title": f"New Invoice for RO {ro.repair_order_number}",
+            "submit_label": "Create Invoice",
+        },
+    )
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
@@ -255,14 +256,18 @@ def invoice_edit(request, pk):
     else:
         form = InvoiceEditForm(instance=invoice)
 
-    return render(request, "billing/invoice_form.html", {
-        "form": form,
-        "ro": ro,
-        "invoice": invoice,
-        "mode": "edit",
-        "title": f"Edit Invoice {invoice.invoice_number}",
-        "submit_label": "Save Changes",
-    })
+    return render(
+        request,
+        "billing/invoice_form.html",
+        {
+            "form": form,
+            "ro": ro,
+            "invoice": invoice,
+            "mode": "edit",
+            "title": f"Edit Invoice {invoice.invoice_number}",
+            "submit_label": "Save Changes",
+        },
+    )
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
@@ -347,13 +352,17 @@ def payment_create(request, invoice_pk):
     else:
         form = PaymentForm()
 
-    return render(request, "billing/payment_form.html", {
-        "form": form,
-        "invoice": invoice,
-        "ro": ro,
-        "title": f"Record Payment for Invoice {invoice.invoice_number}",
-        "submit_label": "Record Payment",
-    })
+    return render(
+        request,
+        "billing/payment_form.html",
+        {
+            "form": form,
+            "invoice": invoice,
+            "ro": ro,
+            "title": f"Record Payment for Invoice {invoice.invoice_number}",
+            "submit_label": "Record Payment",
+        },
+    )
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
@@ -392,15 +401,19 @@ def line_item_create(request, invoice_pk):
     else:
         form = InvoiceLineItemForm(invoice=invoice)
 
-    return render(request, "billing/line_item_form.html", {
-        "form": form,
-        "invoice": invoice,
-        "line_item": None,
-        "ro": ro,
-        "mode": "create",
-        "title": f"Add Line Item to Invoice {invoice.invoice_number}",
-        "submit_label": "Add Line Item",
-    })
+    return render(
+        request,
+        "billing/line_item_form.html",
+        {
+            "form": form,
+            "invoice": invoice,
+            "line_item": None,
+            "ro": ro,
+            "mode": "create",
+            "title": f"Add Line Item to Invoice {invoice.invoice_number}",
+            "submit_label": "Add Line Item",
+        },
+    )
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
@@ -437,12 +450,16 @@ def line_item_edit(request, pk):
     else:
         form = InvoiceLineItemForm(instance=line_item)
 
-    return render(request, "billing/line_item_form.html", {
-        "form": form,
-        "invoice": invoice,
-        "line_item": line_item,
-        "ro": ro,
-        "mode": "edit",
-        "title": f"Edit Line Item for Invoice {invoice.invoice_number}",
-        "submit_label": "Save Changes",
-    })
+    return render(
+        request,
+        "billing/line_item_form.html",
+        {
+            "form": form,
+            "invoice": invoice,
+            "line_item": line_item,
+            "ro": ro,
+            "mode": "edit",
+            "title": f"Edit Line Item for Invoice {invoice.invoice_number}",
+            "submit_label": "Save Changes",
+        },
+    )

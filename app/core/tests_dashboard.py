@@ -1,15 +1,14 @@
 from datetime import date, timedelta
 from decimal import Decimal
 
+from accounts.authorization import ROLE_MANAGER, ROLE_TECHNICIAN
+from billing.models import Invoice, Payment
+from customers.models import Customer
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
-
-from accounts.authorization import ROLE_MANAGER, ROLE_TECHNICIAN
-from billing.models import Invoice, Payment
-from customers.models import Customer
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -117,13 +116,9 @@ class DashboardWorkflowVisibilityTests(TestCase):
     def test_ready_for_pickup_count_list_link_and_empty_state(self):
         empty_response = self.client.get("/")
         self.assertEqual(empty_response.context["ready_for_pickup_count"], 0)
-        self.assertContains(
-            empty_response, "No ready-for-pickup repair orders."
-        )
+        self.assertContains(empty_response, "No ready-for-pickup repair orders.")
 
-        ready = self._repair_order(
-            "RO-READY", 0, RepairOrder.Status.READY_FOR_PICKUP
-        )
+        ready = self._repair_order("RO-READY", 0, RepairOrder.Status.READY_FOR_PICKUP)
         self._repair_order("RO-OTHER", 1, RepairOrder.Status.IN_REPAIR)
 
         response = self.client.get("/")
@@ -166,9 +161,7 @@ class DashboardWorkflowVisibilityTests(TestCase):
     def test_blocked_from_closure_count_list_link_and_empty_state(self):
         empty_response = self.client.get("/")
         self.assertEqual(empty_response.context["blocked_from_closure_count"], 0)
-        self.assertContains(
-            empty_response, "No repair orders blocked from closure."
-        )
+        self.assertContains(empty_response, "No repair orders blocked from closure.")
 
         blocked_ro = self._repair_order("RO-BLOCKED", 0, RepairOrder.Status.IN_REPAIR)
         blocked_invoice = make_invoice(blocked_ro, "INV-BLOCKED")
@@ -189,25 +182,19 @@ class DashboardWorkflowVisibilityTests(TestCase):
         )
         self.assertContains(response, "RO-BLOCKED")
         self.assertContains(response, "INV-BLOCKED")
-        self.assertContains(
-            response, reverse("repair_orders:detail", args=[blocked_ro.pk])
-        )
+        self.assertContains(response, reverse("repair_orders:detail", args=[blocked_ro.pk]))
 
     def test_recently_updated_repair_orders_limit_and_order(self):
         orders = []
         now = timezone.now()
         for index in range(6):
             ro = self._repair_order(f"RO-RECENT-{index}", index)
-            RepairOrder.objects.filter(pk=ro.pk).update(
-                updated_at=now + timedelta(minutes=index)
-            )
+            RepairOrder.objects.filter(pk=ro.pk).update(updated_at=now + timedelta(minutes=index))
             orders.append(ro)
 
         response = self.client.get("/")
 
-        recent_numbers = [
-            ro.repair_order_number for ro in response.context["recent_repair_orders"]
-        ]
+        recent_numbers = [ro.repair_order_number for ro in response.context["recent_repair_orders"]]
         self.assertEqual(
             recent_numbers,
             [

@@ -1,12 +1,11 @@
 from decimal import Decimal
 
+from customers.models import Customer
 from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
-
-from customers.models import Customer
 from estimates.admin import EstimateAdmin, EstimateLineItemAdmin, EstimateLineItemInline
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
@@ -96,9 +95,7 @@ class EstimateAdminSaveModelTests(TestCase):
         self.assertEqual(estimate.updated_by, updater)
 
     def test_customer_display_returns_customer(self):
-        estimate = Estimate.objects.create(
-            repair_order=self.ro, estimate_number="EST-ADM-DISP"
-        )
+        estimate = Estimate.objects.create(repair_order=self.ro, estimate_number="EST-ADM-DISP")
         self.assertEqual(self.admin_instance.customer_display(estimate), self.customer)
 
 
@@ -136,6 +133,7 @@ class EstimateAdminChangeListTests(TestCase):
 # Supplement / line-item admin
 # ---------------------------------------------------------------------------
 
+
 class EstimateAdminSupplementFieldsTests(TestCase):
     def test_admin_exposes_kind_and_parent_estimate(self):
         instance = EstimateAdmin(Estimate, admin.site)
@@ -168,7 +166,8 @@ class EstimateLineItemAdminTests(TestCase):
         vehicle = make_vehicle(customer)
         ro = make_repair_order(customer, vehicle)
         self.estimate = Estimate.objects.create(
-            repair_order=ro, estimate_number="EST-LI-ADM",
+            repair_order=ro,
+            estimate_number="EST-LI-ADM",
         )
         self.item = EstimateLineItem.objects.create(
             estimate=self.estimate,
@@ -180,9 +179,7 @@ class EstimateLineItemAdminTests(TestCase):
 
     def test_line_item_admin_is_registered(self):
         self.assertIn(EstimateLineItem, admin.site._registry)
-        self.assertIs(
-            admin.site._registry[EstimateLineItem].__class__, EstimateLineItemAdmin
-        )
+        self.assertIs(admin.site._registry[EstimateLineItem].__class__, EstimateLineItemAdmin)
 
     def test_line_total_display(self):
         instance = EstimateLineItemAdmin(EstimateLineItem, admin.site)
@@ -196,7 +193,8 @@ class EstimateLineItemAdminChangeListTests(TestCase):
         vehicle = make_vehicle(customer)
         ro = make_repair_order(customer, vehicle)
         estimate = Estimate.objects.create(
-            repair_order=ro, estimate_number="EST-LI-CL",
+            repair_order=ro,
+            estimate_number="EST-LI-CL",
         )
         self.item = EstimateLineItem.objects.create(
             estimate=estimate,

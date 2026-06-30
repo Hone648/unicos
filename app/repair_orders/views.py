@@ -1,7 +1,3 @@
-from django.contrib import messages
-from django.db.models import Q
-from django.shortcuts import get_object_or_404, redirect, render
-
 from accounts.authorization import (
     PERM_REPAIR_ORDERS_CHANGE_STATUS,
     PERM_REPAIR_ORDERS_MANAGE,
@@ -19,6 +15,9 @@ from accounts.policies import (
 from accounts.policies import can_view_repair_order as policy_can_view_repair_order
 from core.document_numbers import generate_repair_order_number
 from core.pagination import paginate_queryset, pagination_querystring
+from django.contrib import messages
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
 
 from .business_rules import is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
@@ -47,7 +46,9 @@ def _repair_order_detail_context(ro, user):
     except RepairOrder.invoice.RelatedObjectDoesNotExist:
         pass
     estimates = list(
-        ro.estimates.select_related("parent_estimate", "created_by", "updated_by").order_by("-updated_at", "-id")
+        ro.estimates.select_related("parent_estimate", "created_by", "updated_by").order_by(
+            "-updated_at", "-id"
+        )
     )
     can_manage_invoice = False
     can_record_payment = False
@@ -58,8 +59,14 @@ def _repair_order_detail_context(ro, user):
     if invoice is not None:
         from accounts.policies import (
             can_manage_invoice as policy_can_manage_invoice,
+        )
+        from accounts.policies import (
             can_manage_invoice_line_items as policy_can_manage_invoice_line_items,
+        )
+        from accounts.policies import (
             can_record_payment as policy_can_record_payment,
+        )
+        from accounts.policies import (
             can_view_invoice as policy_can_view_invoice,
         )
 
@@ -90,9 +97,8 @@ def _repair_order_detail_context(ro, user):
 
 @app_permission_required(PERM_REPAIR_ORDERS_VIEW)
 def repair_order_list(request):
-    qs = (
-        RepairOrder.objects.select_related("customer", "vehicle", "assigned_to")
-        .order_by("-opened_at", "-id")
+    qs = RepairOrder.objects.select_related("customer", "vehicle", "assigned_to").order_by(
+        "-opened_at", "-id"
     )
     qs = filter_repair_orders_for_user(request.user, qs)
 
@@ -151,8 +157,11 @@ def repair_order_detail(request, pk):
         pk=pk,
     )
     require_policy(policy_can_view_repair_order(request.user, ro))
-    return render(request, "repair_orders/repair_order_detail.html",
-                  _repair_order_detail_context(ro, request.user))
+    return render(
+        request,
+        "repair_orders/repair_order_detail.html",
+        _repair_order_detail_context(ro, request.user),
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_CHANGE_STATUS)
@@ -171,15 +180,21 @@ def repair_order_status_update(request, pk):
         messages.error(request, f"'{new_status}' is not a valid repair order status.")
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
-        return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro, request.user))
+        return render(
+            request,
+            "repair_orders/partials/_status_update_response.html",
+            _repair_order_detail_context(ro, request.user),
+        )
 
     if new_status == ro.status:
         messages.info(request, "Status is already set to that value — no change made.")
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
-        return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro, request.user))
+        return render(
+            request,
+            "repair_orders/partials/_status_update_response.html",
+            _repair_order_detail_context(ro, request.user),
+        )
 
     if not note:
         note = "Status changed from repair order workspace."
@@ -190,17 +205,23 @@ def repair_order_status_update(request, pk):
         messages.error(request, str(exc))
         if not is_htmx:
             return redirect("repair_orders:detail", pk=pk)
-        return render(request, "repair_orders/partials/_status_update_response.html",
-                      _repair_order_detail_context(ro, request.user))
+        return render(
+            request,
+            "repair_orders/partials/_status_update_response.html",
+            _repair_order_detail_context(ro, request.user),
+        )
 
     label = dict(RepairOrder.Status.choices).get(new_status, new_status)
-    messages.success(request, f"Status updated to \"{label}\".")
+    messages.success(request, f'Status updated to "{label}".')
 
     if not is_htmx:
         return redirect("repair_orders:detail", pk=pk)
 
-    return render(request, "repair_orders/partials/_status_update_response.html",
-                  _repair_order_detail_context(ro, request.user))
+    return render(
+        request,
+        "repair_orders/partials/_status_update_response.html",
+        _repair_order_detail_context(ro, request.user),
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -217,13 +238,17 @@ def repair_order_create(request):
             return redirect("repair_orders:detail", pk=ro.pk)
     else:
         form = RepairOrderCreateForm()
-    return render(request, "repair_orders/repair_order_form.html", {
-        "form": form,
-        "mode": "create",
-        "title": "New Repair Order",
-        "submit_label": "Create Repair Order",
-        "repair_order": None,
-    })
+    return render(
+        request,
+        "repair_orders/repair_order_form.html",
+        {
+            "form": form,
+            "mode": "create",
+            "title": "New Repair Order",
+            "submit_label": "Create Repair Order",
+            "repair_order": None,
+        },
+    )
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
@@ -247,10 +272,14 @@ def repair_order_edit(request, pk):
             return redirect("repair_orders:detail", pk=ro.pk)
     else:
         form = RepairOrderEditForm(instance=ro)
-    return render(request, "repair_orders/repair_order_form.html", {
-        "form": form,
-        "mode": "edit",
-        "title": f"Edit Repair Order {ro.repair_order_number}",
-        "submit_label": "Save Changes",
-        "repair_order": ro,
-    })
+    return render(
+        request,
+        "repair_orders/repair_order_form.html",
+        {
+            "form": form,
+            "mode": "edit",
+            "title": f"Edit Repair Order {ro.repair_order_number}",
+            "submit_label": "Save Changes",
+            "repair_order": ro,
+        },
+    )

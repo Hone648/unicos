@@ -1,11 +1,10 @@
 from decimal import Decimal
 
+from accounts.authorization import PERM_DASHBOARD_VIEW, app_permission_required
+from billing.models import Invoice
 from django.db import connections
 from django.http import JsonResponse
 from django.shortcuts import render
-
-from accounts.authorization import PERM_DASHBOARD_VIEW, app_permission_required
-from billing.models import Invoice
 from repair_orders.business_rules import (
     FINAL_REPAIR_ORDER_STATUSES,
     is_final_repair_order_status,
@@ -14,30 +13,28 @@ from repair_orders.models import RepairOrder
 
 
 def _dashboard_context():
-    active_repair_orders = RepairOrder.objects.exclude(
-        status__in=FINAL_REPAIR_ORDER_STATUSES
+    active_repair_orders = RepairOrder.objects.exclude(status__in=FINAL_REPAIR_ORDER_STATUSES)
+    ready_for_pickup = (
+        active_repair_orders.filter(status=RepairOrder.Status.READY_FOR_PICKUP)
+        .select_related("customer", "vehicle")
+        .order_by("-updated_at", "-id")
     )
-    ready_for_pickup = active_repair_orders.filter(
-        status=RepairOrder.Status.READY_FOR_PICKUP
-    ).select_related("customer", "vehicle").order_by("-updated_at", "-id")
 
     invoices = (
         Invoice.objects.exclude(status=Invoice.Status.VOID)
         .select_related("repair_order", "repair_order__customer", "repair_order__vehicle")
         .order_by("-updated_at", "-id")
     )
-    unpaid_invoices = [
-        invoice for invoice in invoices if invoice.balance_due > 0
-    ]
+    unpaid_invoices = [invoice for invoice in invoices if invoice.balance_due > 0]
     blocked_from_closure_invoices = [
         invoice
         for invoice in unpaid_invoices
         if not is_final_repair_order_status(invoice.repair_order.status)
     ]
 
-    recent_repair_orders = RepairOrder.objects.select_related(
-        "customer", "vehicle"
-    ).order_by("-updated_at", "-id")[:5]
+    recent_repair_orders = RepairOrder.objects.select_related("customer", "vehicle").order_by(
+        "-updated_at", "-id"
+    )[:5]
 
     return {
         "active_repair_order_count": active_repair_orders.count(),
