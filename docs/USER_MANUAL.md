@@ -126,6 +126,11 @@ It shows current counts for active/final repair orders, ready-for-pickup work,
 unassigned active repair orders, invoice balances/statuses, and estimate
 status/conversion attention items.
 
+Use the filter form to narrow the report by date range, repair order status,
+invoice status, or estimate status. The date range filters repair orders by
+opened date and invoices/estimates by created date. Empty date fields leave that
+side of the range open.
+
 Tables currently include:
 
 - Top unpaid invoices, ordered by largest balance due.
@@ -133,9 +138,12 @@ Tables currently include:
 - Submitted or approved estimates that still need attention.
 
 Each table links back to the relevant invoice, repair order, or estimate detail
-page. Reports do not currently include exports, charts, date ranges, aging
-analysis, revenue reporting, or per-object reporting scope beyond the detail
-links' normal authorization checks.
+page. Use the export buttons to download repair order, invoice, or estimate CSV
+files using the active filters. Reports remain read-only; exporting does not
+change shop data.
+
+Reports do not currently include charts, aging analysis, revenue reporting, or
+per-object reporting scope beyond the detail links' normal authorization checks.
 
 **Who can see it:** Owner/Admin, Manager, Read-only, and superusers
 (`reports.view` permission). Front Desk, Estimator, and Technician roles do not

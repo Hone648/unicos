@@ -1,8 +1,7 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 43 plus the
-unnumbered customer-scoped vehicle-dropdown UX fix. It should guide slice
-planning but can change after implementation review and user feedback.
+This roadmap reflects the current implementation after Slice 44. It should guide
+slice planning but can change after implementation review and user feedback.
 
 ## Current State
 
@@ -30,8 +29,9 @@ Implemented:
   mutations, and unpaid-invoice closure blocking
 - CI with Ruff lint/format checks, Django checks, missing migration checks,
   migrations, full tests, Docker build/runtime smoke, and `/healthz/`
-- Read-only reporting foundation at `/reports/` for repair-order, billing, and
-  estimate operational snapshots, gated by `reports.view`
+- Read-only reporting at `/reports/` for repair-order, billing, and estimate
+  operational snapshots, with date/status filters and CSV exports gated by
+  `reports.view`
 - Repair-order file attachments (upload, download, delete; local `media/`
   storage; policy-gated)
 - Admin service alignment: estimate status changes, invoice issue/void,
@@ -118,9 +118,8 @@ originally planned separate "billing views call services only" slice was
 absorbed into actual Slice 37 because billing services now own invoice
 issue/void, payment recording, and invoice line-item mutations while views call
 services. Actual Slice 43 was inserted as an admin service-alignment hardening
-slice. The post-Slice-43 customer-scoped vehicle-dropdown UX fix is unnumbered;
-the next planned product slice remains reporting filters/date ranges and CSV
-export unless reprioritized.
+slice. The post-Slice-43 customer-scoped vehicle-dropdown UX fix is unnumbered.
+Slice 44 then added reporting filters/date ranges and CSV export.
 
 Remaining service-layer gaps:
 
@@ -303,8 +302,7 @@ Remaining admin gaps:
 
 Recommended next slices:
 
-- Next product slice: reporting filters/date ranges and CSV export.
-- Attachment hardening / media persistence (named Docker volume for local dev;
+- Next product slice: attachment hardening / media persistence (named Docker volume for local dev;
   S3 for production).
 - Customer/insurer contact model or communication log.
 
@@ -319,7 +317,7 @@ Recommended next slices:
 | Attachments | basic repair-order file upload/download/delete implemented; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
-| Reporting | basic read-only operational snapshot exists; still missing filters, date ranges, CSV/export, charts, revenue, receivables, cycle time, and aging invoices |
+| Reporting | read-only operational snapshot with date/status filters and CSV exports exists; still missing charts, revenue, receivables, cycle time, and aging invoices |
 
 ## Validation Roadmap
 

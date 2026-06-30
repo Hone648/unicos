@@ -58,11 +58,12 @@ Slice-number reconciliation:
 - The originally planned separate Slice 38, "Billing views call services only," was effectively absorbed into actual Slice 37 because `billing.services` now owns invoice issue/void, payment recording, and invoice line-item mutations while views call services.
 - Slice 43 was an inserted hardening slice for admin service alignment and override-audit planning.
 - This reconciliation is docs-only and does not claim the product Slice 44 number.
-- Next product slice: Slice 44 - reporting filters/date ranges and CSV export, unless reprioritized.
+- Slice 44 follows this docs-only reconciliation as the next product slice.
+
+45. Slice 44: reporting filters/date ranges and CSV export (`/reports/` adds GET filters for date range, repair-order status, invoice status, and estimate status; CSV exports for repair orders, invoices, and estimates preserve active filters; invalid filters render form errors instead of CSV; reports remain read-only behind `reports.view`; no migrations)
 
 Likely next implementation slices:
 
-- Slice 44: reporting filters/date ranges and CSV export if prioritized
 - Slice 45: attachment hardening / media persistence (named Docker volume)
 - Slice 46: customer/insurer contact model or communication log
 
