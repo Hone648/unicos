@@ -16,7 +16,7 @@ from billing.services import (
 from core.document_numbers import generate_estimate_number
 from repair_orders.models import RepairOrder
 
-from .forms import EstimateForm, EstimateLineItemForm
+from .forms import EstimateApprovalForm, EstimateForm, EstimateLineItemForm
 from .models import Estimate, EstimateLineItem
 from .services import (
     EstimateStatusTransitionBlocked,
@@ -68,6 +68,7 @@ def estimate_detail(request, pk):
         estimate.supplements.order_by("-updated_at", "-id")
     )
     converted_invoice = estimate.converted_invoices.first()
+    status_action_choices = _status_action_choices(estimate)
     return render(request, "estimates/estimate_detail.html", {
         "estimate": estimate,
         "ro": estimate.repair_order,
@@ -75,7 +76,10 @@ def estimate_detail(request, pk):
         "supplements": supplements,
         "has_line_items": bool(line_items),
         "is_editable": estimate_is_editable(estimate),
-        "status_action_choices": _status_action_choices(estimate),
+        "status_action_choices": status_action_choices,
+        "approval_form": EstimateApprovalForm()
+        if Estimate.Status.APPROVED in {status for status, _label in status_action_choices}
+        else None,
         "can_convert_to_invoice": estimate_can_convert_to_invoice(estimate),
         "converted_invoice": converted_invoice,
     })
@@ -106,9 +110,26 @@ def estimate_print(request, pk):
 def estimate_status_update(request, pk):
     estimate = get_object_or_404(Estimate, pk=pk)
     new_status = request.POST.get("status", "").strip()
+    approval_data = None
+
+    if new_status == Estimate.Status.APPROVED:
+        form = EstimateApprovalForm(request.POST)
+        if not form.is_valid():
+            messages.error(
+                request,
+                "Approval source and approval contact name are required before "
+                "approving an estimate.",
+            )
+            return redirect("estimates:detail", pk=estimate.pk)
+        approval_data = form.cleaned_data
 
     try:
-        transition_estimate_status(estimate, new_status, updated_by=request.user)
+        transition_estimate_status(
+            estimate,
+            new_status,
+            updated_by=request.user,
+            approval_data=approval_data,
+        )
     except EstimateStatusTransitionBlocked as exc:
         messages.error(request, str(exc))
         return redirect("estimates:detail", pk=estimate.pk)

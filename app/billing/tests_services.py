@@ -2,6 +2,7 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
+from django.utils import timezone
 
 from billing.models import Invoice, InvoiceLineItem
 from billing.services import (
@@ -38,11 +39,26 @@ def make_repair_order(number="RO-CONV-001"):
 
 
 def make_estimate(repair_order, number="EST-CONV-001", status=Estimate.Status.APPROVED):
-    return Estimate.objects.create(
+    estimate = Estimate.objects.create(
         repair_order=repair_order,
         estimate_number=number,
         status=status,
     )
+    if status == Estimate.Status.APPROVED:
+        estimate.approval_source = Estimate.ApprovalSource.CUSTOMER
+        estimate.approval_contact_name = "Jane Smith"
+        estimate.approval_reference = "APPROVAL-REF"
+        estimate.approval_note = "Approved for conversion."
+        estimate.approved_at = timezone.now()
+        estimate.save(update_fields=[
+            "approval_source",
+            "approval_contact_name",
+            "approval_reference",
+            "approval_note",
+            "approved_at",
+            "updated_at",
+        ])
+    return estimate
 
 
 def add_line_item(estimate, **kwargs):
@@ -160,6 +176,18 @@ class ConvertBlockedTests(TestCase):
         estimate = make_estimate(self.ro, status=Estimate.Status.APPROVED)
         with self.assertRaises(EstimateInvoiceConversionBlocked):
             convert_estimate_to_invoice(estimate, created_by=self.user)
+        self.assertFalse(Invoice.objects.exists())
+
+    def test_approved_without_approval_capture_is_blocked(self):
+        estimate = Estimate.objects.create(
+            repair_order=self.ro,
+            estimate_number="EST-NO-CAPTURE",
+            status=Estimate.Status.APPROVED,
+        )
+        add_line_item(estimate)
+        with self.assertRaises(EstimateInvoiceConversionBlocked) as ctx:
+            convert_estimate_to_invoice(estimate, created_by=self.user)
+        self.assertIn("approval capture", str(ctx.exception))
         self.assertFalse(Invoice.objects.exists())
 
     def test_duplicate_conversion_is_blocked(self):

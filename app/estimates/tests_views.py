@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from accounts.authorization import (
     ROLE_MANAGER,
@@ -122,6 +123,32 @@ def make_line_item(estimate, **kwargs):
     }
     defaults.update(kwargs)
     return EstimateLineItem.objects.create(estimate=estimate, **defaults)
+
+
+def approval_post_data(**overrides):
+    data = {
+        "approval_source": Estimate.ApprovalSource.CUSTOMER,
+        "approval_contact_name": "Jane Smith",
+        "approval_reference": "EMAIL-123",
+        "approval_note": "Approved by email.",
+    }
+    data.update(overrides)
+    return data
+
+
+def add_approval_capture(estimate, **overrides):
+    defaults = {
+        "approval_source": Estimate.ApprovalSource.CUSTOMER,
+        "approval_contact_name": "Jane Smith",
+        "approval_reference": "EMAIL-123",
+        "approval_note": "Approved by email.",
+        "approved_at": timezone.now(),
+    }
+    defaults.update(overrides)
+    for field, value in defaults.items():
+        setattr(estimate, field, value)
+    estimate.save(update_fields=[*defaults.keys(), "updated_at"])
+    return estimate
 
 
 # ---------------------------------------------------------------------------
@@ -354,6 +381,31 @@ class EstimateDetailTests(TestCase):
         self.assertContains(response, "Decline Estimate")
         self.assertContains(response, "Expire Estimate")
 
+    def test_submitted_detail_shows_approval_capture_fields(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, 'name="approval_source"')
+        self.assertContains(response, 'name="approval_contact_name"')
+        self.assertContains(response, 'name="approval_reference"')
+        self.assertContains(response, 'name="approval_note"')
+
+    def test_approved_detail_shows_approval_metadata(self):
+        self.estimate.status = Estimate.Status.APPROVED
+        add_approval_capture(
+            self.estimate,
+            approval_source=Estimate.ApprovalSource.INSURER,
+            approval_contact_name="Pat Adjuster",
+            approval_reference="CLAIM-APPROVAL",
+            approval_note="Approved by adjuster.",
+        )
+        response = self.client.get(detail_url(self.estimate.pk))
+        self.assertContains(response, "Approval")
+        self.assertContains(response, "Insurer")
+        self.assertContains(response, "Pat Adjuster")
+        self.assertContains(response, "CLAIM-APPROVAL")
+        self.assertContains(response, "Approved by adjuster.")
+
     def test_detail_hides_status_buttons_for_terminal_status(self):
         self.estimate.status = Estimate.Status.APPROVED
         self.estimate.save()
@@ -478,6 +530,21 @@ class EstimatePrintTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "EST-PRINT-001")
 
+    def test_print_page_shows_approval_metadata_when_present(self):
+        self.estimate.status = Estimate.Status.APPROVED
+        add_approval_capture(
+            self.estimate,
+            approval_source=Estimate.ApprovalSource.CUSTOMER_AND_INSURER,
+            approval_contact_name="Jane and Acme",
+            approval_reference="APP-PRINT",
+            approval_note="Both parties approved.",
+        )
+        response = self.client.get(print_url(self.estimate.pk))
+        self.assertContains(response, "Customer and insurer")
+        self.assertContains(response, "Jane and Acme")
+        self.assertContains(response, "APP-PRINT")
+        self.assertContains(response, "Both parties approved.")
+
 
 # ---------------------------------------------------------------------------
 # Status actions
@@ -506,11 +573,50 @@ class EstimateStatusUpdateTests(TestCase):
         self.estimate.save()
         response = self.client.post(
             status_update_url(self.estimate.pk),
-            {"status": Estimate.Status.APPROVED},
+            {"status": Estimate.Status.APPROVED, **approval_post_data()},
         )
         self.assertRedirects(response, detail_url(self.estimate.pk))
         self.estimate.refresh_from_db()
         self.assertEqual(self.estimate.status, Estimate.Status.APPROVED)
+
+    def test_submitted_estimate_cannot_be_approved_without_capture(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {"status": Estimate.Status.APPROVED},
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.SUBMITTED)
+        self.assertEqual(self.estimate.approval_source, "")
+        self.assertEqual(self.estimate.approval_contact_name, "")
+        self.assertIsNone(self.estimate.approved_at)
+
+    def test_valid_approval_stores_capture_fields(self):
+        self.estimate.status = Estimate.Status.SUBMITTED
+        self.estimate.save()
+        response = self.client.post(
+            status_update_url(self.estimate.pk),
+            {
+                "status": Estimate.Status.APPROVED,
+                **approval_post_data(
+                    approval_source=Estimate.ApprovalSource.INSURER,
+                    approval_contact_name="  Pat Adjuster  ",
+                    approval_reference="  CLAIM-REF  ",
+                    approval_note="  Approved by insurer.  ",
+                ),
+            },
+        )
+        self.assertRedirects(response, detail_url(self.estimate.pk))
+        self.estimate.refresh_from_db()
+        self.assertEqual(self.estimate.status, Estimate.Status.APPROVED)
+        self.assertEqual(self.estimate.approval_source, Estimate.ApprovalSource.INSURER)
+        self.assertEqual(self.estimate.approval_contact_name, "Pat Adjuster")
+        self.assertEqual(self.estimate.approval_reference, "CLAIM-REF")
+        self.assertEqual(self.estimate.approval_note, "Approved by insurer.")
+        self.assertIsNotNone(self.estimate.approved_at)
+        self.assertEqual(self.estimate.updated_by, self.user)
 
     def test_manage_user_can_decline_submitted(self):
         self.estimate.status = Estimate.Status.SUBMITTED
@@ -954,6 +1060,7 @@ class SupplementCreateTests(TestCase):
 
 def make_approved_estimate_with_line_item(ro, number="EST-CONV-V"):
     estimate = make_estimate(ro, number=number, status=Estimate.Status.APPROVED)
+    add_approval_capture(estimate)
     make_line_item(estimate, quantity=Decimal("2.00"), unit_price=Decimal("75.00"))
     estimate.refresh_from_db()
     return estimate
@@ -1002,6 +1109,20 @@ class EstimateConvertToInvoiceViewTests(TestCase):
         self.assertRedirects(response, detail_url(draft.pk))
         self.assertFalse(Invoice.objects.filter(source_estimate=draft).exists())
 
+    def test_approved_without_approval_capture_cannot_convert(self):
+        from billing.models import Invoice
+
+        estimate = make_estimate(
+            self.ro,
+            number="EST-NO-APPROVAL",
+            status=Estimate.Status.APPROVED,
+        )
+        make_line_item(estimate)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.post(convert_url(estimate.pk))
+        self.assertRedirects(response, detail_url(estimate.pk))
+        self.assertFalse(Invoice.objects.filter(source_estimate=estimate).exists())
+
     def test_duplicate_conversion_is_blocked(self):
         from billing.models import Invoice
 
@@ -1034,6 +1155,18 @@ class EstimateConvertButtonVisibilityTests(TestCase):
 
     def test_button_hidden_for_approved_without_line_items(self):
         estimate = make_estimate(self.ro, number="EST-NOITEMS", status=Estimate.Status.APPROVED)
+        add_approval_capture(estimate)
+        self.client.force_login(make_user("manager", ROLE_MANAGER))
+        response = self.client.get(detail_url(estimate.pk))
+        self.assertNotContains(response, "Create Invoice Draft")
+
+    def test_button_hidden_for_approved_without_approval_capture(self):
+        estimate = make_estimate(
+            self.ro,
+            number="EST-NO-CAPTURE",
+            status=Estimate.Status.APPROVED,
+        )
+        make_line_item(estimate)
         self.client.force_login(make_user("manager", ROLE_MANAGER))
         response = self.client.get(detail_url(estimate.pk))
         self.assertNotContains(response, "Create Invoice Draft")

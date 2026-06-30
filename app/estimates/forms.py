@@ -86,3 +86,35 @@ class EstimateLineItemForm(forms.ModelForm):
         if price is not None and price < Decimal("0.00"):
             raise forms.ValidationError("Unit price cannot be negative.")
         return price
+
+
+class EstimateApprovalForm(forms.ModelForm):
+    class Meta:
+        model = Estimate
+        fields = [
+            "approval_source",
+            "approval_contact_name",
+            "approval_reference",
+            "approval_note",
+        ]
+        widgets = {
+            "approval_note": forms.Textarea(attrs={"rows": 2}),
+        }
+
+    def clean_approval_source(self):
+        source = self.cleaned_data.get("approval_source")
+        if not source:
+            raise forms.ValidationError("Approval source is required.")
+        return source
+
+    def clean_approval_contact_name(self):
+        name = self.cleaned_data.get("approval_contact_name", "")
+        if not name or not name.strip():
+            raise forms.ValidationError("Approval contact name is required.")
+        return name.strip()
+
+    def clean_approval_reference(self):
+        return (self.cleaned_data.get("approval_reference") or "").strip()
+
+    def clean_approval_note(self):
+        return (self.cleaned_data.get("approval_note") or "").strip()

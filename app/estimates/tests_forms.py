@@ -3,7 +3,7 @@ from decimal import Decimal
 from django.test import TestCase
 
 from customers.models import Customer
-from estimates.forms import EstimateForm, EstimateLineItemForm
+from estimates.forms import EstimateApprovalForm, EstimateForm, EstimateLineItemForm
 from estimates.models import Estimate, EstimateLineItem
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
@@ -68,6 +68,45 @@ class EstimateFormTests(TestCase):
         form = EstimateForm(_form_data(status="not-a-status"))
         self.assertTrue(form.is_valid(), form.errors)
         self.assertNotIn("status", form.cleaned_data)
+
+
+class EstimateApprovalFormTests(TestCase):
+    def _data(self, **overrides):
+        data = {
+            "approval_source": Estimate.ApprovalSource.CUSTOMER,
+            "approval_contact_name": "Jane Smith",
+            "approval_reference": "Email 123",
+            "approval_note": "Approved by email.",
+        }
+        data.update(overrides)
+        return data
+
+    def test_valid_form_passes(self):
+        form = EstimateApprovalForm(self._data())
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_approval_source_is_required(self):
+        form = EstimateApprovalForm(self._data(approval_source=""))
+        self.assertFalse(form.is_valid())
+        self.assertIn("approval_source", form.errors)
+
+    def test_approval_contact_name_is_required(self):
+        form = EstimateApprovalForm(self._data(approval_contact_name=""))
+        self.assertFalse(form.is_valid())
+        self.assertIn("approval_contact_name", form.errors)
+
+    def test_contact_reference_and_note_are_stripped(self):
+        form = EstimateApprovalForm(
+            self._data(
+                approval_contact_name="  Jane Smith  ",
+                approval_reference="  REF-1  ",
+                approval_note="  Approved.  ",
+            )
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["approval_contact_name"], "Jane Smith")
+        self.assertEqual(form.cleaned_data["approval_reference"], "REF-1")
+        self.assertEqual(form.cleaned_data["approval_note"], "Approved.")
 
     def test_form_excludes_repair_order_and_estimate_number(self):
         form = EstimateForm()

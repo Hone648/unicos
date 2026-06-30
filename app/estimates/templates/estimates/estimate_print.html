@@ -119,6 +119,27 @@
     </table>
   </div>
 
+  {% if estimate.has_approval_capture %}
+    <div class="estimate-approval">
+      <h3>Approval</h3>
+      <dl>
+        <dt>Source</dt>
+        <dd>{{ estimate.get_approval_source_display }}</dd>
+        <dt>Contact</dt>
+        <dd>{{ estimate.approval_contact_name }}</dd>
+        {% if estimate.approval_reference %}
+          <dt>Reference</dt>
+          <dd>{{ estimate.approval_reference }}</dd>
+        {% endif %}
+        <dt>Approved</dt>
+        <dd>{{ estimate.approved_at|date:"Y-m-d H:i" }}</dd>
+      </dl>
+      {% if estimate.approval_note %}
+        <p>{{ estimate.approval_note }}</p>
+      {% endif %}
+    </div>
+  {% endif %}
+
   {% if estimate.notes %}
     <div class="estimate-notes">
       <h3>Notes</h3>

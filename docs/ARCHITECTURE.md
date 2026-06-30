@@ -91,12 +91,13 @@ Current domain models:
   order; FK to repair order uses `PROTECT`; a repair order may have multiple
   estimates; tracks a small status lifecycle (draft/submitted/approved/declined/
   expired) plus insurance company, claim number, deductible, and estimated
-  total; number is system-generated (`EST-YYYY-NNNNNN`); status changes are
-  controlled by explicit shop-facing POST actions (`draft -> submitted`,
-  `submitted -> approved/declined/expired`), and submitted/final estimates are
-  read-only for normal estimate/detail and line-item mutation views; estimate
-  status does not affect invoice behavior. An estimate may be an initial
-  estimate or a supplement
+  total; approved estimates capture approval source, contact, optional
+  reference/note, and server-set approval timestamp; number is system-generated
+  (`EST-YYYY-NNNNNN`); status changes are controlled by explicit shop-facing
+  POST actions (`draft -> submitted`, `submitted -> approved/declined/expired`),
+  and submitted/final estimates are read-only for normal estimate/detail and
+  line-item mutation views; estimate-to-invoice conversion requires approval
+  capture. An estimate may be an initial estimate or a supplement
   (`kind="supplement"`) that links back to a `parent_estimate` (`PROTECT`,
   self-FK) belonging to the same repair order; lineage rules are enforced in
   `Estimate.clean()`
@@ -231,7 +232,7 @@ Missing body-shop workflow areas:
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, a small approval status flow, and approved-estimate-to-draft-invoice conversion exist; still missing full estimate versioning, generated PDF output, and supplement-to-invoice handling |
+| Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, a small approval status flow, approval capture, and approved-estimate-to-draft-invoice conversion exist; still missing full estimate versioning, generated PDF output, and supplement-to-invoice handling |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |

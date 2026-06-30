@@ -15,6 +15,17 @@ from vehicles.models import Vehicle
 VALID_VIN = "1HGBH41JXMN109186"
 
 
+def approval_data(**overrides):
+    data = {
+        "approval_source": Estimate.ApprovalSource.CUSTOMER,
+        "approval_contact_name": "Jane Smith",
+        "approval_reference": "EMAIL-123",
+        "approval_note": "Approved by email.",
+    }
+    data.update(overrides)
+    return data
+
+
 def make_estimate(status=Estimate.Status.DRAFT, number="EST-SERVICE"):
     customer = Customer.objects.create(
         customer_type=Customer.CustomerType.INDIVIDUAL,
@@ -49,9 +60,54 @@ class EstimateStatusTransitionServiceTests(TestCase):
 
     def test_submitted_to_approved_succeeds(self):
         estimate = make_estimate(status=Estimate.Status.SUBMITTED)
-        transition_estimate_status(estimate, Estimate.Status.APPROVED)
+        transition_estimate_status(
+            estimate,
+            Estimate.Status.APPROVED,
+            approval_data=approval_data(),
+        )
         estimate.refresh_from_db()
         self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+
+    def test_submitted_to_approved_requires_approval_data(self):
+        estimate = make_estimate(status=Estimate.Status.SUBMITTED)
+        with self.assertRaises(EstimateStatusTransitionBlocked):
+            transition_estimate_status(estimate, Estimate.Status.APPROVED)
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.SUBMITTED)
+        self.assertEqual(estimate.approval_source, "")
+        self.assertEqual(estimate.approval_contact_name, "")
+        self.assertIsNone(estimate.approved_at)
+
+    def test_submitted_to_approved_rejects_invalid_approval_source(self):
+        estimate = make_estimate(status=Estimate.Status.SUBMITTED)
+        with self.assertRaises(EstimateStatusTransitionBlocked):
+            transition_estimate_status(
+                estimate,
+                Estimate.Status.APPROVED,
+                approval_data=approval_data(approval_source="bad-source"),
+            )
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.SUBMITTED)
+        self.assertEqual(estimate.approval_source, "")
+
+    def test_submitted_to_approved_stores_approval_capture(self):
+        estimate = make_estimate(status=Estimate.Status.SUBMITTED)
+        transition_estimate_status(
+            estimate,
+            Estimate.Status.APPROVED,
+            approval_data=approval_data(
+                approval_contact_name="  Jane Smith  ",
+                approval_reference="  REF-99  ",
+                approval_note="  Approved by phone.  ",
+            ),
+        )
+        estimate.refresh_from_db()
+        self.assertEqual(estimate.status, Estimate.Status.APPROVED)
+        self.assertEqual(estimate.approval_source, Estimate.ApprovalSource.CUSTOMER)
+        self.assertEqual(estimate.approval_contact_name, "Jane Smith")
+        self.assertEqual(estimate.approval_reference, "REF-99")
+        self.assertEqual(estimate.approval_note, "Approved by phone.")
+        self.assertIsNotNone(estimate.approved_at)
 
     def test_submitted_to_declined_succeeds(self):
         estimate = make_estimate(status=Estimate.Status.SUBMITTED)

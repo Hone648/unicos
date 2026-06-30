@@ -26,13 +26,16 @@ class EstimateAdmin(admin.ModelAdmin):
         "kind",
         "parent_estimate",
         "status",
+        "approval_source",
+        "approval_contact_name",
+        "approved_at",
         "insurance_company",
         "claim_number",
         "deductible",
         "estimated_total",
         "updated_at",
     )
-    list_filter = ("kind", "status", "insurance_company")
+    list_filter = ("kind", "status", "approval_source", "insurance_company")
     search_fields = (
         "estimate_number",
         "parent_estimate__estimate_number",
@@ -70,6 +73,18 @@ class EstimateAdmin(admin.ModelAdmin):
         (
             "Notes",
             {"fields": ("notes",)},
+        ),
+        (
+            "Approval",
+            {
+                "fields": (
+                    "approval_source",
+                    "approval_contact_name",
+                    "approval_reference",
+                    "approval_note",
+                    "approved_at",
+                ),
+            },
         ),
         (
             "Tracking",

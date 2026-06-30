@@ -148,6 +148,20 @@ class EstimateAdminSupplementFieldsTests(TestCase):
         self.assertIn(EstimateLineItemInline, instance.inlines)
 
 
+class EstimateAdminApprovalFieldsTests(TestCase):
+    def test_admin_exposes_approval_fields(self):
+        instance = EstimateAdmin(Estimate, admin.site)
+        self.assertIn("approval_source", instance.list_display)
+        self.assertIn("approval_contact_name", instance.list_display)
+        self.assertIn("approved_at", instance.list_display)
+        self.assertIn("approval_source", instance.list_filter)
+
+    def test_admin_includes_approval_fieldset(self):
+        instance = EstimateAdmin(Estimate, admin.site)
+        fieldset_names = [name for name, _options in instance.fieldsets]
+        self.assertIn("Approval", fieldset_names)
+
+
 class EstimateLineItemAdminTests(TestCase):
     def setUp(self):
         customer = make_customer()
