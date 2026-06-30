@@ -33,6 +33,10 @@ _CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
 _VALID_STATUSES = set(RepairOrder.Status.values)
 
 
+def _posted_customer_id(request):
+    return request.POST.get("customer") or None
+
+
 def _repair_order_detail_context(ro, user):
     """Build context shared by the full detail view and HTMX partial responses."""
     history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
@@ -235,7 +239,11 @@ def repair_order_status_update(request, pk):
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
 def repair_order_create(request):
     if request.method == "POST":
-        form = RepairOrderCreateForm(request.POST)
+        form = RepairOrderCreateForm(
+            request.POST,
+            customer_id=_posted_customer_id(request),
+            enable_vehicle_htmx=True,
+        )
         if form.is_valid():
             ro = form.save(commit=False)
             ro.repair_order_number = generate_repair_order_number()
@@ -245,7 +253,7 @@ def repair_order_create(request):
             messages.success(request, f"Repair order {ro.repair_order_number} created.")
             return redirect("repair_orders:detail", pk=ro.pk)
     else:
-        form = RepairOrderCreateForm()
+        form = RepairOrderCreateForm(enable_vehicle_htmx=True)
     return render(
         request,
         "repair_orders/repair_order_form.html",
@@ -255,6 +263,18 @@ def repair_order_create(request):
             "title": "New Repair Order",
             "submit_label": "Create Repair Order",
             "repair_order": None,
+        },
+    )
+
+
+@app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
+def repair_order_vehicle_field(request):
+    form = RepairOrderCreateForm(customer_id=request.GET.get("customer") or None)
+    return render(
+        request,
+        "repair_orders/partials/_vehicle_field.html",
+        {
+            "form": form,
         },
     )
 
@@ -271,7 +291,11 @@ def repair_order_edit(request, pk):
         return redirect("repair_orders:detail", pk=ro.pk)
 
     if request.method == "POST":
-        form = RepairOrderEditForm(request.POST, instance=ro)
+        form = RepairOrderEditForm(
+            request.POST,
+            instance=ro,
+            customer_id=_posted_customer_id(request),
+        )
         if form.is_valid():
             updated = form.save(commit=False)
             updated.updated_by = request.user
