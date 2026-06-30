@@ -46,6 +46,7 @@ screenshot set.
 - Billing invoice queue
 - Read-only reports snapshot for operational counts and attention queues
 - Hardened CI with Ruff quality checks, migration checks, Docker smoke, and healthz
+- Repair order attachments (upload, download, delete; local `media/` storage; policy-gated)
 
 ## Stack
 

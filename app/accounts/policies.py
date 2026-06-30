@@ -192,3 +192,23 @@ def can_record_payment(user, invoice):
 
 def can_manage_invoice_line_items(user, invoice):
     return can_manage_invoice(user, invoice)
+
+
+def can_view_attachment(user, attachment):
+    return can_view_repair_order(user, attachment.repair_order)
+
+
+def can_upload_attachment_for_repair_order(user, repair_order):
+    if _is_superuser(user):
+        return True
+    if not user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE):
+        return False
+    return can_view_repair_order(user, repair_order)
+
+
+def can_delete_attachment(user, attachment):
+    # Deleting evidence/photos/documents is restricted to Owner/Admin and Manager.
+    # Front Desk can upload but not delete, since removal of records is more sensitive.
+    if _is_superuser(user):
+        return True
+    return is_owner_admin_or_manager(user)
