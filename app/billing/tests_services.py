@@ -1,14 +1,25 @@
+from datetime import date
 from decimal import Decimal
+from unittest import mock
 
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
-from billing.models import Invoice, InvoiceLineItem
+from billing.models import Invoice, InvoiceLineItem, Payment
 from billing.services import (
     EstimateInvoiceConversionBlocked,
+    InvoiceIssueBlocked,
+    InvoiceLineItemMutationBlocked,
+    InvoiceVoidBlocked,
+    PaymentRecordingBlocked,
+    create_invoice_line_item,
     convert_estimate_to_invoice,
+    edit_invoice_line_item,
     estimate_can_convert_to_invoice,
+    issue_invoice,
+    record_payment,
+    void_invoice,
 )
 from customers.models import Customer
 from estimates.models import Estimate, EstimateLineItem
@@ -18,7 +29,7 @@ from vehicles.models import Vehicle
 VALID_VIN = "1HGBH41JXMN109186"
 
 
-def make_repair_order(number="RO-CONV-001"):
+def make_repair_order(number="RO-CONV-001", vin=VALID_VIN):
     customer = Customer.objects.create(
         customer_type=Customer.CustomerType.INDIVIDUAL,
         first_name="Conv",
@@ -26,7 +37,7 @@ def make_repair_order(number="RO-CONV-001"):
     )
     vehicle = Vehicle.objects.create(
         customer=customer,
-        vin=VALID_VIN,
+        vin=vin,
         make="Honda",
         model="Civic",
         year=2021,
@@ -35,6 +46,37 @@ def make_repair_order(number="RO-CONV-001"):
         customer=customer,
         vehicle=vehicle,
         repair_order_number=number,
+    )
+
+
+def make_invoice(repair_order, number="INV-SVC-001", **kwargs):
+    defaults = {
+        "invoice_number": number,
+        "status": Invoice.Status.DRAFT,
+        "subtotal": Decimal("100.00"),
+        "tax_amount": Decimal("0.00"),
+    }
+    defaults.update(kwargs)
+    return Invoice.objects.create(repair_order=repair_order, **defaults)
+
+
+def make_invoice_line_item(invoice, **kwargs):
+    defaults = {
+        "item_type": InvoiceLineItem.ItemType.LABOR,
+        "description": "Service labor",
+        "quantity": Decimal("1.00"),
+        "unit_price": Decimal("100.00"),
+    }
+    defaults.update(kwargs)
+    return InvoiceLineItem.objects.create(invoice=invoice, **defaults)
+
+
+def make_payment(invoice, amount):
+    return Payment.objects.create(
+        invoice=invoice,
+        payment_date=date.today(),
+        amount=amount,
+        method=Payment.Method.CASH,
     )
 
 
@@ -213,3 +255,223 @@ class ConvertBlockedTests(TestCase):
         estimate = make_estimate(self.ro, status=Estimate.Status.DRAFT)
         add_line_item(estimate)
         self.assertFalse(estimate_can_convert_to_invoice(estimate))
+
+
+class InvoiceIssueServiceTests(TestCase):
+    def setUp(self):
+        self.ro = make_repair_order(number="RO-ISSUE-SVC")
+        self.invoice = make_invoice(self.ro, number="INV-ISSUE-SVC")
+        self.user = get_user_model().objects.create_user(
+            username="issue-svc", password="pw-test-12345"
+        )
+
+    def test_issue_invoice_sets_status_date_and_actor(self):
+        issue_invoice(self.invoice, actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.ISSUED)
+        self.assertIsNotNone(self.invoice.issued_at)
+        self.assertEqual(self.invoice.updated_by, self.user)
+
+    def test_issue_invoice_preserves_existing_issued_at(self):
+        original_date = date(2025, 3, 15)
+        self.invoice.issued_at = original_date
+        self.invoice.save(update_fields=["issued_at", "updated_at"])
+        issue_invoice(self.invoice, actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.issued_at, original_date)
+
+    def test_issue_invoice_blocks_non_draft_invoice(self):
+        self.invoice.status = Invoice.Status.ISSUED
+        self.invoice.save(update_fields=["status", "updated_at"])
+        with self.assertRaises(InvoiceIssueBlocked):
+            issue_invoice(self.invoice, actor=self.user)
+
+    def test_issue_invoice_blocks_final_repair_order(self):
+        self.ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        with self.assertRaises(InvoiceIssueBlocked):
+            issue_invoice(self.invoice, actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.DRAFT)
+
+
+class InvoiceVoidServiceTests(TestCase):
+    def setUp(self):
+        self.ro = make_repair_order(number="RO-VOID-SVC")
+        self.invoice = make_invoice(self.ro, number="INV-VOID-SVC")
+        self.user = get_user_model().objects.create_user(
+            username="void-svc", password="pw-test-12345"
+        )
+
+    def test_void_invoice_sets_status_and_actor(self):
+        void_invoice(self.invoice, actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.VOID)
+        self.assertEqual(self.invoice.updated_by, self.user)
+
+    def test_void_invoice_blocks_already_void_invoice(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        with self.assertRaises(InvoiceVoidBlocked):
+            void_invoice(self.invoice, actor=self.user)
+
+    def test_void_invoice_blocks_final_repair_order(self):
+        self.ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        with self.assertRaises(InvoiceVoidBlocked):
+            void_invoice(self.invoice, actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.DRAFT)
+
+
+class RecordPaymentServiceTests(TestCase):
+    def setUp(self):
+        self.ro = make_repair_order(number="RO-PAY-SVC")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-PAY-SVC",
+            status=Invoice.Status.ISSUED,
+            subtotal=Decimal("100.00"),
+        )
+        self.user = get_user_model().objects.create_user(
+            username="pay-svc", password="pw-test-12345"
+        )
+
+    def _payment_data(self, amount=Decimal("50.00")):
+        return {
+            "payment_date": date.today(),
+            "amount": amount,
+            "method": Payment.Method.CASH,
+            "reference": "",
+            "notes": "",
+        }
+
+    def test_record_payment_creates_payment_and_sets_actor(self):
+        payment = record_payment(self.invoice, self._payment_data(), actor=self.user)
+        self.assertEqual(payment.invoice, self.invoice)
+        self.assertEqual(payment.received_by, self.user)
+
+    def test_record_payment_syncs_invoice_status(self):
+        record_payment(self.invoice, self._payment_data(), actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PARTIALLY_PAID)
+
+    def test_record_full_payment_marks_invoice_paid(self):
+        record_payment(
+            self.invoice,
+            self._payment_data(amount=Decimal("100.00")),
+            actor=self.user,
+        )
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PAID)
+
+    def test_record_payment_rejects_overpayment(self):
+        with self.assertRaises(PaymentRecordingBlocked):
+            record_payment(
+                self.invoice,
+                self._payment_data(amount=Decimal("101.00")),
+                actor=self.user,
+            )
+        self.assertFalse(Payment.objects.filter(invoice=self.invoice).exists())
+
+    def test_record_payment_rejects_non_positive_amount(self):
+        with self.assertRaises(PaymentRecordingBlocked):
+            record_payment(
+                self.invoice,
+                self._payment_data(amount=Decimal("0.00")),
+                actor=self.user,
+            )
+        self.assertFalse(Payment.objects.filter(invoice=self.invoice).exists())
+
+    def test_record_payment_blocks_void_invoice(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        with self.assertRaises(PaymentRecordingBlocked):
+            record_payment(self.invoice, self._payment_data(), actor=self.user)
+
+    def test_record_payment_blocks_final_repair_order(self):
+        self.ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        with self.assertRaises(PaymentRecordingBlocked):
+            record_payment(self.invoice, self._payment_data(), actor=self.user)
+
+    def test_record_payment_locks_invoice_row(self):
+        with mock.patch.object(
+            Invoice.objects,
+            "select_for_update",
+            wraps=Invoice.objects.select_for_update,
+        ) as select_for_update:
+            record_payment(self.invoice, self._payment_data(), actor=self.user)
+
+        select_for_update.assert_called_once()
+
+
+class InvoiceLineItemServiceTests(TestCase):
+    def setUp(self):
+        self.ro = make_repair_order(number="RO-LINE-SVC")
+        self.invoice = make_invoice(
+            self.ro,
+            number="INV-LINE-SVC",
+            subtotal=Decimal("0.00"),
+        )
+        self.user = get_user_model().objects.create_user(
+            username="line-svc", password="pw-test-12345"
+        )
+
+    def _line_item_data(self, **overrides):
+        data = {
+            "item_type": InvoiceLineItem.ItemType.LABOR,
+            "description": "Service line",
+            "quantity": Decimal("2.00"),
+            "unit_price": Decimal("50.00"),
+        }
+        data.update(overrides)
+        return data
+
+    def test_create_invoice_line_item_creates_item_and_recalculates_subtotal(self):
+        create_invoice_line_item(self.invoice, self._line_item_data(), actor=self.user)
+        self.invoice.refresh_from_db()
+        self.assertEqual(InvoiceLineItem.objects.filter(invoice=self.invoice).count(), 1)
+        self.assertEqual(self.invoice.subtotal, Decimal("100.00"))
+
+    def test_create_invoice_line_item_blocks_void_invoice(self):
+        self.invoice.status = Invoice.Status.VOID
+        self.invoice.save(update_fields=["status", "updated_at"])
+        with self.assertRaises(InvoiceLineItemMutationBlocked):
+            create_invoice_line_item(
+                self.invoice,
+                self._line_item_data(),
+                actor=self.user,
+            )
+
+    def test_create_invoice_line_item_blocks_final_repair_order(self):
+        self.ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        with self.assertRaises(InvoiceLineItemMutationBlocked):
+            create_invoice_line_item(
+                self.invoice,
+                self._line_item_data(),
+                actor=self.user,
+            )
+
+    def test_edit_invoice_line_item_updates_item_and_recalculates_subtotal(self):
+        line_item = make_invoice_line_item(self.invoice)
+        edit_invoice_line_item(
+            line_item,
+            self._line_item_data(description="Updated", unit_price=Decimal("75.00")),
+            actor=self.user,
+        )
+        line_item.refresh_from_db()
+        self.invoice.refresh_from_db()
+        self.assertEqual(line_item.description, "Updated")
+        self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
+
+    def test_edit_invoice_line_item_blocks_total_below_amount_paid(self):
+        line_item = make_invoice_line_item(self.invoice)
+        make_payment(self.invoice, Decimal("90.00"))
+        with self.assertRaises(InvoiceLineItemMutationBlocked):
+            edit_invoice_line_item(
+                line_item,
+                self._line_item_data(quantity=Decimal("1.00"), unit_price=Decimal("50.00")),
+                actor=self.user,
+            )
+        line_item.refresh_from_db()
+        self.invoice.refresh_from_db()
+        self.assertEqual(line_item.unit_price, Decimal("100.00"))
+        self.assertEqual(self.invoice.subtotal, Decimal("100.00"))

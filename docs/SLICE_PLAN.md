@@ -40,10 +40,11 @@ Planned slices:
 35. Slice 34: estimate-to-invoice draft conversion (billing conversion service `convert_estimate_to_invoice`; POST `/estimates/<pk>/convert-to-invoice/` action requiring `billing.manage`; only approved estimates with line items and no existing converted invoice can convert; creates a draft invoice on the same repair order, copies estimate line items into invoice line items, and the invoice total matches the estimate total; nullable `Invoice.source_estimate` FK with partial unique constraint for traceability and duplicate prevention; estimate detail shows "Create Invoice Draft" when convertible and links to the converted invoice otherwise; invoice detail shows a source-estimate reference; invoice issue/void/payment behavior unchanged; one billing migration)
 36. Slice 35: user manual and operator workflow guide (`docs/USER_MANUAL.md`; operator-facing guide covering customer, vehicle, repair order, estimate, supplement, print, approval lifecycle, estimate-to-invoice conversion, invoices, payments, closure rules, common workflows, troubleshooting FAQ, and glossary; role/permission table matching actual implemented matrix; honest limitation notes; README link; ADR 0038; docs-only, no app code changes)
 37. Slice 36: customer/insurer approval capture (Estimate approval source/contact/reference/note/approved_at fields; approval source/contact required when moving submitted -> approved through the shop-facing status action; detail and print show captured approval metadata; estimate-to-invoice conversion requires approval capture in addition to approved status, line items, no prior conversion, and no existing repair-order invoice; admin exposes approval fields; one estimates migration)
+38. Slice 37: billing service boundary and payment concurrency guarantee (`billing.services` owns invoice issue, invoice void, payment recording, and invoice line-item mutations; payment recording locks the invoice row with `select_for_update()`; views remain thin; no migrations)
 
 Likely next implementation slices:
 
-- Slice 37: supplement-to-invoice handling, approval artifact/signature planning, or advanced search/filtering
+- Slice 38: supplement-to-invoice handling, approval artifact/signature planning, or advanced search/filtering
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

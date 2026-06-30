@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 23. It should guide
+This roadmap reflects the current implementation after Slice 37. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -15,7 +15,8 @@ Implemented:
 - Repair orders, status history, create/edit workflow, and HTMX status updates
 - Dashboard workflow visibility
 - Billing foundation, invoices, payments, invoice line items, printable invoice
-  detail, lifecycle actions, and invoice queue
+  detail, lifecycle actions, invoice queue, and a service boundary for billing
+  mutations
 - Estimate and insurance spine, estimate line items, supplement lineage,
   browser-printable estimate output, controlled approval status actions, and
   approval capture for approved estimates
@@ -72,29 +73,32 @@ Remaining limits:
 
 ### Priority 3 - Centralized Lifecycle/Domain Services
 
-Status: partially implemented in Slice 26.
+Status: partially implemented in Slices 26 and 37.
 
 ```text
 Slice 26: repair-order lifecycle service boundary
+Slice 37: billing service boundary and payment concurrency guarantee
 ```
 
 Repair-order status transitions are now centralized in
 `repair_orders/services.py`. The unpaid-invoice final-status block is enforced
 uniformly across shop-facing views and Django admin.
 
+Billing mutations are now centralized in `billing/services.py` for invoice
+issue, invoice void, payment recording, and invoice line-item create/edit.
+Payment recording locks the invoice row with `select_for_update()` before
+checking balance and saving the payment.
+
 Remaining service-layer gaps:
 
-- Billing workflow operations (invoice issue, void, payment) do not yet have a
-  service boundary.
 - No admin override pathway exists for lifecycle rules.
 
 Future service-layer direction:
 
 ```text
-issue_invoice(invoice, actor)
-void_invoice(invoice, actor)
-record_payment(invoice, data, actor)
-edit_invoice_line_item(...)
+create_invoice(...)
+edit_invoice(...)
+convert_or_merge_supplement_to_invoice(...)
 ```
 
 ### Priority 4 - Pagination And Query Safety

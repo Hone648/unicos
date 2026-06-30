@@ -1,10 +1,8 @@
 from urllib.parse import urlencode
 
 from django.contrib import messages
-from django.core.exceptions import ValidationError
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
-from django.utils import timezone
 
 from accounts.authorization import (
     PERM_BILLING_MANAGE,
@@ -18,7 +16,20 @@ from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 
 from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
-from .models import Invoice, InvoiceLineItem, Payment
+from .models import Invoice, InvoiceLineItem
+from .services import (
+    InvoiceIssueBlocked,
+    InvoiceLineItemMutationBlocked,
+    InvoiceVoidBlocked,
+    PaymentRecordingBlocked,
+    create_invoice_line_item,
+    edit_invoice_line_item,
+    ensure_invoice_line_items_mutable,
+    ensure_payment_recordable,
+    issue_invoice,
+    record_payment,
+    void_invoice,
+)
 
 
 _VALID_INVOICE_STATUSES = set(Invoice.Status.values)
@@ -248,23 +259,18 @@ def invoice_issue(request, pk):
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
 
-    if _repair_order_is_final(ro):
-        messages.error(request, _final_invoice_message(invoice))
+    try:
+        issue_invoice(invoice, actor=request.user)
+    except InvoiceIssueBlocked as error:
+        if _repair_order_is_final(ro):
+            messages.error(request, str(error))
+            return redirect("billing:invoice_detail", pk=invoice.pk)
+        if invoice.status != Invoice.Status.DRAFT:
+            messages.info(request, str(error))
+            return redirect("repair_orders:detail", pk=ro.pk)
+        messages.error(request, str(error))
         return redirect("billing:invoice_detail", pk=invoice.pk)
 
-    if invoice.status != Invoice.Status.DRAFT:
-        messages.info(
-            request,
-            f"Invoice {invoice.invoice_number} is already "
-            f"{invoice.get_status_display().lower()} — no change made.",
-        )
-        return redirect("repair_orders:detail", pk=ro.pk)
-
-    invoice.status = Invoice.Status.ISSUED
-    if not invoice.issued_at:
-        invoice.issued_at = timezone.localdate()
-    invoice.updated_by = request.user
-    invoice.save(update_fields=["status", "issued_at", "updated_by", "updated_at"])
     messages.success(request, f"Invoice {invoice.invoice_number} issued.")
     return redirect("repair_orders:detail", pk=ro.pk)
 
@@ -277,17 +283,18 @@ def invoice_void(request, pk):
     invoice = get_object_or_404(Invoice.objects.select_related("repair_order"), pk=pk)
     ro = invoice.repair_order
 
-    if _repair_order_is_final(ro):
-        messages.error(request, _final_invoice_message(invoice))
+    try:
+        void_invoice(invoice, actor=request.user)
+    except InvoiceVoidBlocked as error:
+        if _repair_order_is_final(ro):
+            messages.error(request, str(error))
+            return redirect("billing:invoice_detail", pk=invoice.pk)
+        if invoice.status == Invoice.Status.VOID:
+            messages.info(request, str(error))
+            return redirect("repair_orders:detail", pk=ro.pk)
+        messages.error(request, str(error))
         return redirect("billing:invoice_detail", pk=invoice.pk)
 
-    if invoice.status == Invoice.Status.VOID:
-        messages.info(request, f"Invoice {invoice.invoice_number} is already void.")
-        return redirect("repair_orders:detail", pk=ro.pk)
-
-    invoice.status = Invoice.Status.VOID
-    invoice.updated_by = request.user
-    invoice.save(update_fields=["status", "updated_by", "updated_at"])
     messages.success(request, f"Invoice {invoice.invoice_number} voided.")
     return redirect("repair_orders:detail", pk=ro.pk)
 
@@ -304,31 +311,20 @@ def payment_create(request, invoice_pk):
     )
     ro = invoice.repair_order
 
-    if _repair_order_is_final(ro):
-        messages.error(request, _final_invoice_message(invoice))
-        return redirect("repair_orders:detail", pk=ro.pk)
-
-    if invoice.status == Invoice.Status.VOID:
-        messages.error(
-            request,
-            f"Invoice {invoice.invoice_number} is void and cannot accept payments.",
-        )
+    try:
+        ensure_payment_recordable(invoice)
+    except PaymentRecordingBlocked as error:
+        messages.error(request, str(error))
         return redirect("repair_orders:detail", pk=ro.pk)
 
     if request.method == "POST":
         form = PaymentForm(request.POST)
         if form.is_valid():
-            payment = form.save(commit=False)
-            payment.invoice = invoice
-            payment.received_by = request.user
-            # Run full model validation now that invoice is set — this catches
-            # void-invoice and overpayment constraints defined in Payment.clean().
             try:
-                payment.full_clean()
-            except ValidationError as e:
-                form.add_error(None, e)
+                payment = record_payment(invoice, form.cleaned_data, actor=request.user)
+            except PaymentRecordingBlocked as error:
+                form.add_error(None, str(error))
             else:
-                payment.save()  # also calls invoice.sync_payment_status()
                 messages.success(request, f"Payment of ${payment.amount} recorded.")
                 return redirect("repair_orders:detail", pk=ro.pk)
     else:
@@ -355,23 +351,23 @@ def line_item_create(request, invoice_pk):
     )
     ro = invoice.repair_order
 
-    if _repair_order_is_final(ro):
-        messages.error(request, _final_invoice_message(invoice))
-        return redirect("billing:invoice_detail", pk=invoice.pk)
-
-    if invoice.status == Invoice.Status.VOID:
-        messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
+    try:
+        ensure_invoice_line_items_mutable(invoice)
+    except InvoiceLineItemMutationBlocked as error:
+        messages.error(request, str(error))
         return redirect("billing:invoice_detail", pk=invoice.pk)
 
     if request.method == "POST":
         form = InvoiceLineItemForm(request.POST, invoice=invoice)
         if form.is_valid():
-            line_item = form.save(commit=False)
-            line_item.invoice = invoice
             try:
-                line_item.save()
-            except ValidationError as e:
-                form.add_error(None, e)
+                create_invoice_line_item(
+                    invoice,
+                    form.cleaned_data,
+                    actor=request.user,
+                )
+            except InvoiceLineItemMutationBlocked as error:
+                form.add_error(None, str(error))
             else:
                 messages.success(request, "Invoice line item added.")
                 return redirect("repair_orders:detail", pk=ro.pk)
@@ -403,21 +399,19 @@ def line_item_edit(request, pk):
     invoice = line_item.invoice
     ro = invoice.repair_order
 
-    if _repair_order_is_final(ro):
-        messages.error(request, _final_invoice_message(invoice))
-        return redirect("billing:invoice_detail", pk=invoice.pk)
-
-    if invoice.status == Invoice.Status.VOID:
-        messages.error(request, f"Invoice {invoice.invoice_number} is void and cannot be edited.")
+    try:
+        ensure_invoice_line_items_mutable(invoice)
+    except InvoiceLineItemMutationBlocked as error:
+        messages.error(request, str(error))
         return redirect("billing:invoice_detail", pk=invoice.pk)
 
     if request.method == "POST":
         form = InvoiceLineItemForm(request.POST, instance=line_item)
         if form.is_valid():
             try:
-                form.save()
-            except ValidationError as e:
-                form.add_error(None, e)
+                edit_invoice_line_item(line_item, form.cleaned_data, actor=request.user)
+            except InvoiceLineItemMutationBlocked as error:
+                form.add_error(None, str(error))
             else:
                 messages.success(request, "Invoice line item updated.")
                 return redirect("repair_orders:detail", pk=ro.pk)

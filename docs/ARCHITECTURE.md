@@ -73,8 +73,10 @@ Current domain models:
   payment status (draft/issued/partially paid/paid/void); subtotal is manual
   until line items exist, then calculated from line items; number is
   system-generated (`INV-YYYY-NNNNNN`) — staff do not type it manually;
-  lifecycle transitions (draft→issued, any→void) are POST-only shop-facing
-  actions at `/billing/invoices/<pk>/issue/` and `/billing/invoices/<pk>/void/`;
+  lifecycle transitions (draft -> issued, any -> void) are POST-only
+  shop-facing actions at `/billing/invoices/<pk>/issue/` and
+  `/billing/invoices/<pk>/void/`, backed by
+  `billing.services.issue_invoice()` and `billing.services.void_invoice()`;
   void invoices are billing-read-only — invoice edit, line-item create/edit,
   and payment create are all blocked with a redirect and error message; invoices
   that belong to final repair orders are also billing-read-only in shop-facing
@@ -187,16 +189,20 @@ Lifecycle service layer:
   `estimate_can_convert_to_invoice()` predicate). It validates that the estimate
   is approved, itemized, and not already converted, then creates a draft invoice
   and copies line items inside a single transaction.
-- Billing workflow operations (invoice issue, void, payment) do not yet have a
-  service boundary — that is planned as future work.
+- Billing workflow mutations are centralized in `billing/services.py`:
+  `issue_invoice()`, `void_invoice()`, `record_payment()`,
+  `create_invoice_line_item()`, and `edit_invoice_line_item()`. The service
+  layer owns final-repair-order blocks, void-invoice blocks, invoice lifecycle
+  state checks, line-item total checks, payment amount checks, overpayment
+  checks, and payment status synchronization. Payment recording locks the
+  invoice row with `select_for_update()` inside a transaction.
 
 Future service-layer direction:
 
 ```text
-issue_invoice(invoice, actor)
-void_invoice(invoice, actor)
-record_payment(invoice, data, actor)
-edit_invoice_line_item(...)
+create_invoice(...)
+edit_invoice(...)
+convert_or_merge_supplement_to_invoice(...)
 ```
 
 List pagination:
