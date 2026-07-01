@@ -10,13 +10,13 @@
   <h1>Repair Order {{ ro.repair_order_number }}</h1>
   {% include "repair_orders/partials/_status_badge.html" %}
   {% if not is_final_repair_order and can_edit_repair_order %}
-    <a class="button button-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
+    <a class="btn btn-outline-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
   {% endif %}
 </div>
 
 <div class="card-grid">
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Customer &amp; Vehicle</h2>
     <dl>
       <dt>Customer</dt><dd>{{ ro.customer }}</dd>
@@ -27,7 +27,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Dates</h2>
     <dl>
       <dt>Opened</dt><dd>{{ ro.opened_at|date:"Y-m-d H:i" }}</dd>
@@ -43,7 +43,7 @@
 {% endif %}
 
 {% if ro.reported_problem or ro.internal_notes %}
-<div class="card">
+<div class="card shadow-sm">
   <h2>Notes</h2>
   {% if ro.reported_problem %}
     <h3>Reported problem</h3>

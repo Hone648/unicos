@@ -9,12 +9,12 @@
 <div class="page-header">
   <h1>{{ vehicle }}</h1>
   {% if user|has_app_permission:"customers.manage" %}
-    <a class="button button-secondary" href="{% url 'vehicles:edit' vehicle.pk %}">Edit Vehicle</a>
+    <a class="btn btn-outline-secondary" href="{% url 'vehicles:edit' vehicle.pk %}">Edit Vehicle</a>
   {% endif %}
 </div>
 
 <div class="card-grid">
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Vehicle</h2>
     <dl>
       <dt>VIN</dt>
@@ -32,7 +32,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Registration &amp; Condition</h2>
     <dl>
       <dt>License plate</dt>
@@ -44,7 +44,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Owner</h2>
     <dl>
       <dt>Customer</dt>
@@ -54,17 +54,17 @@
 </div>
 
 {% if vehicle.notes %}
-<div class="card">
+<div class="card shadow-sm">
   <h2>Notes</h2>
   <p>{{ vehicle.notes }}</p>
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Repair Orders</h2>
   {% if repair_orders %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>RO #</th>

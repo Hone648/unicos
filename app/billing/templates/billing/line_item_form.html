@@ -10,7 +10,7 @@
 </div>
 
 <div class="card-grid">
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Invoice</h2>
     <dl>
       <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
@@ -19,7 +19,7 @@
       <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
     </dl>
   </div>
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Current Totals</h2>
     <dl>
       <dt>Subtotal</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd>
@@ -37,7 +37,7 @@
 </div>
 {% endif %}
 
-<div class="form-card">
+<div class="form-card shadow-sm">
   <form method="post">
     {% csrf_token %}
 
@@ -70,8 +70,8 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="button-primary">{{ submit_label }}</button>
-      <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a class="btn btn-outline-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
     </div>
 
   </form>

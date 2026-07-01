@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 46. It should guide
+This roadmap reflects the current implementation after Slice 47. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -18,6 +18,9 @@ Implemented:
 - New repair-order form vehicle selection is scoped by selected customer and
   loads the vehicle field via HTMX
 - Repair-order communication log for customer/insurer/adjuster/internal history
+- Bootstrap-based UI foundation using local static assets, a Bootstrap navbar,
+  Bootstrap alerts/buttons/cards/tables on high-traffic pages, and the existing
+  `unicos.css` file as the domain-specific override layer
 - Dashboard workflow visibility
 - Billing foundation, invoices, payments, invoice line items, printable invoice
   detail, lifecycle actions, invoice queue, and a service boundary for billing
@@ -46,6 +49,7 @@ Implemented:
 The app is local-development only and is not production-ready.
 
 Product Slice 46 is now consumed by the repair-order communication log.
+Product Slice 47 is now consumed by the Bootstrap UI foundation.
 
 ## Priority Roadmap
 
@@ -355,7 +359,7 @@ Remaining communication gaps:
 
 Recommended next slices:
 
-- Product Slice 47 candidate: production media serving/storage/scanning/backup design.
+- Product Slice 48 candidate: production media serving/storage/scanning/backup design.
 - Later candidates: supplement-to-invoice handling, repair planning/parts/sublet,
   or structured customer/insurer contact model.
 

@@ -11,7 +11,7 @@
   Read-only operational snapshot with optional date/status filters and CSV exports. Charts and deeper analytics are future work.
 </p>
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Filters</h2>
   {% if filter_form.non_field_errors %}
     <div class="form-errors">
@@ -68,19 +68,19 @@
       {% endif %}
     </div>
     <div class="form-actions form-field--full">
-      <button type="submit" class="button-primary">Apply Filters</button>
-      <a class="button button-secondary" href="{% url 'reports' %}">Reset</a>
+      <button type="submit" class="btn btn-primary">Apply Filters</button>
+      <a class="btn btn-outline-secondary" href="{% url 'reports' %}">Reset</a>
     </div>
   </form>
   <div class="form-actions">
-    <a class="button button-secondary" href="?{{ csv_export_querystrings.repair_orders }}">Export repair orders CSV</a>
-    <a class="button button-secondary" href="?{{ csv_export_querystrings.invoices }}">Export invoices CSV</a>
-    <a class="button button-secondary" href="?{{ csv_export_querystrings.estimates }}">Export estimates CSV</a>
+    <a class="btn btn-outline-secondary" href="?{{ csv_export_querystrings.repair_orders }}">Export repair orders CSV</a>
+    <a class="btn btn-outline-secondary" href="?{{ csv_export_querystrings.invoices }}">Export invoices CSV</a>
+    <a class="btn btn-outline-secondary" href="?{{ csv_export_querystrings.estimates }}">Export estimates CSV</a>
   </div>
 </div>
 
 <div class="card-grid">
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Repair Orders</h2>
     <dl>
       <dt>Active repair orders</dt><dd>{{ active_repair_order_count }}</dd>
@@ -90,7 +90,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Billing</h2>
     <dl>
       <dt>Non-void invoices</dt><dd>{{ non_void_invoice_count }}</dd>
@@ -103,7 +103,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Estimates</h2>
     <dl>
       <dt>Draft estimates</dt><dd>{{ draft_estimate_count }}</dd>
@@ -117,11 +117,11 @@
   </div>
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Top Unpaid Invoices</h2>
   {% if top_unpaid_invoices %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>Invoice #</th>
@@ -149,11 +149,11 @@
   {% endif %}
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Ready For Pickup Repair Orders</h2>
   {% if ready_for_pickup_repair_orders %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>RO #</th>
@@ -181,11 +181,11 @@
   {% endif %}
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Estimates Needing Attention</h2>
   {% if estimates_needing_attention %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>Estimate #</th>

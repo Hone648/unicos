@@ -1,8 +1,8 @@
-<div class="card">
+<div class="card shadow-sm">
   <h2>Attachments</h2>
   {% if attachments %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>File</th>
@@ -29,7 +29,7 @@
                 {% if can_delete_attachments %}
                   <form method="post" action="{% url 'attachments:delete' attachment.pk %}" class="inline-form">
                     {% csrf_token %}
-                    <button type="submit" class="button button-secondary button-sm">Delete</button>
+                    <button type="submit" class="btn btn-outline-danger btn-sm">Delete</button>
                   </form>
                 {% endif %}
               </td>
@@ -44,7 +44,7 @@
 
   {% if can_upload_attachments %}
     <div class="action-row">
-      <a class="button button-primary"
+      <a class="btn btn-primary"
          href="{% url 'attachments:upload_for_repair_order' repair_order_pk=ro.pk %}">Add Attachment</a>
     </div>
   {% endif %}

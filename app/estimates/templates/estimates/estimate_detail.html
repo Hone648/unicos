@@ -9,17 +9,17 @@
 <div class="page-header">
   <h1>Estimate {{ estimate.estimate_number }}</h1>
   <div class="action-row page-header-actions">
-    <a class="button button-secondary" href="{% url 'estimates:print' estimate.pk %}">Print Estimate</a>
+    <a class="btn btn-outline-secondary" href="{% url 'estimates:print' estimate.pk %}">Print Estimate</a>
     {% if can_manage_estimate and is_editable %}
-      <a class="button button-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
+      <a class="btn btn-outline-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
     {% endif %}
     {% if can_convert_to_invoice %}
       <form method="post" action="{% url 'estimates:convert_to_invoice' estimate.pk %}" class="inline-form">
         {% csrf_token %}
-        <button type="submit" class="button button-primary">Create Invoice Draft</button>
+        <button type="submit" class="btn btn-primary">Create Invoice Draft</button>
       </form>
     {% elif converted_invoice %}
-      <a class="button button-secondary" href="{% url 'billing:invoice_detail' converted_invoice.pk %}">View Invoice {{ converted_invoice.invoice_number }}</a>
+      <a class="btn btn-outline-secondary" href="{% url 'billing:invoice_detail' converted_invoice.pk %}">View Invoice {{ converted_invoice.invoice_number }}</a>
     {% endif %}
   </div>
 </div>
@@ -32,7 +32,7 @@
           <form method="post" action="{% url 'estimates:status_update' estimate.pk %}">
             {% csrf_token %}
             <input type="hidden" name="status" value="{{ status }}">
-            <button type="submit" class="button-primary">{{ label }}</button>
+            <button type="submit" class="btn btn-primary">{{ label }}</button>
           </form>
         {% endif %}
       {% endfor %}
@@ -60,7 +60,7 @@
           </div>
         </div>
         <div class="form-actions">
-          <button type="submit" class="button-primary">Approve Estimate</button>
+          <button type="submit" class="btn btn-primary">Approve Estimate</button>
         </div>
       </form>
     {% endif %}
@@ -71,7 +71,7 @@
 
 <div class="card-grid">
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Estimate</h2>
     <dl>
       <dt>Estimate #</dt><dd>{{ estimate.estimate_number }}</dd>
@@ -86,7 +86,7 @@
     </dl>
   </div>
 
-  <div class="card">
+  <div class="card shadow-sm">
     <h2>Insurance &amp; Claim</h2>
     <dl>
       <dt>Insurance company</dt><dd>{{ estimate.insurance_company|default:"—" }}</dd>
@@ -98,7 +98,7 @@
 </div>
 
 {% if estimate.has_approval_capture %}
-<div class="card">
+<div class="card shadow-sm">
   <h2>Approval</h2>
   <dl>
     <dt>Source</dt><dd>{{ estimate.get_approval_source_display }}</dd>
@@ -114,11 +114,11 @@
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Line Items</h2>
   {% if line_items %}
-    <div class="table-wrap">
-      <table class="line-item-table">
+    <div class="table-wrap table-responsive">
+      <table class="line-item-table table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>Type</th>
@@ -164,16 +164,16 @@
 
   {% if can_manage_estimate and is_editable %}
     <div class="action-row">
-      <a class="button button-primary" href="{% url 'estimates:line_item_create' estimate_pk=estimate.pk %}">Add Line Item</a>
+      <a class="btn btn-primary" href="{% url 'estimates:line_item_create' estimate_pk=estimate.pk %}">Add Line Item</a>
     </div>
   {% endif %}
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Supplements</h2>
   {% if supplements %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>Estimate #</th>
@@ -198,19 +198,19 @@
 
   {% if can_manage_estimate %}
     <div class="action-row">
-      <a class="button button-secondary" href="{% url 'estimates:supplement_create' pk=estimate.pk %}">Create Supplement</a>
+      <a class="btn btn-outline-secondary" href="{% url 'estimates:supplement_create' pk=estimate.pk %}">Create Supplement</a>
     </div>
   {% endif %}
 </div>
 
 {% if estimate.notes %}
-<div class="card">
+<div class="card shadow-sm">
   <h2>Notes</h2>
   <p>{{ estimate.notes }}</p>
 </div>
 {% endif %}
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Record</h2>
   <dl>
     <dt>Created</dt><dd>{{ estimate.created_at|date:"Y-m-d H:i" }}{% if estimate.created_by %} by {{ estimate.created_by.get_username }}{% endif %}</dd>

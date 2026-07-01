@@ -15,7 +15,7 @@
   <h1>{{ title }}</h1>
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <dl>
     <dt>Repair order</dt><dd>{{ ro.repair_order_number }}</dd>
     <dt>Customer</dt><dd>{{ ro.customer }}</dd>
@@ -37,7 +37,7 @@
 </div>
 {% endif %}
 
-<div class="form-card">
+<div class="form-card shadow-sm">
   <form method="post">
     {% csrf_token %}
 
@@ -77,11 +77,11 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
       {% if mode == "edit" %}
-        <a class="button button-secondary" href="{% url 'estimates:detail' estimate.pk %}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{% url 'estimates:detail' estimate.pk %}">Cancel</a>
       {% else %}
-        <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
       {% endif %}
     </div>
 

@@ -9,7 +9,7 @@
   <h1>{{ title }}</h1>
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <dl>
     <dt>Repair order</dt><dd>{{ ro.repair_order_number }}</dd>
     <dt>Customer</dt><dd>{{ ro.customer }}</dd>
@@ -23,7 +23,7 @@
 </div>
 {% endif %}
 
-<div class="form-card">
+<div class="form-card shadow-sm">
   <form method="post">
     {% csrf_token %}
 
@@ -72,8 +72,8 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="button-primary">{{ submit_label }}</button>
-      <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <a class="btn btn-outline-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
     </div>
 
   </form>

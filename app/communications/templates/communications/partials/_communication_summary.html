@@ -1,15 +1,15 @@
-<div class="card">
+<div class="card shadow-sm">
   <h2>Communication Log</h2>
   {% if can_add_communication %}
     <div class="action-row">
-      <a class="button button-primary"
+      <a class="btn btn-primary"
          href="{% url 'communications:create' repair_order_pk=ro.pk %}">Add Communication</a>
     </div>
   {% endif %}
 
   {% if communications %}
-    <div class="table-wrap">
-      <table>
+    <div class="table-wrap table-responsive">
+      <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
             <th>When</th>
