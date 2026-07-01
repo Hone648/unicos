@@ -26,7 +26,7 @@
     <div class="form-section">
       <h3 class="form-section__title">Identity</h3>
       <div class="form-grid">
-        <div class="form-field">
+        <div class="form-field" data-customer-type-control>
           <label for="{{ form.customer_type.id_for_label }}">Customer type</label>
           {{ form.customer_type }}
           {% if form.customer_type.errors %}<ul class="field-errors">{% for e in form.customer_type.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
@@ -36,17 +36,17 @@
           <label for="{{ form.is_active.id_for_label }}">Active</label>
           {% if form.is_active.errors %}<ul class="field-errors">{% for e in form.is_active.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
-        <div class="form-field">
+        <div class="form-field" data-customer-type-field="individual">
           <label for="{{ form.first_name.id_for_label }}">First name</label>
           {{ form.first_name }}
           {% if form.first_name.errors %}<ul class="field-errors">{% for e in form.first_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
-        <div class="form-field">
+        <div class="form-field" data-customer-type-field="individual">
           <label for="{{ form.last_name.id_for_label }}">Last name</label>
           {{ form.last_name }}
           {% if form.last_name.errors %}<ul class="field-errors">{% for e in form.last_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
         </div>
-        <div class="form-field">
+        <div class="form-field" data-customer-type-field="business">
           <label for="{{ form.business_name.id_for_label }}">Business name</label>
           {{ form.business_name }}
           {% if form.business_name.errors %}<ul class="field-errors">{% for e in form.business_name.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
@@ -128,4 +128,41 @@
 
   </form>
 </div>
+
+<script>
+  (function () {
+    const customerType = document.getElementById("{{ form.customer_type.id_for_label }}");
+    const scopedFields = document.querySelectorAll("[data-customer-type-field]");
+
+    function hasErrors(field) {
+      return Boolean(field.querySelector(".field-errors li"));
+    }
+
+    function setFieldVisible(field, visible) {
+      const input = field.querySelector("input, select, textarea");
+      const mustShowError = hasErrors(field);
+      const shouldShow = visible || mustShowError;
+
+      field.classList.toggle("d-none", !shouldShow);
+      if (input) {
+        input.disabled = !shouldShow;
+      }
+    }
+
+    function syncCustomerTypeFields() {
+      if (!customerType) {
+        return;
+      }
+
+      scopedFields.forEach(function (field) {
+        setFieldVisible(field, field.dataset.customerTypeField === customerType.value);
+      });
+    }
+
+    if (customerType) {
+      customerType.addEventListener("change", syncCustomerTypeFields);
+      syncCustomerTypeFields();
+    }
+  })();
+</script>
 {% endblock %}

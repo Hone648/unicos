@@ -225,6 +225,15 @@ class CustomerCreateTests(TestCase):
         self.assertNotContains(response, 'name="created_at"')
         self.assertNotContains(response, 'name="updated_at"')
 
+    def test_form_includes_customer_type_toggle_hooks(self):
+        response = self.client.get(CREATE_URL)
+        self.assertContains(response, 'name="customer_type"')
+        self.assertContains(response, "data-customer-type-control")
+        self.assertContains(response, 'data-customer-type-field="individual"', count=2)
+        self.assertContains(response, 'data-customer-type-field="business"')
+        self.assertContains(response, "syncCustomerTypeFields")
+        self.assertContains(response, "input.disabled = !shouldShow")
+
     def test_valid_post_creates_customer(self):
         self.client.post(CREATE_URL, self._valid_data())
         self.assertTrue(Customer.objects.filter(first_name="New", last_name="Customer").exists())
