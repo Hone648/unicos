@@ -44,6 +44,9 @@ Implemented:
 
 The app is local-development only and is not production-ready.
 
+Current planning note: this post-Slice 45 docs/roadmap renewal is unnumbered
+and does not consume product Slice 46.
+
 ## Priority Roadmap
 
 ### Priority 1 - README / Docs Reality Check
@@ -254,10 +257,32 @@ Required later:
 - Require explicit audited override reasons for production admin bypasses
   (admin mutations are now service-backed or read-only as of Slice 43; an
   audited override pathway for blocked actions is still future work).
-- Design media storage for attachments/photos/documents.
+- Design production media serving/storage/scanning/backup for
+  attachments/photos/documents.
 - Define deployment-specific environment management.
 
-### Priority 8 - Attachments / Media Foundation
+### Priority 8 - Reporting
+
+Status: implemented in Slices 41 and 44.
+
+```text
+Slice 41: reporting foundation
+Slice 44: reporting filters/date ranges and CSV export
+```
+
+Reports now provide a read-only `/reports/` operational snapshot behind
+`reports.view`, with date/status filters and CSV exports for repair orders,
+invoices, and estimates.
+
+Remaining reporting gaps:
+
+- Charts.
+- Revenue reporting.
+- Receivables and aging.
+- Cycle-time reporting.
+- Scoped reporting / object-level aggregate strategy.
+
+### Priority 9 - Attachments / Media Foundation
 
 Status: implemented in Slice 42 and hardened in Slice 45.
 
@@ -272,7 +297,8 @@ Upload, download, and delete are policy-gated. Files are stored under local
 `/app/media` so local uploads survive container recreation. Media is served in
 development only (`DEBUG=True`). Upload validation now checks filename
 shape/length, extension allowlist, content-type alignment, size, and lightweight
-binary signatures for image/PDF types.
+binary signatures for image/PDF types. See
+`DECISIONS/0047-local-media-persistence.md`.
 
 Remaining attachment gaps:
 
@@ -281,7 +307,7 @@ Remaining attachment gaps:
 - No image thumbnails or preview.
 - Production media serving/storage/scanning/backup is future work.
 
-### Priority 9 - Admin Service Alignment
+### Priority 10 - Admin Service Alignment
 
 Status: implemented in Slice 43.
 
@@ -309,8 +335,10 @@ Remaining admin gaps:
 
 Recommended next slices:
 
-- Customer/insurer contact model or communication log.
-- Production media serving/storage/scanning/backup design.
+- Current unnumbered step: docs/roadmap renewal after Slice 45 (this pass; does
+  not consume product Slice 46).
+- Product Slice 46 candidate: customer/insurer contact model or communication log.
+- Later candidate: production media serving/storage/scanning/backup design.
 
 ## Missing Body-Shop Workflow Areas
 
@@ -323,7 +351,7 @@ Recommended next slices:
 | Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
-| Reporting | read-only operational snapshot with date/status filters and CSV exports exists; still missing charts, revenue, receivables, cycle time, and aging invoices |
+| Reporting | read-only operational snapshot with date/status filters and CSV exports exists; still missing charts, revenue, receivables/aging, cycle time, and scoped object-level aggregate strategy |
 
 ## Validation Roadmap
 

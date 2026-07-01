@@ -17,7 +17,7 @@ Production deployment still requires:
 - Secure cookies, CSRF, and proxy header configuration
 - Backups and a restore procedure
 - Admin hardening
-- Media/document storage strategy
+- Production media/document storage, private serving, backup/restore, or equivalent
 - Deployment-specific environment management
 
 Screenshots are future work; the repo does not currently include a maintained
@@ -178,7 +178,8 @@ Current authorization limits:
 - `is_staff` is not treated as a shop permission.
 - Django admin still uses Django admin authorization and is intentionally
   separate from shop-facing authorization policy.
-- Admin service alignment is partial and remains future work.
+- High-risk admin mutations are service-backed or read-only as of Slice 43;
+  audited override paths and admin object-policy integration remain future work.
 - Production hardening remains future work.
 
 ## Roadmap And Readiness
