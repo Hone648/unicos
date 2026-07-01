@@ -341,6 +341,22 @@ class RepairOrderDetailContentTests(TestCase):
         # Initial intake history row is always created on save
         self.assertContains(response, "Intake")
 
+    def test_detail_loads_pinned_htmx_script(self):
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(
+            response,
+            '<script src="https://unpkg.com/htmx.org@2.0.4" defer></script>',
+            html=True,
+        )
+
+    def test_detail_preserves_status_form_htmx_attributes(self):
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertContains(response, 'id="status-update-card"')
+        self.assertContains(response, f'action="{status_url(self.ro.pk)}"')
+        self.assertContains(response, f'hx-post="{status_url(self.ro.pk)}"')
+        self.assertContains(response, 'hx-target="#status-update-card"')
+        self.assertContains(response, 'hx-swap="outerHTML"')
+
     def test_detail_shows_invoice_summary_when_invoice_exists(self):
         make_invoice(self.ro, number="INV-DETAIL-01")
         response = self.client.get(detail_url(self.ro.pk))
@@ -545,6 +561,16 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
     def test_htmx_post_response_contains_status_history_section(self):
         response = self._htmx_post({"new_status": "estimating"})
         self.assertContains(response, "Status History")
+
+    def test_htmx_post_response_contains_oob_swap_fragments(self):
+        response = self._htmx_post({"new_status": "estimating"})
+        self.assertContains(response, 'id="messages" class="messages" hx-swap-oob="true"')
+        self.assertContains(response, 'id="ro-status-badge"')
+        self.assertContains(response, 'hx-swap-oob="true"')
+        self.assertContains(response, 'id="status-history-card"')
+        self.assertContains(response, 'id="status-update-card"')
+        self.assertContains(response, f'hx-post="{status_url(self.ro.pk)}"')
+        self.assertContains(response, 'hx-target="#status-update-card"')
 
     def test_htmx_post_same_status_does_not_create_duplicate_history(self):
         # RO starts at INTAKE — posting INTAKE again is a no-op
