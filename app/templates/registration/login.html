@@ -3,14 +3,15 @@
 {% block title %}Log in - Unicos{% endblock %}
 
 {% block content %}
-  <div class="login-card card shadow-sm">
+  <div class="login-card card shadow-sm form-panel">
     <h1>Log in</h1>
     {% if form.errors %}
       <div class="alert alert-danger" role="alert">Your username and password didn't match. Please try again.</div>
     {% endif %}
     <form method="post">
       {% csrf_token %}
-      {{ form.as_p }}
+      {% include "partials/_form_field.html" with field=form.username %}
+      {% include "partials/_form_field.html" with field=form.password %}
       <button class="btn btn-primary" type="submit">Log in</button>
     </form>
   </div>
