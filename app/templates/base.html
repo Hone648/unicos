@@ -5,51 +5,61 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{% block title %}Unicos{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" />
     <link rel="stylesheet" href="{% static 'css/unicos.css' %}" />
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+    <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}" defer></script>
   </head>
   <body>
-    <header class="site-header">
-      <div class="site-header__inner">
-        <a class="brand" href="{% url 'dashboard' %}">Unicos</a>
+    <header class="site-header navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
+      <div class="container-fluid">
+        <a class="navbar-brand fw-semibold" href="{% url 'dashboard' %}">Unicos</a>
         {% if user.is_authenticated %}
-          <nav class="nav">
-            {% if user|has_app_permission:"dashboard.view" %}
-              <a href="{% url 'dashboard' %}">Dashboard</a>
-            {% endif %}
-            {% if user|has_app_permission:"repair_orders.view" %}
-              <a href="{% url 'repair_orders:list' %}">Repair Orders</a>
-            {% endif %}
-            {% if user|has_app_permission:"customers.view" %}
-              <a href="{% url 'customers:list' %}">Customers</a>
-            {% endif %}
-            {% if user|has_app_permission:"billing.view" %}
-              <a href="{% url 'billing:invoice_list' %}">Billing</a>
-            {% endif %}
-            {% if user|has_app_permission:"reports.view" %}
-              <a href="{% url 'reports' %}">Reports</a>
-            {% endif %}
-          </nav>
-          <div class="user-bar">
-            <span>{{ user.get_username }}</span>
-            <form class="logout-form" method="post" action="{% url 'logout' %}">
-              {% csrf_token %}
-              <button type="submit">Log out</button>
-            </form>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#site-navbar" aria-controls="site-navbar" aria-expanded="false" aria-label="Toggle navigation">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+          <div id="site-navbar" class="collapse navbar-collapse">
+            <nav class="navbar-nav me-auto mb-2 mb-lg-0">
+              {% if user|has_app_permission:"dashboard.view" %}
+                <a class="nav-link" href="{% url 'dashboard' %}">Dashboard</a>
+              {% endif %}
+              {% if user|has_app_permission:"repair_orders.view" %}
+                <a class="nav-link" href="{% url 'repair_orders:list' %}">Repair Orders</a>
+              {% endif %}
+              {% if user|has_app_permission:"customers.view" %}
+                <a class="nav-link" href="{% url 'customers:list' %}">Customers</a>
+              {% endif %}
+              {% if user|has_app_permission:"billing.view" %}
+                <a class="nav-link" href="{% url 'billing:invoice_list' %}">Billing</a>
+              {% endif %}
+              {% if user|has_app_permission:"reports.view" %}
+                <a class="nav-link" href="{% url 'reports' %}">Reports</a>
+              {% endif %}
+            </nav>
+            <div class="d-flex align-items-center gap-3">
+              <span class="navbar-text">{{ user.get_username }}</span>
+              <form class="logout-form" method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button class="btn btn-outline-light btn-sm" type="submit">Log out</button>
+              </form>
+            </div>
           </div>
         {% endif %}
       </div>
     </header>
 
-    <div id="messages" class="messages">
+    <div id="messages" class="container-fluid messages">
       {% if messages %}
         {% for message in messages %}
-          <div class="message message-{{ message.tags }}">{{ message }}</div>
+          <div class="alert {% if message.tags == 'error' %}alert-danger{% elif message.tags == 'success' %}alert-success{% elif message.tags == 'warning' %}alert-warning{% else %}alert-info{% endif %} alert-dismissible fade show" role="alert">
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+          </div>
         {% endfor %}
       {% endif %}
     </div>
 
-    <main class="page">
+    <main class="page container-fluid py-4">
       {% block content %}{% endblock %}
     </main>
   </body>

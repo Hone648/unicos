@@ -46,6 +46,8 @@ screenshot set.
 - Generated document numbers
 - Billing invoice queue
 - Read-only reports snapshot with date/status filters and CSV exports
+- Bootstrap-based UI foundation with local static assets and no frontend build
+  tooling
 - Hardened CI with Ruff quality checks, migration checks, Docker smoke, and healthz
 - Repair order attachments (upload, download, delete; local Docker `media_data`
   persistence; policy-gated)
@@ -56,7 +58,8 @@ screenshot set.
 - PostgreSQL
 - Docker Compose
 - GitHub Actions
-- Plain server-rendered HTML/CSS with limited HTMX; no frontend build tooling
+- Server-rendered HTML with local Bootstrap 5, project CSS overrides, and
+  limited HTMX; no frontend build tooling
 
 ## Local Setup
 

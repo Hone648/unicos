@@ -1,6 +1,6 @@
 {% load app_permissions %}
 
-<div class="card">
+<div class="card shadow-sm">
   <h2>Invoice</h2>
   {% if can_view_invoice %}
     {% if invoice %}
@@ -20,34 +20,34 @@
       {% endif %}
 
       <div class="action-row">
-        <a class="button button-secondary" href="{% url 'billing:invoice_detail' pk=invoice.pk %}">View/Print Invoice</a>
+        <a class="btn btn-outline-secondary" href="{% url 'billing:invoice_detail' pk=invoice.pk %}">View/Print Invoice</a>
         {% if invoice.status != "void" and not is_final_repair_order and can_manage_invoice %}
-          <a class="button button-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
+          <a class="btn btn-outline-secondary" href="{% url 'billing:invoice_edit' pk=invoice.pk %}">Edit Invoice</a>
         {% endif %}
         {% if invoice.status != "void" and not is_final_repair_order and can_manage_invoice_line_items %}
-          <a class="button button-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
+          <a class="btn btn-outline-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
         {% endif %}
         {% if invoice.status == "draft" and not is_final_repair_order and can_manage_invoice %}
           <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
             {% csrf_token %}
-            <button type="submit" class="button button-primary">Issue Invoice</button>
+            <button type="submit" class="btn btn-primary">Issue Invoice</button>
           </form>
         {% endif %}
         {% if invoice.status != "void" and not is_final_repair_order and can_manage_invoice %}
           <form method="post" action="{% url 'billing:invoice_void' pk=invoice.pk %}">
             {% csrf_token %}
-            <button type="submit" class="button button-secondary">Void Invoice</button>
+            <button type="submit" class="btn btn-outline-secondary">Void Invoice</button>
           </form>
         {% endif %}
         {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order and can_record_payment %}
-          <a class="button button-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
+          <a class="btn btn-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
         {% endif %}
       </div>
 
       {% if line_items %}
         <h3 style="margin-top: 1.25rem;">Line Items</h3>
-        <div class="table-wrap">
-          <table class="line-item-table">
+        <div class="table-wrap table-responsive">
+          <table class="line-item-table table table-sm table-hover align-middle mb-0">
             <thead>
               <tr>
                 <th>Type</th>
@@ -80,8 +80,8 @@
 
       {% if payments %}
         <h3 style="margin-top: 1.25rem;">Payments</h3>
-        <div class="table-wrap">
-          <table>
+        <div class="table-wrap table-responsive">
+          <table class="table table-sm table-hover align-middle mb-0">
             <thead>
               <tr>
                 <th>Date</th>
@@ -110,7 +110,7 @@
       <p class="muted-text">No invoice on file for this repair order.</p>
       {% if not is_final_repair_order and can_create_invoice %}
         <div class="action-row">
-          <a class="button button-primary" href="{% url 'billing:invoice_create' repair_order_pk=ro.pk %}">Create Invoice</a>
+          <a class="btn btn-primary" href="{% url 'billing:invoice_create' repair_order_pk=ro.pk %}">Create Invoice</a>
         </div>
       {% endif %}
     {% endif %}

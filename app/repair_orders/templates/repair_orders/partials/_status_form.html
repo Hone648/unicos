@@ -1,4 +1,4 @@
-<div id="status-update-card" class="card">
+<div id="status-update-card" class="card shadow-sm">
   <h2>Change Status</h2>
   <form method="post"
         action="{% url 'repair_orders:status_update' ro.pk %}"
@@ -15,7 +15,7 @@
       </select>
       <label for="note">Note</label>
       <input type="text" id="note" name="note" maxlength="500" placeholder="Optional note…" />
-      <button type="submit">Update Status</button>
+      <button class="btn btn-primary" type="submit">Update Status</button>
     </div>
   </form>
 </div>

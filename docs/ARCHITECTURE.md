@@ -5,7 +5,8 @@ Approved stack (unchanged):
 - Django
 - PostgreSQL
 - HTMX, limited use where progressive enhancement is useful
-- Plain CSS currently; no Tailwind/frontend build tooling
+- Local Bootstrap 5 static assets plus project CSS overrides; no
+  Tailwind/frontend build tooling
 - Docker Compose
 
 Architectural style:
@@ -53,8 +54,11 @@ Architectural style:
     the explicit `reports.view` app permission and currently exposes aggregate
     counts, limited attention queues, date/status filters, and CSV exports;
     charts and per-object report scoping are future work
-- UI styling: plain Django static CSS (`app/static/css/unicos.css`); no
-  frontend build tooling, no Tailwind
+- UI styling: Bootstrap 5 is vendored under `app/static/vendor/bootstrap/` and
+  loaded before the project stylesheet. `app/static/css/unicos.css` remains the
+  domain-specific override layer for shop statuses, print views, forms, tables,
+  and operational layout. There is no frontend build tooling and no Tailwind
+  runtime.
 - HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
   repair-order status update form; normal POST/redirect fallback preserved
 

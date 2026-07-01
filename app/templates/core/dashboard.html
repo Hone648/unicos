@@ -39,7 +39,7 @@
   </div>
 
   <div class="card-grid dashboard-card-grid">
-    <section class="card">
+    <section class="card shadow-sm">
       <h2>Ready for Pickup</h2>
       {% if ready_for_pickup_repair_orders %}
         <ul class="dashboard-list">
@@ -57,7 +57,7 @@
     </section>
 
     {% if user|has_app_permission:"billing.view" %}
-      <section class="card">
+      <section class="card shadow-sm">
         <h2>Unpaid Invoices</h2>
         {% if unpaid_invoices %}
           <ul class="dashboard-list">
@@ -76,7 +76,7 @@
     {% endif %}
 
     {% if user|has_app_permission:"repair_orders.view" %}
-      <section class="card">
+      <section class="card shadow-sm">
         <h2>Blocked From Closure</h2>
         {% if blocked_from_closure_invoices %}
           <ul class="dashboard-list">
@@ -99,11 +99,11 @@
     {% endif %}
   </div>
 
-  <section class="card">
+  <section class="card shadow-sm">
     <h2>Recently Updated Repair Orders</h2>
     {% if recent_repair_orders %}
-      <div class="table-wrap">
-        <table>
+      <div class="table-wrap table-responsive">
+        <table class="table table-sm table-hover align-middle mb-0">
           <thead>
             <tr>
               <th>Repair Order</th>

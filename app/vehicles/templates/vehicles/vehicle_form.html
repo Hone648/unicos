@@ -19,7 +19,7 @@
 </div>
 {% endif %}
 
-<div class="form-card">
+<div class="form-card shadow-sm">
   <form method="post">
     {% csrf_token %}
 
@@ -97,11 +97,11 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="button-primary">{{ submit_label }}</button>
+      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
       {% if mode == "edit" %}
-        <a class="button button-secondary" href="{% url 'vehicles:detail' vehicle.pk %}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{% url 'vehicles:detail' vehicle.pk %}">Cancel</a>
       {% else %}
-        <a class="button button-secondary" href="{% url 'customers:detail' customer.pk %}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{% url 'customers:detail' customer.pk %}">Cancel</a>
       {% endif %}
     </div>
 

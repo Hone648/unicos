@@ -63,66 +63,6 @@ dd { margin: 0 0 0.25rem; color: #1a202c; }
 
 .site-header {
   background: #1a2634;
-  color: #e2e8f0;
-  position: sticky;
-  top: 0;
-  z-index: 100;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.3);
-}
-
-.site-header__inner {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 0 1.25rem;
-  height: 52px;
-}
-
-.brand {
-  font-size: 1.0625rem;
-  font-weight: 700;
-  color: #fff;
-  letter-spacing: 0.03em;
-  text-decoration: none;
-  flex-shrink: 0;
-}
-
-.brand:hover { color: #90cdf4; text-decoration: none; }
-
-.nav {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-  flex: 1;
-}
-
-.nav a {
-  color: #cbd5e0;
-  font-size: 0.875rem;
-  padding: 0.25rem 0.625rem;
-  border-radius: 4px;
-  transition: background 0.15s, color 0.15s;
-}
-
-.nav a:hover {
-  background: rgba(255,255,255,0.1);
-  color: #fff;
-  text-decoration: none;
-}
-
-.user-bar {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.user-bar span {
-  font-size: 0.8125rem;
-  color: #a0aec0;
 }
 
 /* Inline logout form */
@@ -133,7 +73,7 @@ dd { margin: 0 0 0.25rem; color: #1a202c; }
    -------------------------------------------------------------------------- */
 
 .button,
-button {
+button:not(.btn):not(.navbar-toggler):not(.btn-close) {
   display: inline-block;
   padding: 0.4rem 1rem;
   font-size: 0.875rem;
@@ -148,27 +88,31 @@ button {
 }
 
 .button:hover,
-button:hover {
+button:not(.btn):not(.navbar-toggler):not(.btn-close):hover {
   background: #cbd5e0;
   text-decoration: none;
 }
 
 .button-primary,
-button[type="submit"] {
+button[type="submit"]:not(.btn) {
   background: #2563eb;
   color: #fff;
   border-color: #2563eb;
 }
 
 .button-primary:hover,
-button[type="submit"]:hover {
+button[type="submit"]:not(.btn):hover {
   background: #1d4ed8;
   border-color: #1d4ed8;
   color: #fff;
 }
 
+.button-sm {
+  padding: 0.25rem 0.625rem;
+  font-size: 0.8125rem;
+}
+
 /* Logout button — ghost style in header */
-.site-header button,
 .logout-form button {
   background: transparent;
   border: 1px solid #4a5568;
@@ -177,7 +121,6 @@ button[type="submit"]:hover {
   padding: 0.25rem 0.625rem;
 }
 
-.site-header button:hover,
 .logout-form button:hover {
   background: rgba(255,255,255,0.1);
   border-color: #718096;
@@ -190,7 +133,7 @@ button[type="submit"]:hover {
 
 .messages {
   max-width: 1200px;
-  margin: 0.75rem auto;
+  margin: 0.75rem auto 0;
   padding: 0 1.25rem;
 }
 
@@ -234,8 +177,8 @@ button[type="submit"]:hover {
 
 .page {
   max-width: 1200px;
-  margin: 1.5rem auto;
-  padding: 0 1.25rem 3rem;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 3rem;
 }
 
 .page-header {
@@ -282,6 +225,10 @@ button[type="submit"]:hover {
   border-radius: 6px;
   border: 1px solid #e2e8f0;
   background: #fff;
+}
+
+.table-wrap.table-responsive {
+  border: 1px solid #e2e8f0;
 }
 
 table {
@@ -497,13 +444,6 @@ tbody tr:hover { background: #f7fafc; }
 /* --------------------------------------------------------------------------
    Pagination
    -------------------------------------------------------------------------- */
-
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  margin-top: 1.25rem;
-}
 
 .pagination-info {
   font-size: 0.875rem;
@@ -796,6 +736,54 @@ a.dashboard-metric:hover {
   color: #2d3748;
   margin: 0;
   padding: 0.125rem 0;
+}
+
+.field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  margin-bottom: 1rem;
+}
+
+.field-row label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #4a5568;
+}
+
+.field-row input[type="text"],
+.field-row input[type="email"],
+.field-row input[type="file"],
+.field-row input[type="datetime-local"],
+.field-row select,
+.field-row textarea {
+  padding: 0.4375rem 0.75rem;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  color: #2d3748;
+  background: #fff;
+  width: 100%;
+}
+
+.field-row input:focus,
+.field-row select:focus,
+.field-row textarea:focus {
+  border-color: #63b3ed;
+  box-shadow: 0 0 0 2px rgba(99,179,237,0.25);
+  outline: none;
+}
+
+.help-text {
+  color: #718096;
+  font-size: 0.8125rem;
+  margin: 0;
+}
+
+.field-error {
+  color: #e53e3e;
+  font-size: 0.8125rem;
+  margin: 0;
 }
 
 /* Muted body text (empty state within cards) */

@@ -10,7 +10,7 @@
   <p class="muted-text">Repair order {{ ro.repair_order_number }} &mdash; {{ ro.customer }}</p>
 </div>
 
-<div class="card">
+<div class="card shadow-sm">
   <form method="post">
     {% csrf_token %}
     {% for field in form %}
@@ -26,8 +26,8 @@
       </div>
     {% endfor %}
     <div class="action-row">
-      <button type="submit" class="button button-primary">Add Entry</button>
-      <a class="button button-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
+      <button type="submit" class="btn btn-primary">Add Entry</button>
+      <a class="btn btn-outline-secondary" href="{% url 'repair_orders:detail' ro.pk %}">Cancel</a>
     </div>
   </form>
   <p class="muted-text" style="margin-top: 1rem;">
