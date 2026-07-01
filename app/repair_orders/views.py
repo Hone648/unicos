@@ -5,6 +5,7 @@ from accounts.authorization import (
     app_permission_required,
 )
 from accounts.policies import (
+    can_add_communication_for_repair_order,
     can_change_repair_order_status,
     can_edit_repair_order,
     can_manage_estimate_for_repair_order,
@@ -57,6 +58,9 @@ def _repair_order_detail_context(ro, user):
         )
     )
     attachments = list(ro.attachments.select_related("uploaded_by").order_by("-created_at", "-id"))
+    communications = list(
+        ro.communications.select_related("created_by").order_by("-occurred_at", "-id")[:10]
+    )
     can_upload_attachments = can_upload_attachment_for_repair_order(user, ro)
     can_delete_attachments = is_owner_admin_or_manager(user)
     can_manage_invoice = False
@@ -104,6 +108,8 @@ def _repair_order_detail_context(ro, user):
         "attachments": attachments,
         "can_upload_attachments": can_upload_attachments,
         "can_delete_attachments": can_delete_attachments,
+        "communications": communications,
+        "can_add_communication": can_add_communication_for_repair_order(user, ro),
     }
 
 

@@ -20,7 +20,9 @@ Architectural style:
     superusers/staff; not the primary shop-facing workflow
   - Repair-order workspace (`/repair-orders/`): shop-facing list, detail,
     create, and edit views; staff can search, filter, view, create, edit, and
-    change repair order status without using Django admin
+    change repair order status without using Django admin. Repair-order detail
+    includes a communication log for customer/insurer/adjuster/internal notes
+    entered through a create-only shop-facing form
   - Customer workspace (`/customers/`): shop-facing customer list, detail,
     create, and edit views; vehicle create-for-customer, detail, and edit under
     `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`
@@ -122,6 +124,12 @@ Current domain models:
   gated by the repair-order object policy (`can_view_repair_order` for download,
   `can_upload_attachment_for_repair_order` for upload, `can_delete_attachment` for delete);
   local `FileField` storage only — production storage/serving/scanning/backup is future work
+- `communications.CommunicationEntry`: repair-order-scoped communication history
+  linked to `RepairOrder` via `PROTECT`; records occurred time, direction,
+  channel, contact role/name, summary, optional next step/outcome,
+  authorization-related flag, created_by, and timestamps. Creation reuses
+  repair-order permissions; no structured contact model or messaging
+  integration exists
 - `core.DocumentNumberSequence`: tracks the last-used sequence value per
   `(document_type, year)` pair; powers the race-safe `RO-YYYY-NNNNNN`,
   `INV-YYYY-NNNNNN`, and `EST-YYYY-NNNNNN` generators in
@@ -321,7 +329,7 @@ Missing body-shop workflow areas:
 | Estimating | estimate records, estimate line items, supplement lineage, browser-printable estimate output, a small approval status flow, approval capture, and approved-estimate-to-draft-invoice conversion exist; still missing full estimate versioning, generated PDF output, and supplement-to-invoice handling |
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
-| Customer communication | call/text/email log, authorization history |
+| Customer communication | basic repair-order communication log implemented; still missing structured customer/insurer/adjuster contacts, email/SMS integrations, reminders, customer portal, and global communication views |
 | Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global attachment queue, thumbnails, image processing, production media serving, malware scanning, signed-form workflow |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |

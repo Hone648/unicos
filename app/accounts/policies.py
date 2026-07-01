@@ -212,3 +212,20 @@ def can_delete_attachment(user, attachment):
     if _is_superuser(user):
         return True
     return is_owner_admin_or_manager(user)
+
+
+def can_view_communication_entry(user, communication_entry):
+    return can_view_repair_order(user, communication_entry.repair_order)
+
+
+def can_add_communication_for_repair_order(user, repair_order):
+    if _is_superuser(user):
+        return True
+    if not (
+        user_has_app_permission(user, PERM_REPAIR_ORDERS_MANAGE)
+        or user_has_app_permission(user, PERM_REPAIR_ORDERS_CHANGE_STATUS)
+    ):
+        return False
+    if _is_technician_only(user):
+        return False
+    return can_view_repair_order(user, repair_order)

@@ -1,0 +1,46 @@
+<div class="card">
+  <h2>Communication Log</h2>
+  {% if can_add_communication %}
+    <div class="action-row">
+      <a class="button button-primary"
+         href="{% url 'communications:create' repair_order_pk=ro.pk %}">Add Communication</a>
+    </div>
+  {% endif %}
+
+  {% if communications %}
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>When</th>
+            <th>Direction</th>
+            <th>Channel</th>
+            <th>Role</th>
+            <th>Contact</th>
+            <th>Summary</th>
+            <th>Next step / outcome</th>
+            <th>Authorization</th>
+            <th>Logged by</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for entry in communications %}
+            <tr>
+              <td>{{ entry.occurred_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ entry.get_direction_display }}</td>
+              <td>{{ entry.get_channel_display }}</td>
+              <td>{{ entry.get_contact_role_display }}</td>
+              <td>{{ entry.contact_name|default:"&mdash;" }}</td>
+              <td>{{ entry.summary }}</td>
+              <td>{{ entry.next_step|default:"&mdash;" }}</td>
+              <td>{% if entry.is_authorization_related %}<span class="status-badge status-badge-approved">Yes</span>{% else %}&mdash;{% endif %}</td>
+              <td>{{ entry.created_by.get_username|default:"&mdash;" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="muted-text">No communication entries recorded.</p>
+  {% endif %}
+</div>

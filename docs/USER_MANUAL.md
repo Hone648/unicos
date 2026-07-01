@@ -29,6 +29,7 @@ This manual describes the current implemented local-development version of Unico
 18. [Recording Payments](#18-recording-payments)
 19. [Repair Order Closure Rules](#19-repair-order-closure-rules)
 19A. [Attachments](#19a-attachments)
+19B. [Communication Log](#19b-communication-log)
 20. [Common Workflows](#20-common-workflows)
 21. [Troubleshooting / FAQ](#21-troubleshooting--faq)
 22. [Glossary](#22-glossary)
@@ -56,7 +57,7 @@ Be aware of these limitations before using Unicos in day-to-day operations.
 - **No partial estimate conversion.** Conversion is all-or-nothing. You cannot convert only some line items from an estimate.
 - **No estimate reopen or revision workflow.** Once an estimate leaves draft status, it cannot be reopened for editing through shop-facing views. A supplement can capture additional work.
 - **No digital approval artifacts.** Estimate approval records source, contact, optional reference, optional note, and timestamp only. There are no signatures, uploads, email approval links, or customer portal approvals yet.
-- **No email or PDF generation.** Estimate and invoice output uses the browser's built-in print function. There is no automated email sending or server-side PDF export.
+- **No email/SMS or PDF generation.** Estimate and invoice output uses the browser's built-in print function. Communication log entries do not send email or text messages. There is no automated email sending, SMS sending, inbound sync, or server-side PDF export.
 - **Limited object-level permissions.** Shop-facing repair-order, estimate, and billing views now use object-level policy checks. Technician repair-order visibility is limited to assigned repair orders. Full customer/vehicle object policies, multi-shop tenancy, and Django admin object policies are not implemented.
 - **Django admin is separate.** The Django admin interface is an emergency/development back-office console for trusted superusers/staff. It is not a normal production workflow and should not be used to bypass workflow rules except for emergency/development correction.
 - **Deployment is not production-ready.** See the README for production prerequisites.
@@ -74,7 +75,7 @@ Every staff user is assigned to one or more roles. Roles control which pages and
 | Owner/Admin | All actions across all areas |
 | Manager | All actions across all areas |
 | Front Desk | Customer intake, vehicle intake, repair order create/edit, estimate/supplement work, view invoices, record payments |
-| Estimator | View dashboard, view customers, view repair orders, change repair order status, view invoices |
+| Estimator | View dashboard, view customers, view repair orders, log communication entries, change repair order status, view invoices |
 | Technician | View dashboard, view assigned repair orders |
 | Read-only | View dashboard, reports, customers, repair orders, and invoices |
 
@@ -237,6 +238,7 @@ The detail page shows:
 - Customer and vehicle summary
 - Current status and status history
 - Status update controls
+- Communication log
 - A summary of all estimates
 - Invoice and payment summary
 - Action links for creating estimates and invoices
@@ -709,6 +711,46 @@ Click any filename in the attachment table to download the file.
   recreation. Backups are still manual and production storage is not designed.
 - No image thumbnails or in-browser preview — files are download-only.
 - Production media serving, cloud storage, and malware scanning are future work.
+
+---
+
+## 19B. Communication Log
+
+The communication log records repair-order-scoped customer, insurer, adjuster,
+vendor, tow-provider, and internal communication history. It is for notes only:
+it does not send email, text messages, reminders, approvals, notifications, or
+files.
+
+### Viewing communication entries
+
+Open the repair order detail page and find the **Communication Log** section.
+The log shows the latest entries, including when the communication happened,
+direction, channel, contact role/name, summary, next step/outcome, authorization
+flag, and who logged it.
+
+All users who can view the repair order can view its communication log.
+Technicians can only view communication entries on repair orders assigned to
+them.
+
+### Adding a communication entry
+
+1. Open the repair order detail page.
+2. Click **Add Communication**.
+3. Enter the communication time, direction, channel, contact role/name, summary,
+   optional next step/outcome, and whether it relates to authorization.
+4. Click **Add Entry**.
+
+**Who can add:** Owner/Admin, Manager, Front Desk, Estimator, and superusers.
+Read-only users and Technician-only users cannot add communication entries.
+
+### Communication limitations
+
+- Entries are scoped to repair orders only.
+- There is no customer-level or global communication inbox.
+- There are no structured customer/insurer/adjuster contact records yet.
+- There is no edit/delete workflow for communication entries.
+- There are no email/SMS integrations, reminders, signatures, portal approvals,
+  or file uploads on communication entries.
 
 ---
 
