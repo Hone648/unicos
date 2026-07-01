@@ -150,7 +150,8 @@ Deployment:
 - Backups/restore are not specified.
 - Admin hardening is incomplete. Django admin is currently an
   emergency/development console, not a production operator workflow.
-- Media storage for attachments/photos/documents is not designed yet.
+- Local development media persistence exists for repair-order attachments;
+  production media storage for attachments/photos/documents is not designed yet.
 
 Authorization:
 
@@ -296,12 +297,20 @@ implemented via the `attachments` app using local `FileField` storage.
 
 Media / attachments:
 
-- `MEDIA_URL = "media/"`, `MEDIA_ROOT = REPO_ROOT / "media"` configured in settings.
+- `MEDIA_URL` defaults to `media/` and can be overridden with `DJANGO_MEDIA_URL`.
+- `MEDIA_ROOT` defaults to `REPO_ROOT / "media"` and can be overridden with
+  `DJANGO_MEDIA_ROOT`.
+- Docker Compose mounts the named `media_data` volume at `/app/media` so local
+  development uploads survive container recreation.
 - Django serves media files in `DEBUG` mode only (development-only `static()` handler).
-- Production media serving (nginx, S3, presigned URLs) is future work.
-- `media/` is in `.gitignore` and `.dockerignore`; files do not survive container
-  recreation without a named volume or bind mount.
+- Production media serving (nginx, S3, presigned URLs), malware scanning, and
+  backup/restore design are future work.
+- `media/` is in `.gitignore` and `.dockerignore`; files are not copied into
+  Docker build context.
 - `attachments.Attachment` upload path: `repair_orders/<ro_id>/<uuid>_<safe_basename>`.
+- Upload validation checks filename shape/length, extension allowlist,
+  content-type alignment, size, and minimal binary signatures for image/PDF
+  types.
 - Access gated by existing repair-order object policies (no new permission primitives).
 
 Missing body-shop workflow areas:
@@ -312,7 +321,7 @@ Missing body-shop workflow areas:
 | Insurance | insurer, claim number, and deductible captured on estimates; still missing adjuster, DRP fields, coverage lines |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
-| Attachments | basic repair-order file upload/download/delete implemented (Slice 42); still missing estimate/invoice-specific attachments, global attachment queue, thumbnails, image processing, production media serving, malware scanning, signed-form workflow |
+| Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global attachment queue, thumbnails, image processing, production media serving, malware scanning, signed-form workflow |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
 | Reporting | read-only operational snapshot exists for key repair-order, invoice, and estimate counts, with date/status filters and CSV exports; still missing scoped object filtering, charts, revenue, receivables, cycle time, and aging invoices |

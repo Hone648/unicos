@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 44. It should guide
+This roadmap reflects the current implementation after Slice 45. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -34,6 +34,9 @@ Implemented:
   `reports.view`
 - Repair-order file attachments (upload, download, delete; local `media/`
   storage; policy-gated)
+- Attachment hardening and local Docker media persistence (`media_data` volume,
+  health check coverage, filename/content validation, and missing-file
+  download/delete behavior)
 - Admin service alignment: estimate status changes, invoice issue/void,
   payment recording, and invoice line-item mutation in Django admin are
   service-backed or read-only, matching the existing repair-order admin
@@ -256,19 +259,23 @@ Required later:
 
 ### Priority 8 - Attachments / Media Foundation
 
-Status: implemented in Slice 42.
+Status: implemented in Slice 42 and hardened in Slice 45.
 
 ```text
 Slice 42: repair-order attachments/media model
+Slice 45: attachment hardening / media persistence
 ```
 
 Repair orders can now have file attachments (photos, signed estimates, documents).
-Upload, download, and delete are policy-gated. Files are stored under local `media/`
-using Django `FileField`. Media is served in development only (`DEBUG=True`).
+Upload, download, and delete are policy-gated. Files are stored under local
+`media/` using Django `FileField`, and Docker Compose mounts `media_data` at
+`/app/media` so local uploads survive container recreation. Media is served in
+development only (`DEBUG=True`). Upload validation now checks filename
+shape/length, extension allowlist, content-type alignment, size, and lightweight
+binary signatures for image/PDF types.
 
 Remaining attachment gaps:
 
-- Media files do not survive container recreation (no Docker volume mount yet).
 - Estimate-specific, invoice-specific, or customer-level attachments not yet scoped.
 - No global attachment queue or search.
 - No image thumbnails or preview.
@@ -302,9 +309,8 @@ Remaining admin gaps:
 
 Recommended next slices:
 
-- Next product slice: attachment hardening / media persistence (named Docker volume for local dev;
-  S3 for production).
 - Customer/insurer contact model or communication log.
+- Production media serving/storage/scanning/backup design.
 
 ## Missing Body-Shop Workflow Areas
 
@@ -314,7 +320,7 @@ Recommended next slices:
 | Insurance | insurer, claim number, adjuster, deductible, DRP fields |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
 | Customer communication | call/text/email log, authorization history |
-| Attachments | basic repair-order file upload/download/delete implemented; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
+| Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |
 | Reporting | read-only operational snapshot with date/status filters and CSV exports exists; still missing charts, revenue, receivables, cycle time, and aging invoices |

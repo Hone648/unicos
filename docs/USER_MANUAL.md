@@ -677,8 +677,10 @@ preserved for display and download.
 **Who can upload:** Owner/Admin, Manager, Front Desk (repair_orders.manage permission).
 Estimators, Technicians, and Read-only users cannot upload.
 
-Note: File type validation is extension-only. Production deployments require server-side
-content verification, malware scanning, and private media serving.
+The upload form rejects unsafe filenames, path-like names, disallowed extensions,
+oversized files, mismatched content types, and obvious binary content mismatches
+for image/PDF uploads. Production deployments still require malware scanning and
+private media serving.
 
 ### Viewing and downloading attachments
 
@@ -702,9 +704,9 @@ Click any filename in the attachment table to download the file.
 - Attachments are scoped to repair orders only. Estimate-specific, invoice-specific, and
   customer-level attachments are not yet implemented.
 - There is no global attachment queue or search across the shop.
-- Uploaded files are stored locally on the development machine. Files are lost if the
-  Docker container is recreated without a data volume. Back up the `media/` directory
-  regularly in development.
+- Uploaded files are stored locally. Docker Compose mounts the `media_data`
+  volume at `/app/media` so local-development uploads survive container
+  recreation. Backups are still manual and production storage is not designed.
 - No image thumbnails or in-browser preview — files are download-only.
 - Production media serving, cloud storage, and malware scanning are future work.
 

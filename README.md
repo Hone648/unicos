@@ -46,7 +46,8 @@ screenshot set.
 - Billing invoice queue
 - Read-only reports snapshot with date/status filters and CSV exports
 - Hardened CI with Ruff quality checks, migration checks, Docker smoke, and healthz
-- Repair order attachments (upload, download, delete; local `media/` storage; policy-gated)
+- Repair order attachments (upload, download, delete; local Docker `media_data`
+  persistence; policy-gated)
 
 ## Stack
 
@@ -74,6 +75,11 @@ Start the app and database:
 ```powershell
 docker compose up --build
 ```
+
+Docker Compose uses named volumes for PostgreSQL data and local attachment media.
+The web container mounts `media_data` at `/app/media`, so uploaded files survive
+container recreation during local development. Production media storage and
+private serving remain future work.
 
 The health check should be available at:
 

@@ -61,11 +61,12 @@ Slice-number reconciliation:
 - Slice 44 follows this docs-only reconciliation as the next product slice.
 
 45. Slice 44: reporting filters/date ranges and CSV export (`/reports/` adds GET filters for date range, repair-order status, invoice status, and estimate status; CSV exports for repair orders, invoices, and estimates preserve active filters; invalid filters render form errors instead of CSV; reports remain read-only behind `reports.view`; no migrations)
+46. Slice 45: attachment hardening / media persistence (Docker Compose mounts named `media_data` at `/app/media`; `MEDIA_URL`/`MEDIA_ROOT` support environment overrides with local defaults; `/healthz/` checks database and media writability; upload validation rejects unsafe filenames, disallowed extensions, MIME/extension mismatches, oversized files, and minimal binary signature mismatches; missing attachment files 404 on download but do not block DB-row deletion; no migrations; ADR 0047)
 
 Likely next implementation slices:
 
-- Slice 45: attachment hardening / media persistence (named Docker volume)
 - Slice 46: customer/insurer contact model or communication log
+- Slice 47: production media serving/storage/scanning/backup design
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an

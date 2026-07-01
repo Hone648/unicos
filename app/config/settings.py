@@ -96,8 +96,8 @@ USE_TZ = True
 STATIC_URL = "static/"
 STATICFILES_DIRS = [BASE_DIR / "static"]
 
-MEDIA_URL = "media/"
-MEDIA_ROOT = REPO_ROOT / "media"
+MEDIA_URL = os.environ.get("DJANGO_MEDIA_URL", "media/")
+MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", REPO_ROOT / "media"))
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
