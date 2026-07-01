@@ -82,7 +82,10 @@ def attachment_delete(request, pk):
 
     ro_pk = attachment.repair_order_id
     filename = attachment.original_filename
-    attachment.file.delete(save=False)
+    try:
+        attachment.file.delete(save=False)
+    except FileNotFoundError:
+        pass
     attachment.delete()
     messages.success(request, f"Attachment '{filename}' deleted.")
     return redirect("repair_orders:detail", pk=ro_pk)

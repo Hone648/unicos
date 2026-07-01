@@ -16,6 +16,7 @@ from repair_orders.business_rules import (
 from repair_orders.models import RepairOrder
 
 from .forms import ReportFilterForm
+from .health import check_media_storage
 from .reports import REPORT_EXPORTS, build_reports_context, report_csv_response
 
 
@@ -84,16 +85,31 @@ def reports(request):
 
 
 def healthz(request):
+    database_status = "ok"
+    media_status = "ok"
+    errors = {}
+
     try:
         with connections["default"].cursor() as cursor:
             cursor.execute("SELECT 1")
             cursor.fetchone()
     except Exception as exc:
+        database_status = "error"
+        errors["database"] = str(exc)
+
+    try:
+        check_media_storage()
+    except Exception as exc:
+        media_status = "error"
+        errors["media"] = str(exc)
+
+    if errors:
         return JsonResponse(
             {
                 "status": "error",
-                "database": "error",
-                "error": str(exc),
+                "database": database_status,
+                "media": media_status,
+                "errors": errors,
             },
             status=503,
         )
@@ -102,5 +118,6 @@ def healthz(request):
         {
             "status": "ok",
             "database": "ok",
+            "media": "ok",
         }
     )

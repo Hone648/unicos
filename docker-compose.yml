@@ -5,6 +5,7 @@ services:
       - .env
     volumes:
       - .:/app
+      - media_data:/app/media
     ports:
       - "8000:8000"
     depends_on:
@@ -29,3 +30,4 @@ services:
 
 volumes:
   postgres_data:
+  media_data:

@@ -14,18 +14,23 @@ def assign_role(user, role_name):
 
 class HealthCheckTests(SimpleTestCase):
     def test_healthz_returns_ok_when_database_is_available(self):
-        with patch("core.views.connections") as connections:
+        with (
+            patch("core.views.connections") as connections,
+            patch("core.views.check_media_storage") as check_media_storage,
+        ):
             cursor = connections.__getitem__.return_value.cursor.return_value.__enter__.return_value
             cursor.fetchone.return_value = (1,)
 
             response = self.client.get("/healthz/")
 
+        check_media_storage.assert_called_once()
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
             {
                 "status": "ok",
                 "database": "ok",
+                "media": "ok",
             },
         )
 
@@ -38,7 +43,24 @@ class HealthCheckTests(SimpleTestCase):
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["status"], "error")
         self.assertEqual(response.json()["database"], "error")
-        self.assertIn("database unavailable", response.json()["error"])
+        self.assertEqual(response.json()["media"], "ok")
+        self.assertIn("database unavailable", response.json()["errors"]["database"])
+
+    def test_healthz_returns_service_unavailable_when_media_check_fails(self):
+        with (
+            patch("core.views.connections") as connections,
+            patch("core.views.check_media_storage", side_effect=RuntimeError("media unwritable")),
+        ):
+            cursor = connections.__getitem__.return_value.cursor.return_value.__enter__.return_value
+            cursor.fetchone.return_value = (1,)
+
+            response = self.client.get("/healthz/")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "error")
+        self.assertEqual(response.json()["database"], "ok")
+        self.assertEqual(response.json()["media"], "error")
+        self.assertIn("media unwritable", response.json()["errors"]["media"])
 
 
 class HealthCheckPublicAccessTests(TestCase):
@@ -47,6 +69,7 @@ class HealthCheckPublicAccessTests(TestCase):
         response = self.client.get("/healthz/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
+        self.assertEqual(response.json()["media"], "ok")
 
 
 class DashboardAccessTests(TestCase):
