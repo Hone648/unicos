@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 45. It should guide
+This roadmap reflects the current implementation after Slice 46. It should guide
 slice planning but can change after implementation review and user feedback.
 
 ## Current State
@@ -17,6 +17,7 @@ Implemented:
 - Repair orders, status history, create/edit workflow, and HTMX status updates
 - New repair-order form vehicle selection is scoped by selected customer and
   loads the vehicle field via HTMX
+- Repair-order communication log for customer/insurer/adjuster/internal history
 - Dashboard workflow visibility
 - Billing foundation, invoices, payments, invoice line items, printable invoice
   detail, lifecycle actions, invoice queue, and a service boundary for billing
@@ -44,8 +45,7 @@ Implemented:
 
 The app is local-development only and is not production-ready.
 
-Current planning note: this post-Slice 45 docs/roadmap renewal is unnumbered
-and does not consume product Slice 46.
+Product Slice 46 is now consumed by the repair-order communication log.
 
 ## Priority Roadmap
 
@@ -333,12 +333,31 @@ Remaining admin gaps:
   fields (source/contact/reference/note) outside of a status transition;
   only `approved_at` and the transition itself are service-controlled.
 
+### Priority 11 - Communication History
+
+Status: implemented in Slice 46.
+
+```text
+Slice 46: repair-order communication log
+```
+
+Repair orders now have a create-only communication log for customer, insurer,
+adjuster, vendor, tow-provider, and internal communication notes. Entries record
+when communication happened, direction/channel, contact role/name, summary,
+optional next step/outcome, authorization relevance, and who logged it.
+
+Remaining communication gaps:
+
+- No structured customer/insurer/adjuster contact model.
+- No customer-level or global communication list.
+- No email/SMS sending or inbound sync.
+- No reminders, follow-up tasks, portal, signatures, or uploads.
+
 Recommended next slices:
 
-- Current unnumbered step: docs/roadmap renewal after Slice 45 (this pass; does
-  not consume product Slice 46).
-- Product Slice 46 candidate: customer/insurer contact model or communication log.
-- Later candidate: production media serving/storage/scanning/backup design.
+- Product Slice 47 candidate: production media serving/storage/scanning/backup design.
+- Later candidates: supplement-to-invoice handling, repair planning/parts/sublet,
+  or structured customer/insurer contact model.
 
 ## Missing Body-Shop Workflow Areas
 
@@ -347,7 +366,7 @@ Recommended next slices:
 | Estimating | estimates, supplements, browser-printable estimate output, controlled estimate approval status, approval capture, estimate versions |
 | Insurance | insurer, claim number, adjuster, deductible, DRP fields |
 | Repair planning | labor operations, parts orders, sublet vendors, supplements |
-| Customer communication | call/text/email log, authorization history |
+| Customer communication | repair-order communication log implemented; still missing structured contacts, global communication views, email/SMS integrations, reminders, portal, signatures, and uploads |
 | Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |
 | Shop operations | parts received, teardown, quality checklist, delivery checklist |

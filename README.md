@@ -33,6 +33,7 @@ screenshot set.
 - Shop-facing repair-order workspace
 - HTMX status updates
 - Repair-order create/edit workflow
+- Repair-order communication log
 - Billing foundation
 - Invoices and payments
 - Invoice line items
