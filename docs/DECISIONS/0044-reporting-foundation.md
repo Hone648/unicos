@@ -4,6 +4,11 @@
 
 Accepted
 
+## Update
+
+Slice 44 extended this foundation with date/status filters and CSV exports.
+See `0048-reporting-filters-and-csv-exports.md`.
+
 ## Context
 
 - Managers need a quick read-only operational snapshot without using Django

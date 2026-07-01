@@ -4,8 +4,8 @@ Approved stack (unchanged):
 
 - Django
 - PostgreSQL
-- HTMX later
-- Tailwind later
+- HTMX, limited use where progressive enhancement is useful
+- Plain CSS currently; no Tailwind/frontend build tooling
 - Docker Compose
 
 Architectural style:
@@ -139,8 +139,9 @@ Deployment:
 - Production deployment is not implemented in the current slices. When it
   happens it will require secure settings, HTTPS, proper `ALLOWED_HOSTS`,
   `DEBUG=False`, secure cookies/CSRF/proxy headers, backups and restore
-  procedure, admin hardening, media/document storage strategy, and
-  deployment-specific environment management. See
+  procedure, admin hardening, production media/document storage, private
+  serving, backup/restore, or equivalent, and deployment-specific environment
+  management. See
   `DECISIONS/0006-web-capable-deployment.md`.
 - The current Dockerfile uses Django `runserver`.
 - Migrations currently run on container startup.
@@ -151,7 +152,7 @@ Deployment:
 - Admin hardening is incomplete. Django admin is currently an
   emergency/development console, not a production operator workflow.
 - Local development media persistence exists for repair-order attachments;
-  production media storage for attachments/photos/documents is not designed yet.
+  production media serving/storage/scanning/backup is not designed yet.
 
 Authorization:
 

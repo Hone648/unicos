@@ -4,6 +4,12 @@
 
 Accepted
 
+## Update
+
+Slice 45 added local Docker media persistence, media health checking, and
+attachment validation hardening. See
+`0047-local-media-persistence.md`.
+
 ## Context
 
 Repair orders need associated files: photos of damage, signed estimates, authorization
