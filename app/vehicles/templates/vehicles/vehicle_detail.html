@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load app_permissions %}
 
-{% block title %}{{ vehicle }} - Unicos{% endblock %}
+{% block title %}{{ vehicle }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{% url 'customers:detail' vehicle.customer.pk %}">&larr; Back to {{ vehicle.customer.display_name }}</a>

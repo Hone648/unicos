@@ -30,6 +30,9 @@ SECRET_KEY = env_required("DJANGO_SECRET_KEY")
 DEBUG = env_bool("DJANGO_DEBUG")
 ALLOWED_HOSTS = env_list("DJANGO_ALLOWED_HOSTS")
 CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
+SHOP_DISPLAY_NAME = os.environ.get("SHOP_DISPLAY_NAME", "Daniel's Paint and Body").strip()
+if not SHOP_DISPLAY_NAME:
+    SHOP_DISPLAY_NAME = "Daniel's Paint and Body"
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -71,6 +74,7 @@ TEMPLATES = [
                 "django.template.context_processors.request",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "core.context_processors.shop_identity",
             ],
         },
     },

@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{{ title }} - Unicos{% endblock %}
+{% block title %}{{ title }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{% url 'estimates:detail' estimate.pk %}">&larr; Back to Estimate {{ estimate.estimate_number }}</a>

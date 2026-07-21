@@ -1,9 +1,10 @@
 from unittest.mock import patch
 
 from accounts.authorization import ROLE_MANAGER
+from core.context_processors import shop_identity
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
-from django.test import SimpleTestCase, TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 
 
 def assign_role(user, role_name):
@@ -70,6 +71,26 @@ class HealthCheckPublicAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["status"], "ok")
         self.assertEqual(response.json()["media"], "ok")
+
+
+class ShopIdentityContextTests(SimpleTestCase):
+    @override_settings(SHOP_DISPLAY_NAME="Acme Collision")
+    def test_shop_identity_uses_configured_display_name(self):
+        self.assertEqual(
+            shop_identity(None),
+            {
+                "shop_identity": {
+                    "display_name": "Acme Collision",
+                },
+            },
+        )
+
+    @override_settings(SHOP_DISPLAY_NAME="Acme Collision")
+    def test_login_page_renders_configured_shop_display_name(self):
+        response = self.client.get("/accounts/login/")
+
+        self.assertContains(response, "Acme Collision")
+        self.assertIn("<title>Log in - Acme Collision</title>", response.content.decode())
 
 
 class DashboardAccessTests(TestCase):

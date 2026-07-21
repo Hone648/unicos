@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{% block title %}Unicos{% endblock %}</title>
+    <title>{% block title %}{{ shop_identity.display_name }}{% endblock %}</title>
     <link rel="stylesheet" href="{% static 'vendor/bootstrap/css/bootstrap.min.css' %}" />
     <link rel="stylesheet" href="{% static 'css/unicos.css' %}" />
     <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
@@ -13,7 +13,7 @@
   <body>
     <header class="site-header navbar navbar-expand-lg navbar-dark bg-dark shadow-sm sticky-top">
       <div class="container-fluid">
-        <a class="navbar-brand fw-semibold" href="{% url 'dashboard' %}">Unicos</a>
+        <a class="navbar-brand fw-semibold" href="{% url 'dashboard' %}">{{ shop_identity.display_name }}</a>
         {% if user.is_authenticated %}
           <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#site-navbar" aria-controls="site-navbar" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>

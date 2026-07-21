@@ -74,6 +74,9 @@ commit it. `.dockerignore` keeps local secrets, caches, virtual environments,
 media, and generated files out of the Docker build context. The safe
 `.env.example` template is intentionally allowed in the build context.
 
+Set `SHOP_DISPLAY_NAME` in `.env` to change the shop name shown in the app
+header, page titles, and admin labels.
+
 Start the app and database:
 
 ```powershell
