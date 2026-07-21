@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load app_permissions %}
 
-{% block title %}Estimate {{ estimate.estimate_number }} - Unicos{% endblock %}
+{% block title %}Estimate {{ estimate.estimate_number }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{% url 'repair_orders:detail' ro.pk %}">&larr; Back to RO {{ ro.repair_order_number }}</a>

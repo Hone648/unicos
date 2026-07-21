@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load app_permissions %}
 
-{% block title %}Repair Order {{ ro.repair_order_number }} - Unicos{% endblock %}
+{% block title %}Repair Order {{ ro.repair_order_number }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
 <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>

@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load app_permissions %}
 
-{% block title %}Invoice {{ invoice.invoice_number }} - Unicos{% endblock %}
+{% block title %}Invoice {{ invoice.invoice_number }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
 
