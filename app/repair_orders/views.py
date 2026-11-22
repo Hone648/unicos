@@ -9,23 +9,36 @@ from accounts.policies import (
     can_change_repair_order_status,
     can_edit_repair_order,
     can_manage_estimate_for_repair_order,
+    can_manage_invoice,
     can_manage_invoice_for_repair_order,
+    can_manage_invoice_line_items,
+    can_record_payment,
     can_upload_attachment_for_repair_order,
+    can_view_invoice,
+    can_view_invoice_for_repair_order,
     filter_repair_orders_for_user,
     is_owner_admin_or_manager,
     require_policy,
 )
 from accounts.policies import can_view_repair_order as policy_can_view_repair_order
+from billing.services import PaymentRecordingBlocked, ensure_payment_recordable
 from core.document_numbers import generate_repair_order_number
 from core.pagination import paginate_queryset, pagination_querystring
 from django.contrib import messages
 from django.db.models import Q
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 
-from .business_rules import is_final_repair_order_status
+from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
 from .models import RepairOrder
 from .services import RepairOrderStatusTransitionBlocked, transition_repair_order_status
+from .status_continuation import (
+    read_status_continuation,
+    sign_status_continuation,
+    status_controls_url,
+)
 
 # Status values that count as "closed" for default list filtering
 _CLOSED_STATUSES = {RepairOrder.Status.CLOSED, RepairOrder.Status.CANCELED}
@@ -38,7 +51,19 @@ def _posted_customer_id(request):
     return request.POST.get("customer") or None
 
 
-def _repair_order_detail_context(ro, user):
+def _status_payment_url(invoice, token):
+    try:
+        ensure_payment_recordable(invoice)
+    except PaymentRecordingBlocked:
+        return ""
+    return reverse(
+        "billing:payment_create",
+        kwargs={"invoice_pk": invoice.pk},
+        query={"status_continuation": token},
+    )
+
+
+def _repair_order_detail_context(ro, user, *, status_continuation=None):
     """Build context shared by the full detail view and HTMX partial responses."""
     history = ro.status_history.select_related("changed_by").order_by("-changed_at", "-id")
     invoice = None
@@ -63,30 +88,25 @@ def _repair_order_detail_context(ro, user):
     )
     can_upload_attachments = can_upload_attachment_for_repair_order(user, ro)
     can_delete_attachments = is_owner_admin_or_manager(user)
-    can_manage_invoice = False
-    can_record_payment = False
-    can_manage_invoice_line_items = False
-    from accounts.policies import can_view_invoice_for_repair_order
-
-    can_view_invoice = can_view_invoice_for_repair_order(user, ro)
-    if invoice is not None:
-        from accounts.policies import (
-            can_manage_invoice as policy_can_manage_invoice,
+    may_change_status = can_change_repair_order_status(user, ro)
+    may_view_invoice = (
+        can_view_invoice(user, invoice) if invoice else can_view_invoice_for_repair_order(user, ro)
+    )
+    may_record_payment = bool(invoice and can_record_payment(user, invoice))
+    selected_status = ro.status
+    blocking_invoice = None
+    status_payment_url = ""
+    payment_recorded = False
+    if may_change_status:
+        attempted_status, continuation_payment_recorded = read_status_continuation(
+            invoice, status_continuation
         )
-        from accounts.policies import (
-            can_manage_invoice_line_items as policy_can_manage_invoice_line_items,
-        )
-        from accounts.policies import (
-            can_record_payment as policy_can_record_payment,
-        )
-        from accounts.policies import (
-            can_view_invoice as policy_can_view_invoice,
-        )
-
-        can_view_invoice = policy_can_view_invoice(user, invoice)
-        can_manage_invoice = policy_can_manage_invoice(user, invoice)
-        can_record_payment = policy_can_record_payment(user, invoice)
-        can_manage_invoice_line_items = policy_can_manage_invoice_line_items(user, invoice)
+        if attempted_status and attempted_status != ro.status:
+            selected_status = attempted_status
+            payment_recorded = continuation_payment_recorded
+            blocking_invoice = closure_blocked_by_invoice(ro, attempted_status)
+            if blocking_invoice and may_view_invoice and may_record_payment:
+                status_payment_url = _status_payment_url(blocking_invoice, status_continuation)
 
     return {
         "ro": ro,
@@ -97,14 +117,22 @@ def _repair_order_detail_context(ro, user):
         "payments": payments,
         "estimates": estimates,
         "status_choices": RepairOrder.Status.choices,
+        "selected_status": selected_status,
+        "selected_status_label": dict(RepairOrder.Status.choices).get(selected_status),
+        "blocking_invoice": blocking_invoice,
+        "status_payment_url": status_payment_url,
+        "payment_recorded": payment_recorded and may_view_invoice,
+        "payment_paid_in_full": payment_recorded and may_view_invoice and invoice.is_paid,
         "can_edit_repair_order": can_edit_repair_order(user, ro),
-        "can_change_repair_order_status": can_change_repair_order_status(user, ro),
+        "can_change_repair_order_status": may_change_status,
         "can_create_estimate": can_manage_estimate_for_repair_order(user, ro),
-        "can_view_invoice": can_view_invoice,
-        "can_manage_invoice": can_manage_invoice,
+        "can_view_invoice": may_view_invoice,
+        "can_manage_invoice": bool(invoice and can_manage_invoice(user, invoice)),
         "can_create_invoice": can_manage_invoice_for_repair_order(user, ro),
-        "can_record_payment": can_record_payment,
-        "can_manage_invoice_line_items": can_manage_invoice_line_items,
+        "can_record_payment": may_record_payment,
+        "can_manage_invoice_line_items": bool(
+            invoice and can_manage_invoice_line_items(user, invoice)
+        ),
         "attachments": attachments,
         "can_upload_attachments": can_upload_attachments,
         "can_delete_attachments": can_delete_attachments,
@@ -178,7 +206,9 @@ def repair_order_detail(request, pk):
     return render(
         request,
         "repair_orders/repair_order_detail.html",
-        _repair_order_detail_context(ro, request.user),
+        _repair_order_detail_context(
+            ro, request.user, status_continuation=request.GET.get("status_continuation")
+        ),
     )
 
 
@@ -220,13 +250,13 @@ def repair_order_status_update(request, pk):
     try:
         transition_repair_order_status(ro, new_status, changed_by=request.user, note=note)
     except RepairOrderStatusTransitionBlocked as exc:
-        messages.error(request, str(exc))
+        token = sign_status_continuation(exc.invoice, new_status)
         if not is_htmx:
-            return redirect("repair_orders:detail", pk=pk)
+            return redirect(status_controls_url(pk, token))
         return render(
             request,
             "repair_orders/partials/_status_update_response.html",
-            _repair_order_detail_context(ro, request.user),
+            _repair_order_detail_context(ro, request.user, status_continuation=token),
         )
 
     label = dict(RepairOrder.Status.choices).get(new_status, new_status)
@@ -234,6 +264,10 @@ def repair_order_status_update(request, pk):
 
     if not is_htmx:
         return redirect("repair_orders:detail", pk=pk)
+
+    if is_final_repair_order_status(new_status):
+        detail_url = reverse("repair_orders:detail", kwargs={"pk": pk})
+        return HttpResponse(headers={"HX-Redirect": detail_url})
 
     return render(
         request,

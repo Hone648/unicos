@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load app_permissions %}
+{% load app_permissions static %}
 
 {% block title %}Repair Order {{ ro.repair_order_number }} - {{ shop_identity.display_name }}{% endblock %}
 
@@ -40,6 +40,7 @@
 
 {% if can_change_repair_order_status %}
   {% include "repair_orders/partials/_status_form.html" %}
+  <script type="module" src="{% static 'js/repair-order-status.js' %}"></script>
 {% endif %}
 
 {% if ro.reported_problem or ro.internal_notes %}

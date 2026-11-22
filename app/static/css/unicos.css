@@ -285,6 +285,17 @@ table:not(.table) tbody tr:hover { background: #f7fafc; }
   white-space: nowrap;
 }
 
+#status-update-card,
+#status-update-card :is(#status-balance-warning, a, select, input, button) {
+  scroll-margin-block-start: calc(var(--status-header-height, 4rem) + 1rem);
+}
+
+#status-balance-warning:focus-visible,
+#status-balance-warning a:focus-visible {
+  outline: 2px solid #1a2634;
+  outline-offset: 2px;
+}
+
 /* --------------------------------------------------------------------------
    Status badges
    -------------------------------------------------------------------------- */

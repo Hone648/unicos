@@ -1,5 +1,35 @@
-<div id="status-update-card" class="card shadow-sm">
+<div id="status-update-card" class="card shadow-sm" tabindex="-1">
   <h2>Change Status</h2>
+  {% if payment_paid_in_full %}
+    <div class="alert alert-success" role="status">Payment recorded. Invoice paid in full.</div>
+  {% endif %}
+  {% if blocking_invoice %}
+    <div id="status-balance-warning" class="alert alert-warning" tabindex="-1">
+      {% if can_view_invoice %}
+        <p class="mb-0" role="status">
+          {% if payment_recorded %}
+            Payment recorded. Invoice
+            <a href="{% url 'billing:invoice_detail' blocking_invoice.pk %}">{{ blocking_invoice.invoice_number }}</a>
+            has a remaining balance of ${{ blocking_invoice.balance_due }}.
+          {% else %}
+            Repair order cannot be marked {{ selected_status_label|lower }} because invoice
+            <a href="{% url 'billing:invoice_detail' blocking_invoice.pk %}">{{ blocking_invoice.invoice_number }}</a>
+            has a balance due of ${{ blocking_invoice.balance_due }}.
+          {% endif %}
+        </p>
+        {% if status_payment_url %}
+          <div class="d-flex flex-wrap align-items-center gap-2 mt-2">
+            <a class="btn btn-primary" href="{{ status_payment_url }}" aria-describedby="status-payment-hint">
+              {% if payment_recorded %}Record another payment{% else %}Record payment{% endif %}
+            </a>
+            <span id="status-payment-hint">Just received payment? Enter the amount here, then retry the status update.</span>
+          </div>
+        {% endif %}
+      {% else %}
+        <p class="mb-0" role="status">Repair order cannot be marked {{ selected_status_label|lower }} because invoice {{ blocking_invoice.invoice_number }} has a balance due.</p>
+      {% endif %}
+    </div>
+  {% endif %}
   <form method="post"
         action="{% url 'repair_orders:status_update' ro.pk %}"
         hx-post="{% url 'repair_orders:status_update' ro.pk %}"
@@ -10,7 +40,7 @@
       <label for="new_status">New status</label>
       <select id="new_status" name="new_status">
         {% for value, label in status_choices %}
-          <option value="{{ value }}" {% if value == ro.status %}selected{% endif %}>{{ label }}</option>
+          <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
         {% endfor %}
       </select>
       <label for="note">Note</label>
