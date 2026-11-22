@@ -54,6 +54,13 @@
         {% if form.description.errors %}<ul class="field-errors">{% for e in form.description.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 
+      <div class="form-field form-field--full form-check">
+        {{ form.is_taxable }}
+        <label class="form-check-label" for="{{ form.is_taxable.id_for_label }}">{{ form.is_taxable.label }}</label>
+        {% if form.is_taxable.help_text %}<p class="form-field-hint">{{ form.is_taxable.help_text }}</p>{% endif %}
+        {% if form.is_taxable.errors %}<ul class="field-errors">{% for e in form.is_taxable.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+      </div>
+
     </div>
 
     <div class="form-actions">
@@ -63,4 +70,32 @@
 
   </form>
 </div>
+
+<script>
+  // Seed the taxable checkbox from the selected item type as a convenience.
+  // Labor -> unchecked, parts/materials -> checked; sublet/misc are left under
+  // manual control. Once the user toggles the box we stop auto-setting it, and
+  // the server-side submitted value remains authoritative regardless.
+  (function () {
+    var typeField = document.getElementById("{{ form.item_type.id_for_label }}");
+    var taxField = document.getElementById("{{ form.is_taxable.id_for_label }}");
+    if (!typeField || !taxField) {
+      return;
+    }
+    var userOverrode = false;
+    var defaults = { labor: false, parts: true, materials: true };
+    taxField.addEventListener("change", function () {
+      userOverrode = true;
+    });
+    typeField.addEventListener("change", function () {
+      if (userOverrode) {
+        return;
+      }
+      var next = defaults[typeField.value];
+      if (next !== undefined) {
+        taxField.checked = next;
+      }
+    });
+  })();
+</script>
 {% endblock %}

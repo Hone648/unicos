@@ -44,9 +44,13 @@
     <div class="form-grid">
 
       <div class="form-field">
-        <label for="{{ form.estimated_total.id_for_label }}">Estimated total ($)</label>
+        <label for="{{ form.estimated_total.id_for_label }}">Subtotal before tax ($)</label>
         {{ form.estimated_total }}
-        {% if form.estimated_total.help_text %}<p class="form-field-hint">{{ form.estimated_total.help_text }}</p>{% endif %}
+        {% if form.estimated_total.help_text %}
+          <p class="form-field-hint">{{ form.estimated_total.help_text }}</p>
+        {% else %}
+          <p class="form-field-hint">Entered manually as the pre-tax subtotal until line items are added. Sales tax is calculated from taxable line items.</p>
+        {% endif %}
         {% if form.estimated_total.errors %}<ul class="field-errors">{% for e in form.estimated_total.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 

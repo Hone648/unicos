@@ -1,5 +1,10 @@
 from decimal import Decimal
 
+from core.tax import (
+    calculate_tax,
+    default_sales_tax_rate,
+    quantize_money,
+)
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
@@ -69,6 +74,23 @@ class Estimate(models.Model):
         decimal_places=2,
         default=Decimal("0.00"),
     )
+    # Tax snapshot: rate captured at creation time plus derived taxable
+    # subtotal and tax amount. estimated_total stays the pre-tax subtotal.
+    tax_rate = models.DecimalField(
+        max_digits=6,
+        decimal_places=5,
+        default=default_sales_tax_rate,
+    )
+    taxable_subtotal = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
+    tax_amount = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=Decimal("0.00"),
+    )
     notes = models.TextField(blank=True)
     approval_source = models.CharField(
         max_length=30,
@@ -105,6 +127,14 @@ class Estimate(models.Model):
             raise ValidationError("Deductible cannot be negative.")
         if self.estimated_total is not None and self.estimated_total < Decimal("0.00"):
             raise ValidationError("Estimated total cannot be negative.")
+        if self.tax_rate is not None and self.tax_rate < Decimal("0"):
+            raise ValidationError("Tax rate cannot be negative.")
+        if self.tax_rate is not None and self.tax_rate > Decimal("1"):
+            raise ValidationError("Tax rate cannot exceed 1 (100%).")
+        if self.taxable_subtotal is not None and self.taxable_subtotal < Decimal("0.00"):
+            raise ValidationError("Taxable subtotal cannot be negative.")
+        if self.tax_amount is not None and self.tax_amount < Decimal("0.00"):
+            raise ValidationError("Tax amount cannot be negative.")
 
         # Supplement lineage rules.
         if self.kind == self.Kind.INITIAL and self.parent_estimate_id:
@@ -134,14 +164,46 @@ class Estimate(models.Model):
     def has_approval_capture(self):
         return bool(self.approval_source and self.approval_contact_name and self.approved_at)
 
+    @property
+    def total_amount(self):
+        """Pre-tax subtotal plus estimated sales tax."""
+        return (self.estimated_total or Decimal("0.00")) + (self.tax_amount or Decimal("0.00"))
+
+    @property
+    def customer_responsibility(self):
+        """Grand total less the deductible, never below zero."""
+        responsibility = self.total_amount - (self.deductible or Decimal("0.00"))
+        return max(responsibility, Decimal("0.00"))
+
+    @property
+    def tax_rate_percent(self):
+        """Tax rate expressed as a percentage for display (e.g. 8.250)."""
+        return (self.tax_rate or Decimal("0")) * Decimal("100")
+
     def recalculate_total(self):
-        """Sum line items into estimated_total. Resets to 0.00 when none remain."""
-        total = sum(
-            (line_item.line_total for line_item in self.line_items.all()),
+        """Recalculate pre-tax subtotal, taxable subtotal, and tax amount.
+
+        ``estimated_total`` sums all line items; ``taxable_subtotal`` sums only
+        taxable line items; ``tax_amount`` applies the snapshotted ``tax_rate``.
+        All reset to 0.00 when no line items remain.
+        """
+        line_items = list(self.line_items.all())
+        total = sum((line_item.line_total for line_item in line_items), Decimal("0.00"))
+        taxable = sum(
+            (line_item.line_total for line_item in line_items if line_item.is_taxable),
             Decimal("0.00"),
         )
-        self.estimated_total = total.quantize(Decimal("0.01"))
-        self.save(update_fields=["estimated_total", "updated_at"])
+        self.estimated_total = quantize_money(total)
+        self.taxable_subtotal = quantize_money(taxable)
+        self.tax_amount = calculate_tax(self.taxable_subtotal, self.tax_rate or Decimal("0"))
+        self.save(
+            update_fields=[
+                "estimated_total",
+                "taxable_subtotal",
+                "tax_amount",
+                "updated_at",
+            ]
+        )
 
     def __str__(self):
         return f"Estimate {self.estimate_number}"
@@ -168,6 +230,10 @@ class EstimateLineItem(models.Model):
     description = models.CharField(max_length=255)
     quantity = models.DecimalField(max_digits=10, decimal_places=2)
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
+    # Whether this line contributes to the taxable subtotal. Defaults to False
+    # at the model level; forms seed the Texas default from item_type so an
+    # explicitly chosen value is never silently overridden.
+    is_taxable = models.BooleanField(default=False)
     sort_order = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

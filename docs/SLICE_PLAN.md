@@ -81,3 +81,24 @@ Likely next implementation slices:
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
 explicit decision.
+
+Texas estimate/invoice tax totals slice (branch `feat/estimate-tax-totals`):
+
+- Configurable combined sales tax rate via `SHOP_SALES_TAX_RATE` (default
+  `0.0825`), read/normalized as a Decimal in `[0, 1]` and failing loudly at
+  startup on invalid input.
+- Shared `app/core/tax.py` utility: money/rate quantization (`ROUND_HALF_UP`),
+  `calculate_tax`, and Texas default taxability by line-item type
+  (labor/sublet/misc not taxable; parts/materials taxable).
+- `Estimate` gains `tax_rate`/`taxable_subtotal`/`tax_amount` plus
+  `total_amount` and `customer_responsibility` properties; `estimated_total`
+  stays the pre-tax subtotal. `Invoice` gains `tax_rate`/`taxable_subtotal`.
+  Estimate and invoice line items gain `is_taxable`.
+- Recalculation derives taxable subtotal and tax from taxable line items and the
+  snapshotted rate; estimate-to-invoice conversion copies the rate and per-line
+  taxability so converted totals match the approved estimate.
+- Two data migrations backfill `is_taxable` for existing line items and
+  recompute tax snapshots. UI/detail/print show taxable columns and totals with
+  an estimated-tax disclaimer.
+- No new dependencies, no shop profile/admin model, no external tax lookup.
+  ADR 0051.

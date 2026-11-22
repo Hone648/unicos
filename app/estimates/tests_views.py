@@ -773,12 +773,20 @@ class RepairOrderDetailEstimateIntegrationTests(TestCase):
         self.assertContains(response, "Estimates")
 
     def test_detail_lists_existing_estimate(self):
-        estimate = make_estimate(self.ro, number="EST-SUMMARY", insurance_company="Allstate")
+        estimate = make_estimate(
+            self.ro,
+            number="EST-SUMMARY",
+            insurance_company="Allstate",
+            estimated_total=Decimal("180.00"),
+            taxable_subtotal=Decimal("100.00"),
+            tax_amount=Decimal("8.25"),
+        )
         self.client.force_login(make_user("viewer", ROLE_READ_ONLY))
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "EST-SUMMARY")
         self.assertContains(response, "Allstate")
         self.assertContains(response, detail_url(estimate.pk))
+        self.assertContains(response, "<td>$188.25</td>", html=True)
 
     def test_detail_shows_create_link_with_manage_permission(self):
         self.client.force_login(make_user("manager", ROLE_MANAGER))

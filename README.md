@@ -77,6 +77,24 @@ media, and generated files out of the Docker build context. The safe
 Set `SHOP_DISPLAY_NAME` in `.env` to change the shop name shown in the app
 header, page titles, and admin labels.
 
+### Sales tax rate
+
+`SHOP_SALES_TAX_RATE` is the combined state/local sales tax rate applied to
+taxable estimate and invoice line items. It is read from the environment and
+defaults to `0.0825` (8.25%) when unset or blank.
+
+- Example: `0.0825` = 8.25%.
+- The value must be a decimal between `0` and `1`; an invalid value fails
+  loudly at startup.
+- The rate is snapshotted onto each estimate and invoice when it is created, so
+  historical records keep the rate that was in effect at the time.
+- The shop should verify the exact rate for its business address using the
+  Texas Comptroller Sales Tax Rate Locator. The app does not determine local
+  tax jurisdiction automatically.
+- Texas defaults: labor is not taxable; parts and materials are taxable; sublet
+  and misc are manually configurable per line item. This is not tax or legal
+  advice. See `docs/DECISIONS/0051-texas-estimate-tax-totals.md`.
+
 Start the app and database:
 
 ```powershell

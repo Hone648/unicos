@@ -1,3 +1,4 @@
+from core.tax import default_taxable_for_item_type
 from django import forms
 
 from .models import Invoice, InvoiceLineItem, Payment
@@ -42,6 +43,13 @@ class InvoiceLineItemForm(forms.ModelForm):
         if invoice is not None and not self.instance.invoice_id:
             self.instance.invoice = invoice
         self.fields["description"].required = True
+        # Seed the Texas default taxability from item type for new line items.
+        # An explicitly bound value from POST always wins over this initial.
+        if not self.is_bound and self.instance.pk is None:
+            item_type = self.initial.get("item_type") or self.fields["item_type"].initial
+            if item_type is None:
+                item_type = InvoiceLineItem.ItemType.LABOR
+            self.fields["is_taxable"].initial = default_taxable_for_item_type(item_type)
 
     class Meta:
         model = InvoiceLineItem
@@ -50,11 +58,21 @@ class InvoiceLineItemForm(forms.ModelForm):
             "description",
             "quantity",
             "unit_price",
+            "is_taxable",
         ]
         widgets = {
             "description": forms.TextInput(),
             "quantity": forms.NumberInput(attrs={"min": "0.01", "step": "0.01"}),
             "unit_price": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
+        }
+        labels = {
+            "is_taxable": "Taxable",
+        }
+        help_texts = {
+            "is_taxable": (
+                "Texas default: labor is not taxable; parts/materials are taxable. "
+                "Verify unusual sublet or misc charges."
+            ),
         }
 
     # invoice, created_at, and updated_at are excluded.

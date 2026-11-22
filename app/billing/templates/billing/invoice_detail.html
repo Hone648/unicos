@@ -109,6 +109,7 @@
               <th>Description</th>
               <th>Qty</th>
               <th>Unit price</th>
+              <th>Taxable</th>
               <th>Line total</th>
             </tr>
           </thead>
@@ -119,6 +120,7 @@
                 <td>{{ item.description }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.unit_price }}</td>
+                <td>{% if item.is_taxable %}Yes{% else %}No{% endif %}</td>
                 <td>${{ item.line_total }}</td>
               </tr>
             {% endfor %}
@@ -134,11 +136,19 @@
     <table>
       <tbody>
         <tr>
-          <th scope="row">Subtotal</th>
+          <th scope="row">Subtotal before tax</th>
           <td>${{ invoice.subtotal }}</td>
         </tr>
         <tr>
-          <th scope="row">Tax</th>
+          <th scope="row">Taxable subtotal</th>
+          <td>${{ invoice.taxable_subtotal }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Sales tax rate</th>
+          <td>{{ invoice.tax_rate_percent|floatformat:3 }}%</td>
+        </tr>
+        <tr>
+          <th scope="row">Sales tax</th>
           <td>${{ invoice.tax_amount }}</td>
         </tr>
         <tr class="invoice-totals__total">
