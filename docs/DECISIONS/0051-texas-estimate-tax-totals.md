@@ -42,10 +42,23 @@ Snapshot tax on both estimates and invoices:
 - Estimate and invoice line items gain `is_taxable`, defaulting to `False` at
   the model level; forms seed the Texas default from item type.
 
-Recalculation on both models now derives the taxable subtotal from taxable line
-items and the tax amount from the snapshotted rate. Estimate-to-invoice
-conversion copies the estimate's `tax_rate` and each line item's `is_taxable`,
-so the converted invoice's totals match the approved estimate.
+For new documents, recalculation derives tax from taxable line items using
+the saved rate. Estimate-to-invoice conversion copies the approved subtotal,
+tax snapshot, rate, and line taxability without recalculating the invoice at
+conversion time. For documents with an unverified breakdown, price, quantity,
+item type, taxability, and line additions or removals are protected by the
+saved-tax guard. The shop-facing and admin invoice forms make subtotal and tax
+read-only once the invoice has line items. Invoices with manual totals continue
+to accept manual tax.
+
+Authorized staff can choose Review Tax on an unverified draft in the shop
+interface. They enter a percentage rate and confirm whether each line is
+taxable. The application saves the confirmed breakdown and recalculates an
+itemized draft in one transaction. Normal line-item edits can resume afterward.
+Reviewing a draft without line items saves the rate for future itemization and
+preserves the current manual amounts. Notes, descriptions, and payment
+recording remain available under the existing workflow. Issued invoices and
+estimates outside draft status retain their saved, unverified breakdowns.
 
 ## Texas design assumptions
 
@@ -65,16 +78,53 @@ so the converted invoice's totals match the approved estimate.
 Positive:
 
 - Estimates and invoices produce consistent, itemized, Texas-aware totals.
-- Tax is derived from taxable line items rather than entered by hand once line
-  items exist.
+- Tax is derived from taxable line items on new documents. Historical
+  documents retain the tax already saved.
 - Converting an approved estimate preserves the rate and per-line taxability.
 
 Trade-offs:
 
-- Adding taxable line items to a manually created invoice now derives tax
-  automatically; a previously hand-entered `tax_amount` is superseded once line
-  items drive the totals.
+- Adding line items to a new manual invoice begins line-based calculation.
+  The calculated tax supersedes its manual tax entry. An unverified invoice
+  keeps its saved tax until staff complete draft tax review.
 - The shop must still verify its exact local rate; the app will not look it up.
+
+## Slice 49 upgrade and recovery
+
+Use the corrected release for the upgrade and back up the database before
+running `python app/manage.py migrate`. Keep the original migration records.
+
+- **Pre-Slice 48:** The `0004` schema migrations add the tax fields with
+  defaults. The published billing and estimates
+  `0005_backfill_line_item_taxability` migrations now perform no operations
+  in either direction. Django records each migration in the original order.
+  Existing subtotal, manual invoice tax, payment records, balances, approval
+  capture, and statuses keep their saved values. Existing estimates had no
+  tax amount field, so they start with zero added tax.
+- **Slice 48 already applied:** Django skips `0005` because the IDs are
+  recorded. Both paths converge at `0006_tax_breakdown_recorded`, which adds
+  a false marker to existing documents and defaults new documents to true.
+  No financial or approval fields are rewritten. The original backfills did
+  not record which breakdowns were inferred. Therefore the upgrade treats
+  all pre-upgrade documents conservatively, including genuine Slice 48
+  snapshots, and shows saved tax and totals with the breakdown unavailable.
+  Existing snapshot fields and flags are retained as stored.
+- **Recovery:** If the original backfill already changed amounts, restore a
+  pre-Slice 48 backup into a separate database and run the corrected upgrade
+  there. Compare documents by invoice or estimate number. Where legitimate
+  work was recorded after the backup, reconcile against the backup, issued
+  invoices, approved estimates, and payment records before restoring or
+  correcting production data. Without a backup or authoritative documents,
+  the old manual tax and original approved amounts cannot be reconstructed
+  solely from backfilled data. Slice 49 does not repair status and balance
+  discrepancies already present on those databases.
+- **Rollback:** Reversing `0006` drops the marker and loses its provenance.
+  Reapplying it marks all extant documents as unverified again. Reversing the
+  revised `0005` is a no-op and cannot undo the original code's writes.
+  Reversing `0004` removes the new snapshot columns and estimate tax amount.
+  Invoice tax survives as a column, with whatever value was last stored.
+  Use a verified backup for a financial rollback. Do not run the original
+  Slice 48 app or its original backfill over the corrected data.
 
 ## Non-goals
 

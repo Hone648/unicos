@@ -60,6 +60,7 @@
       <div class="form-field">
         <label for="{{ form.tax_amount.id_for_label }}">Tax ($)</label>
         {{ form.tax_amount }}
+        {% if form.tax_amount.help_text %}<p class="form-field-hint">{{ form.tax_amount.help_text }}</p>{% endif %}
         {% if form.tax_amount.errors %}<ul class="field-errors">{% for e in form.tax_amount.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 

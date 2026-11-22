@@ -542,6 +542,28 @@ class InvoiceEditTests(TestCase):
         self.assertEqual(self.invoice.subtotal, Decimal("400.00"))
         self.assertEqual(self.invoice.notes, "Updated note")
 
+    def test_edit_post_updates_manual_tax_without_line_items(self):
+        response = self.client.post(
+            invoice_edit_url(self.invoice.pk), self._valid_data(tax_amount="12.34")
+        )
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.tax_amount, Decimal("12.34"))
+
+    def test_edit_post_cannot_replace_calculated_tax(self):
+        self.invoice.tax_rate = Decimal("0.0825")
+        self.invoice.save(update_fields=["tax_rate"])
+        make_line_item(self.invoice, is_taxable=True, unit_price=Decimal("100.00"))
+        url = invoice_edit_url(self.invoice.pk)
+        response = self.client.get(url)
+        self.assertTrue(response.context["form"].fields["tax_amount"].disabled)
+
+        response = self.client.post(url, self._valid_data(tax_amount="75.00", notes="Updated"))
+        self.assertRedirects(response, ro_detail_url(self.ro.pk))
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.tax_amount, Decimal("8.25"))
+        self.assertEqual(self.invoice.notes, "Updated")
+
     def test_valid_post_redirects_to_repair_order_detail(self):
         response = self.client.post(invoice_edit_url(self.invoice.pk), self._valid_data())
         self.assertRedirects(response, ro_detail_url(self.ro.pk))

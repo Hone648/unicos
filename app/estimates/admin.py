@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 
+from .forms import EstimateLineItemForm
 from .models import Estimate, EstimateLineItem
 from .services import (
     EstimateStatusTransitionBlocked,
@@ -10,6 +11,7 @@ from .services import (
 
 class EstimateLineItemInline(admin.TabularInline):
     model = EstimateLineItem
+    form = EstimateLineItemForm
     fields = (
         "item_type",
         "description",
@@ -31,7 +33,7 @@ class EstimateLineItemInline(admin.TabularInline):
     def has_add_permission(self, request, obj):
         if obj is None:
             return True
-        return estimate_is_editable(obj)
+        return estimate_is_editable(obj) and obj.tax_breakdown_recorded
 
     def has_change_permission(self, request, obj=None):
         if obj is None:
@@ -41,7 +43,7 @@ class EstimateLineItemInline(admin.TabularInline):
     def has_delete_permission(self, request, obj=None):
         if obj is None:
             return True
-        return estimate_is_editable(obj)
+        return estimate_is_editable(obj) and obj.tax_breakdown_recorded
 
 
 @admin.register(Estimate)
@@ -126,6 +128,13 @@ class EstimateAdmin(admin.ModelAdmin):
     def customer_display(self, obj):
         return obj.repair_order.customer
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        match = request.resolver_match
+        if request.method == "POST" and match and match.url_name == "estimates_estimate_change":
+            return queryset.select_for_update()
+        return queryset
+
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
         if obj is not None and obj.has_line_items:
@@ -167,6 +176,7 @@ class EstimateAdmin(admin.ModelAdmin):
 
 @admin.register(EstimateLineItem)
 class EstimateLineItemAdmin(admin.ModelAdmin):
+    form = EstimateLineItemForm
     list_display = (
         "estimate",
         "item_type",
@@ -219,7 +229,9 @@ class EstimateLineItemAdmin(admin.ModelAdmin):
         return super().has_change_permission(request, obj)
 
     def has_delete_permission(self, request, obj=None):
-        if obj is not None and not estimate_is_editable(obj.estimate):
+        if obj is not None and (
+            not estimate_is_editable(obj.estimate) or not obj.estimate.tax_breakdown_recorded
+        ):
             return False
         return super().has_delete_permission(request, obj)
 

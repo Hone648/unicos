@@ -14,6 +14,7 @@ from django.contrib import admin
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.test import RequestFactory, TestCase
+from django.urls import reverse
 from repair_orders.models import RepairOrder
 from vehicles.models import Vehicle
 
@@ -251,6 +252,50 @@ class InvoiceAdminFieldProtectionTests(TestCase):
     def test_subtotal_editable_on_add(self):
         readonly = self.admin_instance.get_readonly_fields(self.request, None)
         self.assertNotIn("subtotal", readonly)
+
+    def post_tax_change(self, invoice, tax_amount):
+        self.client.force_login(make_superuser())
+        url = reverse("admin:billing_invoice_change", args=[invoice.pk])
+        response = self.client.get(url)
+        data = {
+            "repair_order": invoice.repair_order_id,
+            "invoice_number": invoice.invoice_number,
+            "subtotal": str(invoice.subtotal),
+            "tax_amount": tax_amount,
+            "notes": "Admin note",
+            "_save": "Save",
+        }
+        for inline in response.context["inline_admin_formsets"]:
+            for field in inline.formset.management_form:
+                data[field.html_name] = field.value()
+            for form in inline.formset.initial_forms:
+                data[form["id"].html_name] = form.instance.pk
+                data[form["invoice"].html_name] = invoice.pk
+        result = self.client.post(url, data)
+        self.assertEqual(result.status_code, 302)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.notes, "Admin note")
+        return response.context["adminform"].form
+
+    def test_admin_post_cannot_replace_calculated_tax(self):
+        invoice = make_invoice(self.ro, subtotal=Decimal("0.00"), tax_rate=Decimal("0.0825"))
+        InvoiceLineItem.objects.create(
+            invoice=invoice,
+            item_type=InvoiceLineItem.ItemType.PARTS,
+            description="Taxable part",
+            quantity=Decimal("1.00"),
+            unit_price=Decimal("100.00"),
+            is_taxable=True,
+        )
+        form = self.post_tax_change(invoice, "75.00")
+        self.assertNotIn("tax_amount", form.fields)
+        self.assertEqual(invoice.tax_amount, Decimal("8.25"))
+
+    def test_admin_post_can_change_manual_tax(self):
+        invoice = make_invoice(self.ro)
+        form = self.post_tax_change(invoice, "12.34")
+        self.assertIn("tax_amount", form.fields)
+        self.assertEqual(invoice.tax_amount, Decimal("12.34"))
 
 
 class InvoiceAdminLifecycleActionTests(TestCase):

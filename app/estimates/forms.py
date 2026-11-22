@@ -1,6 +1,7 @@
 from decimal import Decimal
 
 from core.tax import default_taxable_for_item_type
+from core.tax_review import TaxReviewLineItemForm
 from django import forms
 
 from .models import Estimate, EstimateLineItem
@@ -53,13 +54,18 @@ class EstimateForm(forms.ModelForm):
         return total
 
 
-class EstimateLineItemForm(forms.ModelForm):
-    def __init__(self, *args, **kwargs):
+class EstimateLineItemForm(TaxReviewLineItemForm):
+    def __init__(self, *args, estimate=None, **kwargs):
         super().__init__(*args, **kwargs)
         # For a new (unbound, unsaved) line item, seed the Texas default
         # taxability from the item type so the checkbox starts correct. An
         # explicitly bound value from POST always wins over this initial.
-        if not self.is_bound and self.instance.pk is None:
+        if estimate is not None and not self.instance.estimate_id:
+            self.instance.estimate = estimate
+        estimate = self.instance.estimate if self.instance.estimate_id else None
+        if estimate is not None and not estimate.tax_breakdown_recorded:
+            self.fields.pop("is_taxable", None)
+        elif not self.is_bound and self.instance.pk is None and "is_taxable" in self.fields:
             item_type = self.initial.get("item_type") or self.fields["item_type"].initial
             if item_type is None:
                 item_type = EstimateLineItem.ItemType.LABOR

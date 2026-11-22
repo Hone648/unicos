@@ -27,6 +27,9 @@
       <a class="btn btn-outline-secondary" href="{% url 'billing:line_item_create' invoice_pk=invoice.pk %}">Add Line Item</a>
     {% endif %}
     {% if invoice.status == "draft" and not is_final_repair_order and can_manage_invoice %}
+      {% if not invoice.tax_breakdown_recorded %}
+        <a class="btn btn-outline-secondary" href="{% url 'billing:invoice_tax_review' invoice.pk %}">Review Tax</a>
+      {% endif %}
       <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
         {% csrf_token %}
         <button type="submit" class="btn btn-primary">Issue Invoice</button>
@@ -109,7 +112,7 @@
               <th>Description</th>
               <th>Qty</th>
               <th>Unit price</th>
-              <th>Taxable</th>
+              {% if invoice.tax_breakdown_recorded %}<th>Taxable</th>{% endif %}
               <th>Line total</th>
             </tr>
           </thead>
@@ -120,7 +123,7 @@
                 <td>{{ item.description }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.unit_price }}</td>
-                <td>{% if item.is_taxable %}Yes{% else %}No{% endif %}</td>
+                {% if invoice.tax_breakdown_recorded %}<td>{% if item.is_taxable %}Yes{% else %}No{% endif %}</td>{% endif %}
                 <td>${{ item.line_total }}</td>
               </tr>
             {% endfor %}
@@ -133,20 +136,25 @@
   </div>
 
   <div class="invoice-totals">
+    {% if not invoice.tax_breakdown_recorded %}
+      <p class="muted-text">Tax breakdown unavailable for this invoice.</p>
+    {% endif %}
     <table>
       <tbody>
         <tr>
           <th scope="row">Subtotal before tax</th>
           <td>${{ invoice.subtotal }}</td>
         </tr>
-        <tr>
-          <th scope="row">Taxable subtotal</th>
-          <td>${{ invoice.taxable_subtotal }}</td>
-        </tr>
-        <tr>
-          <th scope="row">Sales tax rate</th>
-          <td>{{ invoice.tax_rate_percent|floatformat:3 }}%</td>
-        </tr>
+        {% if invoice.tax_breakdown_recorded and line_items %}
+          <tr>
+            <th scope="row">Taxable subtotal</th>
+            <td>${{ invoice.taxable_subtotal }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Sales tax rate</th>
+            <td>{{ invoice.tax_rate_percent|floatformat:3 }}%</td>
+          </tr>
+        {% endif %}
         <tr>
           <th scope="row">Sales tax</th>
           <td>${{ invoice.tax_amount }}</td>

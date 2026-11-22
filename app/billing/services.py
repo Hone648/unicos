@@ -152,18 +152,20 @@ def convert_estimate_to_invoice(estimate, *, created_by=None):
         invoice_number=generate_invoice_number(),
         status=Invoice.Status.DRAFT,
         source_estimate=locked_estimate,
-        # Snapshot the estimate's tax rate so the converted invoice tax matches
-        # the approved estimate rather than the current shop default.
+        subtotal=locked_estimate.estimated_total,
         tax_rate=locked_estimate.tax_rate,
+        taxable_subtotal=locked_estimate.taxable_subtotal,
+        tax_amount=locked_estimate.tax_amount,
+        tax_breakdown_recorded=locked_estimate.tax_breakdown_recorded,
         created_by=created_by,
         updated_by=created_by,
     )
 
-    # Copy line items, including per-line taxability. Each InvoiceLineItem.save()
-    # recalculates the invoice subtotal, taxable subtotal, and tax, so the
-    # converted invoice totals end up matching the approved estimate.
+    # Validate the invoice lines without triggering their recalculation hook.
+    # Conversion carries over the approved snapshot as saved.
+    invoice_lines = []
     for item in locked_estimate.line_items.all():
-        InvoiceLineItem.objects.create(
+        line = InvoiceLineItem(
             invoice=invoice,
             item_type=item.item_type,
             description=item.description,
@@ -171,13 +173,16 @@ def convert_estimate_to_invoice(estimate, *, created_by=None):
             unit_price=item.unit_price,
             is_taxable=item.is_taxable,
         )
-
-    invoice.refresh_from_db()
+        line.full_clean()
+        invoice_lines.append(line)
+    InvoiceLineItem.objects.bulk_create(invoice_lines)
     return invoice
 
 
+@transaction.atomic
 def issue_invoice(invoice, *, actor):
     """Issue a draft invoice and return the updated invoice."""
+    invoice.refresh_from_db(from_queryset=Invoice.objects.select_for_update())
     _ensure_repair_order_allows_billing(invoice, InvoiceIssueBlocked)
     if invoice.status != Invoice.Status.DRAFT:
         raise InvoiceIssueBlocked(
@@ -193,8 +198,10 @@ def issue_invoice(invoice, *, actor):
     return invoice
 
 
+@transaction.atomic
 def void_invoice(invoice, *, actor):
     """Void an invoice and return the updated invoice."""
+    invoice.refresh_from_db(from_queryset=Invoice.objects.select_for_update())
     _ensure_repair_order_allows_billing(invoice, InvoiceVoidBlocked)
     if invoice.status == Invoice.Status.VOID:
         raise InvoiceVoidBlocked(f"Invoice {invoice.invoice_number} is already void.")
@@ -225,9 +232,11 @@ def record_payment(invoice, data, *, actor):
     return payment
 
 
+@transaction.atomic
 def create_invoice_line_item(invoice, data, *, actor):
     """Create an invoice line item and return it."""
     del actor
+    invoice = _lock_invoice(invoice)
     ensure_invoice_line_items_mutable(invoice)
     line_item = InvoiceLineItem(
         invoice=invoice,
@@ -240,11 +249,14 @@ def create_invoice_line_item(invoice, data, *, actor):
     return line_item
 
 
+@transaction.atomic
 def edit_invoice_line_item(line_item, data, *, actor):
     """Edit an invoice line item and return it."""
     del actor
-    invoice = line_item.invoice
+    invoice = _lock_invoice(line_item.invoice)
     ensure_invoice_line_items_mutable(invoice)
+    line_item.refresh_from_db()
+    line_item.invoice = invoice
     for field, value in _clean_data(data, _LINE_ITEM_FIELDS).items():
         setattr(line_item, field, value)
     try:

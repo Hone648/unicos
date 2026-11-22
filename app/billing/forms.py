@@ -1,4 +1,5 @@
 from core.tax import default_taxable_for_item_type
+from core.tax_review import TaxReviewLineItemForm
 from django import forms
 
 from .models import Invoice, InvoiceLineItem, Payment
@@ -32,12 +33,17 @@ class InvoiceCreateForm(_InvoiceBaseForm):
 class InvoiceEditForm(_InvoiceBaseForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if self.instance.pk and self.instance.line_items.exists():
+        if self.instance.has_line_items:
             self.fields["subtotal"].disabled = True
             self.fields["subtotal"].help_text = "Subtotal is calculated from invoice line items."
+            self.fields["tax_amount"].disabled = True
+            if self.instance.tax_breakdown_recorded:
+                self.fields["tax_amount"].help_text = "Tax is calculated from invoice line items."
+            else:
+                self.fields["tax_amount"].help_text = "Saved tax for this itemized invoice."
 
 
-class InvoiceLineItemForm(forms.ModelForm):
+class InvoiceLineItemForm(TaxReviewLineItemForm):
     def __init__(self, *args, invoice=None, **kwargs):
         super().__init__(*args, **kwargs)
         if invoice is not None and not self.instance.invoice_id:
@@ -45,7 +51,9 @@ class InvoiceLineItemForm(forms.ModelForm):
         self.fields["description"].required = True
         # Seed the Texas default taxability from item type for new line items.
         # An explicitly bound value from POST always wins over this initial.
-        if not self.is_bound and self.instance.pk is None:
+        if self.instance.invoice_id and not self.instance.invoice.tax_breakdown_recorded:
+            self.fields.pop("is_taxable", None)
+        elif not self.is_bound and self.instance.pk is None and "is_taxable" in self.fields:
             item_type = self.initial.get("item_type") or self.fields["item_type"].initial
             if item_type is None:
                 item_type = InvoiceLineItem.ItemType.LABOR

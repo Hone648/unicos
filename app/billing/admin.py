@@ -1,5 +1,6 @@
 from django.contrib import admin, messages
 
+from .forms import InvoiceLineItemForm
 from .models import Invoice, InvoiceLineItem, Payment
 from .services import (
     InvoiceIssueBlocked,
@@ -163,10 +164,19 @@ class InvoiceAdmin(admin.ModelAdmin):
     def is_paid_display(self, obj):
         return obj.is_paid
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        # Django wraps change POSTs in an atomic block. Serialize the form's
+        # item check and save with line-item changes on the same invoice.
+        match = request.resolver_match
+        if request.method == "POST" and match and match.url_name == "billing_invoice_change":
+            return queryset.select_for_update()
+        return queryset
+
     def get_readonly_fields(self, request, obj=None):
         readonly = list(super().get_readonly_fields(request, obj))
-        if obj is not None and obj.line_items.exists():
-            readonly.append("subtotal")
+        if obj is not None and obj.has_line_items:
+            readonly.extend(("subtotal", "tax_amount"))
         return readonly
 
     def save_model(self, request, obj, form, change):
@@ -205,6 +215,7 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(InvoiceLineItem)
 class InvoiceLineItemAdmin(admin.ModelAdmin):
+    form = InvoiceLineItemForm
     list_display = (
         "invoice",
         "item_type",

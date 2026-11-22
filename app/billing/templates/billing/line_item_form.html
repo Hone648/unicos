@@ -23,8 +23,10 @@
     <h2>Current Totals</h2>
     <dl>
       <dt>Subtotal before tax</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd>
-      <dt>Taxable subtotal</dt><dd>${{ invoice.taxable_subtotal }}</dd>
-      <dt>Sales tax rate</dt><dd>{{ invoice.tax_rate_percent|floatformat:3 }}%</dd>
+      {% if invoice.tax_breakdown_recorded and invoice.has_line_items %}
+        <dt>Taxable subtotal</dt><dd>${{ invoice.taxable_subtotal }}</dd>
+        <dt>Sales tax rate</dt><dd>{{ invoice.tax_rate_percent|floatformat:3 }}%</dd>
+      {% endif %}
       <dt>Sales tax</dt><dd>${{ invoice.tax_amount }}</dd>
       <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
       <dt>Paid</dt><dd class="amount-paid">${{ invoice.amount_paid }}</dd>
@@ -69,12 +71,14 @@
         {% if form.description.errors %}<ul class="field-errors">{% for e in form.description.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
       </div>
 
-      <div class="form-field form-field--full form-check">
-        {{ form.is_taxable }}
-        <label class="form-check-label" for="{{ form.is_taxable.id_for_label }}">{{ form.is_taxable.label }}</label>
-        {% if form.is_taxable.help_text %}<p class="form-field-hint">{{ form.is_taxable.help_text }}</p>{% endif %}
-        {% if form.is_taxable.errors %}<ul class="field-errors">{% for e in form.is_taxable.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
-      </div>
+      {% if form.is_taxable %}
+        <div class="form-field form-field--full form-check">
+          {{ form.is_taxable }}
+          <label class="form-check-label" for="{{ form.is_taxable.id_for_label }}">{{ form.is_taxable.label }}</label>
+          {% if form.is_taxable.help_text %}<p class="form-field-hint">{{ form.is_taxable.help_text }}</p>{% endif %}
+          {% if form.is_taxable.errors %}<ul class="field-errors">{% for e in form.is_taxable.errors %}<li>{{ e }}</li>{% endfor %}</ul>{% endif %}
+        </div>
+      {% endif %}
 
     </div>
 
@@ -86,6 +90,7 @@
   </form>
 </div>
 
+{% if form.is_taxable %}
 <script>
   // Seed the taxable checkbox from the selected item type as a convenience.
   // Labor -> unchecked, parts/materials -> checked; sublet/misc are left under
@@ -113,4 +118,5 @@
     });
   })();
 </script>
+{% endif %}
 {% endblock %}
