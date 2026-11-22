@@ -1,8 +1,8 @@
-<div id="status-history-card" class="card shadow-sm" hx-swap-oob="true">
-  <h2>Status History</h2>
+<div id="status-history-card" hx-swap-oob="true">
   {% if history %}
-    <div class="table-wrap table-responsive">
+    <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Status History">
       <table class="table table-sm table-hover align-middle mb-0">
+        <caption class="visually-hidden">Status History</caption>
         <thead>
           <tr>
             <th>Date</th>

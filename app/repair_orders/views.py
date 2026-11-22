@@ -97,19 +97,38 @@ def _repair_order_detail_context(ro, user, *, status_continuation=None):
     blocking_invoice = None
     status_payment_url = ""
     payment_recorded = False
+    status_continuation_active = False
     if may_change_status:
         attempted_status, continuation_payment_recorded = read_status_continuation(
             invoice, status_continuation
         )
         if attempted_status and attempted_status != ro.status:
+            status_continuation_active = True
             selected_status = attempted_status
             payment_recorded = continuation_payment_recorded
             blocking_invoice = closure_blocked_by_invoice(ro, attempted_status)
             if blocking_invoice and may_view_invoice and may_record_payment:
                 status_payment_url = _status_payment_url(blocking_invoice, status_continuation)
 
+    may_create_estimate = can_manage_estimate_for_repair_order(user, ro)
+    show_intake_estimate_action = (
+        ro.status == RepairOrder.Status.INTAKE
+        and not estimates
+        and may_create_estimate
+        and not status_continuation_active
+    )
+    displayed_closed_at = ro.closed_at
+    if ro.status == RepairOrder.Status.CLOSED and not displayed_closed_at:
+        displayed_closed_at = (
+            history.filter(new_status=RepairOrder.Status.CLOSED)
+            .values_list("changed_at", flat=True)
+            .first()
+        )
+
     return {
         "ro": ro,
+        "displayed_closed_at": displayed_closed_at,
+        "show_intake_estimate_action": show_intake_estimate_action,
         "history": history,
         "invoice": invoice,
         "is_final_repair_order": is_final_repair_order_status(ro.status),
@@ -125,7 +144,7 @@ def _repair_order_detail_context(ro, user, *, status_continuation=None):
         "payment_paid_in_full": payment_recorded and may_view_invoice and invoice.is_paid,
         "can_edit_repair_order": can_edit_repair_order(user, ro),
         "can_change_repair_order_status": may_change_status,
-        "can_create_estimate": can_manage_estimate_for_repair_order(user, ro),
+        "can_create_estimate": may_create_estimate,
         "can_view_invoice": may_view_invoice,
         "can_manage_invoice": bool(invoice and can_manage_invoice(user, invoice)),
         "can_create_invoice": can_manage_invoice_for_repair_order(user, ro),

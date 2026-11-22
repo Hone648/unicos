@@ -1,0 +1,5 @@
+<div id="ro-estimate-action" class="ro-record-actions" hx-swap-oob="true">
+  {% if can_create_estimate and not show_intake_estimate_action %}
+    <a class="btn {% if not estimates %}btn-outline-primary{% else %}btn-outline-secondary{% endif %}" href="{% url 'estimates:create' repair_order_pk=ro.pk %}">Create Estimate</a>
+  {% endif %}
+</div>

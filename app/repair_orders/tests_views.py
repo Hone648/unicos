@@ -1,5 +1,7 @@
+import re
 from datetime import date
 from decimal import Decimal
+from html import unescape
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
@@ -378,6 +380,67 @@ class RepairOrderDetailContentTests(TestCase):
     def test_detail_has_no_invoice_section_when_no_invoice(self):
         response = self.client.get(detail_url(self.ro.pk))
         self.assertNotContains(response, "INV-")
+
+    def test_detail_groups_records_in_reading_order_without_repeating_problem(self):
+        self.ro.internal_notes = "Call before additional repairs."
+        self.ro.save()
+        make_invoice(self.ro, number="INV-LAYOUT")
+        response = self.client.get(detail_url(self.ro.pk))
+        content = response.content.decode()
+        self.assertEqual(
+            [unescape(heading) for heading in re.findall(r"<h2[^>]*>(.*?)</h2>", content)],
+            ["Overview", "Status & next action", "Estimate & invoice", "Activity & files"],
+        )
+        self.assertContains(response, "Bumper crack", count=1)
+        overview = content.split('id="job-overview-heading"')[1].split("</section>")[0]
+        activity = content.split('id="job-activity-heading"')[1].split("</section>")[0]
+        billing = content.split('id="job-billing-heading"')[1].split("</section>")[0]
+        self.assertIn("Bumper crack", overview)
+        self.assertIn(VALID_VIN, overview)
+        self.assertNotIn("Call before additional repairs.", overview)
+        self.assertIn("Call before additional repairs.", activity)
+        self.assertLess(billing.index("<h3>Estimates</h3>"), billing.index("<h3>Invoice</h3>"))
+        self.assertIn("INV-LAYOUT", billing)
+
+    def test_history_disclosure_is_outside_the_htmx_replacement_region(self):
+        detail = self.client.get(detail_url(self.ro.pk))
+        self.assertRegex(
+            detail.content.decode(),
+            re.compile(
+                r'<details class="ro-history">\s*<summary>Status History</summary>'
+                r'\s*<div id="status-history-card" hx-swap-oob="true">.*?</div>\s*</details>',
+                re.S,
+            ),
+        )
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": RepairOrder.Status.ESTIMATING},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, 'id="status-history-card" hx-swap-oob="true"', count=1)
+        self.assertNotContains(response, "<details")
+        self.assertNotContains(response, "<summary")
+        self.assertContains(response, "<td>Estimating</td>", html=True)
+
+    def test_blocked_closure_prioritizes_payment_and_preserves_status_target(self):
+        make_invoice(self.ro)
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": RepairOrder.Status.CLOSED},
+            HTTP_HX_REQUEST="true",
+        )
+        self.assertContains(response, 'id="status-balance-warning"')
+        self.assertContains(response, 'aria-describedby="status-payment-hint"')
+        self.assertContains(response, '<a class="btn btn-primary"', count=1)
+        self.assertContains(
+            response,
+            '<button class="btn btn-outline-secondary" type="submit">Update Status</button>',
+            html=True,
+        )
+        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(response, 'hx-target="#status-update-card"')
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
 
     def test_404_for_nonexistent_repair_order(self):
         response = self.client.get(detail_url(99999))
@@ -1249,7 +1312,9 @@ class RepairOrderPaymentShortcutTests(TestCase):
             self.payment_url, self._payment_data(token, "440.00"), follow=True
         )
         self.assertEqual(urlsplit(response.redirect_chain[-1][0]).fragment, "status-update-card")
-        self.assertContains(response, "Payment recorded. Invoice paid in full.")
+        self.assertContains(
+            response, "Invoice paid in full. Select Update Status to close this repair order."
+        )
         self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
         self.invoice.refresh_from_db()
         self.ro.refresh_from_db()
@@ -1264,7 +1329,7 @@ class RepairOrderPaymentShortcutTests(TestCase):
         self.assertEqual(self.ro.status_history.first().new_status, RepairOrder.Status.CLOSED)
 
     def test_reopening_payment_return_url_after_closure_clears_confirmation(self):
-        confirmation = "Payment recorded. Invoice paid in full."
+        confirmation = "Invoice paid in full. Select Update Status to close this repair order."
         token = self._open_shortcut(self._attempt_status())
         payment = self.client.post(self.payment_url, self._payment_data(token, "440.00"))
         self.assertEqual(payment.status_code, 302)
@@ -1343,7 +1408,10 @@ class RepairOrderPaymentShortcutTests(TestCase):
         paid = self.client.post(
             self.payment_url, self._payment_data(second_token, "300.00"), follow=True
         )
-        self.assertContains(paid, "Payment recorded. Invoice paid in full.")
+        self.assertContains(
+            paid,
+            "Invoice paid in full. Select Update Status to mark this repair order as delivered.",
+        )
         self.assertContains(
             paid, '<option value="delivered" selected>Delivered</option>', html=True
         )
@@ -1355,7 +1423,10 @@ class RepairOrderPaymentShortcutTests(TestCase):
         self.assertEqual(self.ro.status, target)
 
         completed = self.client.get(paid.redirect_chain[-1][0])
-        self.assertNotContains(completed, "Payment recorded. Invoice paid in full.")
+        self.assertNotContains(
+            completed,
+            "Invoice paid in full. Select Update Status to mark this repair order as delivered.",
+        )
         self.assertNotContains(completed, 'id="status-balance-warning"')
         self.assertNotContains(completed, 'id="status-payment-hint"')
 

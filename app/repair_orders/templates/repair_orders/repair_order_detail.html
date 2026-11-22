@@ -1,69 +1,71 @@
 {% extends "base.html" %}
-{% load app_permissions static %}
+{% load static %}
 
 {% block title %}Repair Order {{ ro.repair_order_number }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
-<a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
+<link rel="stylesheet" href="{% static 'css/repair-order-detail.css' %}" />
+<article class="ro-detail" aria-labelledby="repair-order-heading">
+  <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
+  <header class="page-header ro-detail-header">
+    <h1 id="repair-order-heading">Repair Order {{ ro.repair_order_number }}</h1>
+    {% include "repair_orders/partials/_status_badge.html" %}
+    {% if not is_final_repair_order and can_edit_repair_order %}
+      <a class="btn btn-outline-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
+    {% endif %}
+  </header>
 
-<div class="page-header">
-  <h1>Repair Order {{ ro.repair_order_number }}</h1>
-  {% include "repair_orders/partials/_status_badge.html" %}
-  {% if not is_final_repair_order and can_edit_repair_order %}
-    <a class="btn btn-outline-secondary" href="{% url 'repair_orders:edit' ro.pk %}">Edit Repair Order</a>
-  {% endif %}
-</div>
+  <section class="ro-section" aria-labelledby="job-overview-heading">
+    <h2 id="job-overview-heading">Overview</h2>
+    <div class="ro-overview-grid">
+      <dl class="ro-identity">
+        <div><dt>Customer</dt><dd>{{ ro.customer }}</dd></div>
+        <div><dt>Vehicle</dt><dd>{{ ro.vehicle.year|default_if_none:"" }} {{ ro.vehicle.make }} {{ ro.vehicle.model }}</dd></div>
+        <div><dt>VIN</dt><dd>{{ ro.vehicle.vin }}</dd></div>
+        <div><dt>Assigned technician</dt><dd>{{ ro.assigned_to.get_username|default:"Unassigned" }}</dd></div>
+      </dl>
+      <dl class="ro-dates">
+        <div><dt>Opened</dt><dd>{{ ro.opened_at|date:"Y-m-d H:i" }}</dd></div>
+        <div><dt>Promised</dt><dd>{% if ro.promised_date %}{{ ro.promised_date|date:"Y-m-d" }}{% else %}—{% endif %}</dd></div>
+        <div><dt>Closed</dt><dd>{% if displayed_closed_at %}{{ displayed_closed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd></div>
+      </dl>
+    </div>
+    <div class="ro-problem">
+      <h3>Reported problem</h3>
+      <p>{{ ro.reported_problem|default:"No reported problem recorded." }}</p>
+    </div>
+  </section>
 
-<div class="card-grid">
+  <section class="ro-section" aria-labelledby="job-status-heading">
+    <h2 id="job-status-heading">Status &amp; next action</h2>
+    {% include "repair_orders/partials/_next_action.html" %}
+    {% if can_change_repair_order_status %}
+      {% include "repair_orders/partials/_status_form.html" %}
+      <script type="module" src="{% static 'js/repair-order-status.js' %}"></script>
+    {% else %}
+      <p class="muted-text">Status changes require permission.</p>
+    {% endif %}
+    {# Keep the disclosure outside the OOB region so a refresh preserves open state. #}
+    <details class="ro-history">
+      <summary>Status History</summary>
+      {% include "repair_orders/partials/_status_history.html" %}
+    </details>
+  </section>
 
-  <div class="card shadow-sm">
-    <h2>Customer &amp; Vehicle</h2>
-    <dl>
-      <dt>Customer</dt><dd>{{ ro.customer }}</dd>
-      <dt>Vehicle</dt><dd>{{ ro.vehicle }}</dd>
-      {% if ro.assigned_to %}
-        <dt>Assigned to</dt><dd>{{ ro.assigned_to.get_username }}</dd>
-      {% endif %}
-    </dl>
-  </div>
+  <section class="ro-section" aria-labelledby="job-billing-heading">
+    <h2 id="job-billing-heading">Estimate &amp; invoice</h2>
+    {% include "estimates/partials/_estimate_summary.html" %}
+    {% include "repair_orders/partials/_invoice_summary.html" %}
+  </section>
 
-  <div class="card shadow-sm">
-    <h2>Dates</h2>
-    <dl>
-      <dt>Opened</dt><dd>{{ ro.opened_at|date:"Y-m-d H:i" }}</dd>
-      <dt>Promised</dt><dd>{% if ro.promised_date %}{{ ro.promised_date|date:"Y-m-d" }}{% else %}—{% endif %}</dd>
-      <dt>Closed</dt><dd>{% if ro.closed_at %}{{ ro.closed_at|date:"Y-m-d H:i" }}{% else %}—{% endif %}</dd>
-    </dl>
-  </div>
-
-</div>
-
-{% if can_change_repair_order_status %}
-  {% include "repair_orders/partials/_status_form.html" %}
-  <script type="module" src="{% static 'js/repair-order-status.js' %}"></script>
-{% endif %}
-
-{% if ro.reported_problem or ro.internal_notes %}
-<div class="card shadow-sm">
-  <h2>Notes</h2>
-  {% if ro.reported_problem %}
-    <h3>Reported problem</h3>
-    <p>{{ ro.reported_problem }}</p>
-  {% endif %}
-  {% if ro.internal_notes %}
-    <h3>Internal notes</h3>
-    <p>{{ ro.internal_notes }}</p>
-  {% endif %}
-</div>
-{% endif %}
-
-{% include "communications/partials/_communication_summary.html" %}
-
-{% include "repair_orders/partials/_invoice_summary.html" %}
-
-{% include "estimates/partials/_estimate_summary.html" %}
-
-{% include "attachments/partials/_attachment_summary.html" %}
-
-{% include "repair_orders/partials/_status_history.html" %}
+  <section class="ro-section" aria-labelledby="job-activity-heading">
+    <h2 id="job-activity-heading">Activity &amp; files</h2>
+    <div class="ro-record">
+      <h3>Internal notes</h3>
+      {% if ro.internal_notes %}<p>{{ ro.internal_notes }}</p>{% else %}<p class="muted-text">No internal notes recorded.</p>{% endif %}
+    </div>
+    {% include "communications/partials/_communication_summary.html" %}
+    {% include "attachments/partials/_attachment_summary.html" %}
+  </section>
+</article>
 {% endblock %}

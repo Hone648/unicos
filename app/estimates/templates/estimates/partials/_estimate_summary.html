@@ -1,9 +1,12 @@
 {% load app_permissions %}
 
-<div class="card shadow-sm">
-  <h2>Estimates</h2>
+<div class="ro-record">
+  <div class="ro-record-header">
+    <h3>Estimates</h3>
+    {% include "repair_orders/partials/_estimate_action.html" %}
+  </div>
   {% if estimates %}
-    <div class="table-wrap table-responsive">
+    <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Estimates">
       <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
@@ -40,9 +43,4 @@
     <p class="muted-text">No estimates on file for this repair order.</p>
   {% endif %}
 
-  {% if can_create_estimate %}
-    <div class="action-row">
-      <a class="btn btn-primary" href="{% url 'estimates:create' repair_order_pk=ro.pk %}">Create Estimate</a>
-    </div>
-  {% endif %}
 </div>

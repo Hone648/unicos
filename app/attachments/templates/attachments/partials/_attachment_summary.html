@@ -1,7 +1,15 @@
-<div class="card shadow-sm">
-  <h2>Attachments</h2>
+<div class="ro-record">
+  <div class="ro-record-header">
+    <h3>Attachments</h3>
+    {% if can_upload_attachments %}
+      <div class="ro-record-actions">
+        <a class="btn btn-outline-secondary"
+           href="{% url 'attachments:upload_for_repair_order' repair_order_pk=ro.pk %}">Add Attachment</a>
+      </div>
+    {% endif %}
+  </div>
   {% if attachments %}
-    <div class="table-wrap table-responsive">
+    <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Attachments">
       <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>
@@ -42,10 +50,4 @@
     <p class="muted-text">No attachments yet.</p>
   {% endif %}
 
-  {% if can_upload_attachments %}
-    <div class="action-row">
-      <a class="btn btn-primary"
-         href="{% url 'attachments:upload_for_repair_order' repair_order_pk=ro.pk %}">Add Attachment</a>
-    </div>
-  {% endif %}
 </div>

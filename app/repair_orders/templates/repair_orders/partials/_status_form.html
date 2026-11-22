@@ -1,7 +1,7 @@
-<div id="status-update-card" class="card shadow-sm" tabindex="-1">
-  <h2>Change Status</h2>
+<div id="status-update-card" class="ro-status-controls" tabindex="-1">
+  <h3>Change Status</h3>
   {% if payment_paid_in_full %}
-    <div class="alert alert-success" role="status">Payment recorded. Invoice paid in full.</div>
+    <div class="alert alert-success" role="status">Invoice paid in full. Select Update Status to {% if selected_status == "closed" %}close{% elif selected_status == "delivered" %}mark this repair order as delivered{% else %}cancel{% endif %}{% if selected_status != "delivered" %} this repair order{% endif %}.</div>
   {% endif %}
   {% if blocking_invoice %}
     <div id="status-balance-warning" class="alert alert-warning" tabindex="-1">
@@ -36,16 +36,20 @@
         hx-target="#status-update-card"
         hx-swap="outerHTML">
     {% csrf_token %}
-    <div class="form-row">
-      <label for="new_status">New status</label>
-      <select id="new_status" name="new_status">
-        {% for value, label in status_choices %}
-          <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
-        {% endfor %}
-      </select>
-      <label for="note">Note</label>
-      <input type="text" id="note" name="note" maxlength="500" placeholder="Optional note…" />
-      <button class="btn btn-primary" type="submit">Update Status</button>
+    <div class="form-row ro-status-form">
+      <div class="ro-status-field">
+        <label for="new_status">New status</label>
+        <select id="new_status" name="new_status">
+          {% for value, label in status_choices %}
+            <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="ro-status-field">
+        <label for="note">Note</label>
+        <input type="text" id="note" name="note" maxlength="500" placeholder="Optional note…" />
+      </div>
+      <button class="btn {% if status_payment_url or show_intake_estimate_action %}btn-outline-secondary{% else %}btn-primary{% endif %}" type="submit">Update Status</button>
     </div>
   </form>
 </div>
