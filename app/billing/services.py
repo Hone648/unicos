@@ -43,7 +43,7 @@ class EstimateInvoiceConversionBlocked(EstimateInvoiceConversionError):
 
 
 _PAYMENT_FIELDS = ["payment_date", "amount", "method", "reference", "notes"]
-_LINE_ITEM_FIELDS = ["item_type", "description", "quantity", "unit_price"]
+_LINE_ITEM_FIELDS = ["item_type", "description", "quantity", "unit_price", "is_taxable"]
 
 
 def _final_invoice_message(invoice):
@@ -152,12 +152,16 @@ def convert_estimate_to_invoice(estimate, *, created_by=None):
         invoice_number=generate_invoice_number(),
         status=Invoice.Status.DRAFT,
         source_estimate=locked_estimate,
+        # Snapshot the estimate's tax rate so the converted invoice tax matches
+        # the approved estimate rather than the current shop default.
+        tax_rate=locked_estimate.tax_rate,
         created_by=created_by,
         updated_by=created_by,
     )
 
-    # Copy line items. Each InvoiceLineItem.save() recalculates the invoice
-    # subtotal, so the invoice total ends up matching the estimate total.
+    # Copy line items, including per-line taxability. Each InvoiceLineItem.save()
+    # recalculates the invoice subtotal, taxable subtotal, and tax, so the
+    # converted invoice totals end up matching the approved estimate.
     for item in locked_estimate.line_items.all():
         InvoiceLineItem.objects.create(
             invoice=invoice,
@@ -165,6 +169,7 @@ def convert_estimate_to_invoice(estimate, *, created_by=None):
             description=item.description,
             quantity=item.quantity,
             unit_price=item.unit_price,
+            is_taxable=item.is_taxable,
         )
 
     invoice.refresh_from_db()

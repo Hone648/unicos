@@ -30,7 +30,7 @@
               <td>{{ estimate.insurance_company|default:"—" }}</td>
               <td>{{ estimate.claim_number|default:"—" }}</td>
               <td>${{ estimate.deductible }}</td>
-              <td>${{ estimate.estimated_total }}</td>
+              <td>${{ estimate.total_amount }}</td>
             </tr>
           {% endfor %}
         </tbody>

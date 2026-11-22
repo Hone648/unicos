@@ -795,7 +795,10 @@ class LineItemCreateTests(TestCase):
         self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
         self.invoice.refresh_from_db()
         self.assertEqual(self.invoice.subtotal, Decimal("150.00"))
-        self.assertEqual(self.invoice.total_amount, Decimal("160.00"))
+        # The posted line is labor (not taxable by default), so tax is derived
+        # to 0.00 and the previously seeded manual tax is superseded.
+        self.assertEqual(self.invoice.tax_amount, Decimal("0.00"))
+        self.assertEqual(self.invoice.total_amount, Decimal("150.00"))
 
     def test_line_item_is_tied_to_invoice_from_url(self):
         self.client.post(line_item_create_url(self.invoice.pk), self._valid_data())
@@ -1000,16 +1003,19 @@ class RepairOrderDetailBillingDisplayTests(TestCase):
             self.ro,
             number="INV-BILL-07",
             subtotal=Decimal("0.00"),
-            tax_amount=Decimal("10.00"),
         )
+        # Taxable parts line: subtotal 160.00, tax 160.00 * 0.0825 = 13.20,
+        # total 173.20 — all derived from the line item and snapshot rate.
         make_line_item(
             invoice,
+            item_type=InvoiceLineItem.ItemType.PARTS,
             quantity=Decimal("2.00"),
             unit_price=Decimal("80.00"),
+            is_taxable=True,
         )
         response = self.client.get(ro_detail_url(self.ro.pk))
         self.assertContains(response, "160.00")
-        self.assertContains(response, "170.00")
+        self.assertContains(response, "173.20")
 
     def test_detail_without_invoice_does_not_show_edit_or_payment_links(self):
         response = self.client.get(ro_detail_url(self.ro.pk))
@@ -1605,13 +1611,15 @@ class VoidInvoiceUIRenderingTests(TestCase):
             self.ro,
             number="INV-VOID-UI",
             subtotal=Decimal("0.00"),
-            tax_amount=Decimal("15.00"),
         )
+        # Taxable parts line: subtotal 120.00, tax 120.00 * 0.0825 = 9.90.
         self.line_item = make_line_item(
             self.invoice,
+            item_type=InvoiceLineItem.ItemType.PARTS,
             description="Void line item",
             quantity=Decimal("1.00"),
             unit_price=Decimal("120.00"),
+            is_taxable=True,
         )
         make_payment(self.invoice, Decimal("50.00"))
         self.invoice.status = Invoice.Status.VOID
@@ -1634,7 +1642,7 @@ class VoidInvoiceUIRenderingTests(TestCase):
     def test_void_invoice_detail_shows_totals(self):
         response = self.client.get(invoice_detail_url(self.invoice.pk))
         self.assertContains(response, "120.00")  # subtotal from line item
-        self.assertContains(response, "15.00")  # tax
+        self.assertContains(response, "9.90")  # derived tax
 
     def test_void_invoice_detail_hides_edit_invoice(self):
         response = self.client.get(invoice_detail_url(self.invoice.pk))

@@ -1,4 +1,5 @@
 import os
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -13,6 +14,31 @@ def env_required(name):
     value = os.environ.get(name)
     if value is None or value == "":
         raise RuntimeError(f"Missing required environment variable: {name}")
+    return value
+
+
+def env_decimal_rate(name, default):
+    """Read a sales-tax rate from the environment as a normalized Decimal.
+
+    Whitespace is stripped and a blank value falls back to ``default``. The
+    rate must parse as a Decimal in the inclusive range [0, 1]; anything else
+    raises at startup so misconfiguration fails loudly rather than silently
+    taxing customers at the wrong rate.
+    """
+    raw = os.environ.get(name)
+    if raw is None or raw.strip() == "":
+        return Decimal(default)
+    raw = raw.strip()
+    try:
+        value = Decimal(raw)
+    except (InvalidOperation, ValueError) as exc:
+        raise RuntimeError(
+            f"Invalid {name}: {raw!r} is not a valid decimal sales tax rate."
+        ) from exc
+    if value < Decimal("0") or value > Decimal("1"):
+        raise RuntimeError(
+            f"Invalid {name}: {value} must be between 0 and 1 (e.g. 0.0825 for 8.25%)."
+        )
     return value
 
 
@@ -33,6 +59,11 @@ CSRF_TRUSTED_ORIGINS = env_list("DJANGO_CSRF_TRUSTED_ORIGINS")
 SHOP_DISPLAY_NAME = os.environ.get("SHOP_DISPLAY_NAME", "Daniel's Paint and Body").strip()
 if not SHOP_DISPLAY_NAME:
     SHOP_DISPLAY_NAME = "Daniel's Paint and Body"
+
+# Combined Texas state/local sales tax rate, snapshotted onto estimates and
+# invoices. Defaults to 8.25% until the shop verifies its exact rate via the
+# Texas Comptroller Sales Tax Rate Locator. See ADR 0051 and app/core/tax.py.
+SHOP_SALES_TAX_RATE = env_decimal_rate("SHOP_SALES_TAX_RATE", "0.0825")
 
 INSTALLED_APPS = [
     "django.contrib.admin",

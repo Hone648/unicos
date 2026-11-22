@@ -87,6 +87,7 @@
               <th>Description</th>
               <th>Qty</th>
               <th>Unit price</th>
+              <th>Taxable</th>
               <th>Line total</th>
             </tr>
           </thead>
@@ -97,6 +98,7 @@
                 <td>{{ item.description }}</td>
                 <td>{{ item.quantity }}</td>
                 <td>${{ item.unit_price }}</td>
+                <td>{% if item.is_taxable %}Yes{% else %}No{% endif %}</td>
                 <td>${{ item.line_total }}</td>
               </tr>
             {% endfor %}
@@ -111,12 +113,40 @@
   <div class="estimate-totals">
     <table>
       <tbody>
+        <tr>
+          <th scope="row">Subtotal before tax</th>
+          <td>${{ estimate.estimated_total }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Taxable subtotal</th>
+          <td>${{ estimate.taxable_subtotal }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Sales tax rate</th>
+          <td>{{ estimate.tax_rate_percent|floatformat:3 }}%</td>
+        </tr>
+        <tr>
+          <th scope="row">Estimated sales tax</th>
+          <td>${{ estimate.tax_amount }}</td>
+        </tr>
         <tr class="estimate-totals__total">
           <th scope="row">Estimated total</th>
-          <td>${{ estimate.estimated_total }}</td>
+          <td>${{ estimate.total_amount }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Deductible</th>
+          <td>${{ estimate.deductible }}</td>
+        </tr>
+        <tr class="estimate-totals__total">
+          <th scope="row">Estimated customer responsibility</th>
+          <td>${{ estimate.customer_responsibility }}</td>
         </tr>
       </tbody>
     </table>
+    <p class="estimate-tax-disclaimer muted-text">
+      Sales tax is estimated. Final taxes may vary based on final taxable
+      parts/materials and applicable local rate.
+    </p>
   </div>
 
   {% if estimate.has_approval_capture %}

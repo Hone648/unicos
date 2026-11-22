@@ -1,5 +1,6 @@
 from decimal import Decimal
 
+from core.tax import default_taxable_for_item_type
 from django import forms
 
 from .models import Estimate, EstimateLineItem
@@ -53,6 +54,17 @@ class EstimateForm(forms.ModelForm):
 
 
 class EstimateLineItemForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # For a new (unbound, unsaved) line item, seed the Texas default
+        # taxability from the item type so the checkbox starts correct. An
+        # explicitly bound value from POST always wins over this initial.
+        if not self.is_bound and self.instance.pk is None:
+            item_type = self.initial.get("item_type") or self.fields["item_type"].initial
+            if item_type is None:
+                item_type = EstimateLineItem.ItemType.LABOR
+            self.fields["is_taxable"].initial = default_taxable_for_item_type(item_type)
+
     class Meta:
         model = EstimateLineItem
         fields = [
@@ -60,11 +72,21 @@ class EstimateLineItemForm(forms.ModelForm):
             "description",
             "quantity",
             "unit_price",
+            "is_taxable",
         ]
         widgets = {
             "description": forms.TextInput(),
             "quantity": forms.NumberInput(attrs={"min": "0.01", "step": "0.01"}),
             "unit_price": forms.NumberInput(attrs={"min": "0.00", "step": "0.01"}),
+        }
+        labels = {
+            "is_taxable": "Taxable",
+        }
+        help_texts = {
+            "is_taxable": (
+                "Texas default: labor is not taxable; parts/materials are taxable. "
+                "Verify unusual sublet or misc charges."
+            ),
         }
 
     # estimate, sort_order, and timestamps are excluded. The view assigns the

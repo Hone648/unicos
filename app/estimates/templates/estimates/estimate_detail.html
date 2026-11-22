@@ -82,7 +82,7 @@
         <dt>Supplement of</dt>
         <dd><a href="{% url 'estimates:detail' estimate.parent_estimate.pk %}">{{ estimate.parent_estimate.estimate_number }}</a></dd>
       {% endif %}
-      <dt>Estimated total</dt><dd>${{ estimate.estimated_total }}</dd>
+      <dt>Subtotal before tax</dt><dd>${{ estimate.estimated_total }}</dd>
     </dl>
   </div>
 
@@ -125,6 +125,7 @@
             <th>Description</th>
             <th>Quantity</th>
             <th>Unit price</th>
+            <th>Taxable</th>
             <th>Line total</th>
             {% if can_manage_estimate and is_editable %}<th></th>{% endif %}
           </tr>
@@ -136,6 +137,7 @@
               <td>{{ item.description }}</td>
               <td>{{ item.quantity }}</td>
               <td>${{ item.unit_price }}</td>
+              <td>{% if item.is_taxable %}<span class="badge bg-secondary">Yes</span>{% else %}<span class="badge bg-light text-dark">No</span>{% endif %}</td>
               <td>${{ item.line_total }}</td>
               {% if can_manage_estimate and is_editable %}
                 <td class="line-item-actions">
@@ -151,7 +153,7 @@
         </tbody>
         <tfoot>
           <tr>
-            <th colspan="4">Estimated total</th>
+            <th colspan="5">Subtotal before tax</th>
             <th>${{ estimate.estimated_total }}</th>
             {% if can_manage_estimate and is_editable %}<th></th>{% endif %}
           </tr>
@@ -159,7 +161,7 @@
       </table>
     </div>
   {% else %}
-    <p class="muted-text">No line items yet. The estimated total above is entered manually until line items are added.</p>
+    <p class="muted-text">No line items yet. The subtotal before tax above is entered manually until line items are added.</p>
   {% endif %}
 
   {% if can_manage_estimate and is_editable %}
@@ -167,6 +169,44 @@
       <a class="btn btn-primary" href="{% url 'estimates:line_item_create' estimate_pk=estimate.pk %}">Add Line Item</a>
     </div>
   {% endif %}
+</div>
+
+<div class="card shadow-sm">
+  <h2>Totals</h2>
+  <div class="table-wrap table-responsive">
+    <table class="table table-sm align-middle mb-0 estimate-totals-table">
+      <tbody>
+        <tr>
+          <th scope="row">Subtotal before tax</th>
+          <td>${{ estimate.estimated_total }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Taxable subtotal</th>
+          <td>${{ estimate.taxable_subtotal }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Sales tax rate</th>
+          <td>{{ estimate.tax_rate_percent|floatformat:3 }}%</td>
+        </tr>
+        <tr>
+          <th scope="row">Estimated sales tax</th>
+          <td>${{ estimate.tax_amount }}</td>
+        </tr>
+        <tr class="fw-bold">
+          <th scope="row">Estimated total</th>
+          <td>${{ estimate.total_amount }}</td>
+        </tr>
+        <tr>
+          <th scope="row">Deductible</th>
+          <td>${{ estimate.deductible }}</td>
+        </tr>
+        <tr class="fw-bold">
+          <th scope="row">Estimated customer responsibility</th>
+          <td>${{ estimate.customer_responsibility }}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
 </div>
 
 <div class="card shadow-sm">
