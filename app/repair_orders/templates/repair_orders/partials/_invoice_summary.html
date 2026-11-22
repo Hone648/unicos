@@ -1,19 +1,19 @@
 {% load app_permissions %}
 
-<div class="card shadow-sm">
-  <h2>Invoice</h2>
+<div class="ro-record">
+  <h3>Invoice</h3>
   {% if can_view_invoice %}
     {% if invoice %}
-      <dl>
-        <dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd>
-        <dt>Status</dt><dd>{{ invoice.get_status_display }}</dd>
-        <dt>Issued</dt><dd>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
-        <dt>Due date</dt><dd>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}-{% endif %}</dd>
-        <dt>Subtotal</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd>
-        <dt>Tax</dt><dd>${{ invoice.tax_amount }}</dd>
-        <dt>Total</dt><dd>${{ invoice.total_amount }}</dd>
-        <dt>Paid</dt><dd class="amount-paid">${{ invoice.amount_paid }}</dd>
-        <dt>Balance due</dt><dd {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</dd>
+      <dl class="ro-invoice-facts">
+        <div><dt>Invoice #</dt><dd>{{ invoice.invoice_number }}</dd></div>
+        <div><dt>Status</dt><dd>{{ invoice.get_status_display }}</dd></div>
+        <div><dt>Issued</dt><dd>{% if invoice.issued_at %}{{ invoice.issued_at|date:"Y-m-d" }}{% else %}-{% endif %}</dd></div>
+        <div><dt>Due date</dt><dd>{% if invoice.due_date %}{{ invoice.due_date|date:"Y-m-d" }}{% else %}-{% endif %}</dd></div>
+        <div><dt>Subtotal</dt><dd class="amount-subtotal">${{ invoice.subtotal }}</dd></div>
+        <div><dt>Tax</dt><dd>${{ invoice.tax_amount }}</dd></div>
+        <div><dt>Total</dt><dd>${{ invoice.total_amount }}</dd></div>
+        <div><dt>Paid</dt><dd class="amount-paid">${{ invoice.amount_paid }}</dd></div>
+        <div><dt>Balance due</dt><dd {% if invoice.balance_due %}class="amount-due"{% endif %}>${{ invoice.balance_due }}</dd></div>
       </dl>
       {% if invoice.notes %}
         <p class="muted-text" style="margin-top: 0.75rem;">{{ invoice.notes }}</p>
@@ -30,7 +30,7 @@
         {% if invoice.status == "draft" and not is_final_repair_order and can_manage_invoice %}
           <form method="post" action="{% url 'billing:invoice_issue' pk=invoice.pk %}">
             {% csrf_token %}
-            <button type="submit" class="btn btn-primary">Issue Invoice</button>
+            <button type="submit" class="btn btn-outline-secondary">Issue Invoice</button>
           </form>
         {% endif %}
         {% if invoice.status != "void" and not is_final_repair_order and can_manage_invoice %}
@@ -40,13 +40,13 @@
           </form>
         {% endif %}
         {% if invoice.balance_due and invoice.status != "void" and not is_final_repair_order and can_record_payment %}
-          <a class="btn btn-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
+          <a class="btn btn-outline-primary" href="{% url 'billing:payment_create' invoice_pk=invoice.pk %}">Record Payment</a>
         {% endif %}
       </div>
 
       {% if line_items %}
-        <h3 style="margin-top: 1.25rem;">Line Items</h3>
-        <div class="table-wrap table-responsive">
+        <h4 class="ro-table-heading">Line Items</h4>
+        <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Invoice line items">
           <table class="line-item-table table table-sm table-hover align-middle mb-0">
             <thead>
               <tr>
@@ -79,8 +79,8 @@
       {% endif %}
 
       {% if payments %}
-        <h3 style="margin-top: 1.25rem;">Payments</h3>
-        <div class="table-wrap table-responsive">
+        <h4 class="ro-table-heading">Payments</h4>
+        <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Payments">
           <table class="table table-sm table-hover align-middle mb-0">
             <thead>
               <tr>
@@ -110,7 +110,7 @@
       <p class="muted-text">No invoice on file for this repair order.</p>
       {% if not is_final_repair_order and can_create_invoice %}
         <div class="action-row">
-          <a class="btn btn-primary" href="{% url 'billing:invoice_create' repair_order_pk=ro.pk %}">Create Invoice</a>
+          <a class="btn btn-outline-secondary" href="{% url 'billing:invoice_create' repair_order_pk=ro.pk %}">Create Invoice</a>
         </div>
       {% endif %}
     {% endif %}

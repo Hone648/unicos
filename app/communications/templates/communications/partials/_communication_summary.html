@@ -1,14 +1,16 @@
-<div class="card shadow-sm">
-  <h2>Communication Log</h2>
-  {% if can_add_communication %}
-    <div class="action-row">
-      <a class="btn btn-primary"
-         href="{% url 'communications:create' repair_order_pk=ro.pk %}">Add Communication</a>
-    </div>
-  {% endif %}
+<div class="ro-record">
+  <div class="ro-record-header">
+    <h3>Communication Log</h3>
+    {% if can_add_communication %}
+      <div class="ro-record-actions">
+        <a class="btn btn-outline-secondary"
+           href="{% url 'communications:create' repair_order_pk=ro.pk %}">Add Communication</a>
+      </div>
+    {% endif %}
+  </div>
 
   {% if communications %}
-    <div class="table-wrap table-responsive">
+    <div class="table-wrap table-responsive" tabindex="0" role="region" aria-label="Communication Log">
       <table class="table table-sm table-hover align-middle mb-0">
         <thead>
           <tr>

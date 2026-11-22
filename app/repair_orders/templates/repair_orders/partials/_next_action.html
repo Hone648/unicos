@@ -1,0 +1,7 @@
+<div id="ro-next-action" hx-swap-oob="true">
+  {% if show_intake_estimate_action %}
+    <div class="action-row mb-3">
+      <a class="btn btn-primary" href="{% url 'estimates:create' repair_order_pk=ro.pk %}">Create Estimate</a>
+    </div>
+  {% endif %}
+</div>
