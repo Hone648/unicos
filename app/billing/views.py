@@ -16,9 +16,13 @@ from accounts.policies import (
 )
 from core.document_numbers import generate_invoice_number
 from core.pagination import paginate_queryset, pagination_querystring
+from core.tax_review import TaxReviewForm
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 
@@ -225,15 +229,64 @@ def invoice_create_for_repair_order(request, repair_order_pk):
 
 
 @app_permission_required(PERM_BILLING_MANAGE)
-def invoice_edit(request, pk):
-    invoice = get_object_or_404(
-        Invoice.objects.select_related(
-            "repair_order",
-            "repair_order__customer",
-            "repair_order__vehicle",
-        ),
-        pk=pk,
+@transaction.atomic
+def invoice_tax_review(request, pk):
+    documents = Invoice.objects.select_related("repair_order")
+    if request.method == "POST":
+        documents = documents.select_for_update(of=("self",))
+    invoice = get_object_or_404(documents, pk=pk)
+    require_policy(can_manage_invoice(request.user, invoice))
+    detail_url = reverse("billing:invoice_detail", args=[pk])
+
+    if (
+        invoice.tax_breakdown_recorded
+        or invoice.status != Invoice.Status.DRAFT
+        or _repair_order_is_final(invoice.repair_order)
+    ):
+        messages.error(request, "Tax review is available for drafts with an unverified breakdown.")
+        return redirect(detail_url)
+
+    form = TaxReviewForm(
+        request.POST if request.method == "POST" else None,
+        line_items=list(invoice.line_items.all()),
     )
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                form.save(
+                    invoice,
+                    recalculate=invoice.recalculate_subtotal_from_line_items,
+                    actor=request.user,
+                )
+        except ValidationError as error:
+            invoice.refresh_from_db()
+            form.add_error(None, error)
+        else:
+            messages.success(request, "Tax breakdown reviewed.")
+            return redirect(detail_url)
+    return render(
+        request,
+        "core/tax_review_form.html",
+        {
+            "form": form,
+            "document": invoice,
+            "title": f"Review Tax for Invoice {invoice.invoice_number}",
+            "detail_url": detail_url,
+        },
+    )
+
+
+@app_permission_required(PERM_BILLING_MANAGE)
+@transaction.atomic
+def invoice_edit(request, pk):
+    invoices = Invoice.objects.select_related(
+        "repair_order",
+        "repair_order__customer",
+        "repair_order__vehicle",
+    )
+    if request.method == "POST":
+        invoices = invoices.select_for_update(of=("self",))
+    invoice = get_object_or_404(invoices, pk=pk)
     ro = invoice.repair_order
     require_policy(can_manage_invoice(request.user, invoice))
 

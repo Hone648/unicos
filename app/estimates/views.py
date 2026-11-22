@@ -17,8 +17,12 @@ from billing.services import (
     estimate_can_convert_to_invoice,
 )
 from core.document_numbers import generate_estimate_number
+from core.tax_review import TaxReviewForm
 from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 from repair_orders.models import RepairOrder
 
@@ -221,15 +225,56 @@ def estimate_create(request, repair_order_pk):
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
-def estimate_edit(request, pk):
-    estimate = get_object_or_404(
-        Estimate.objects.select_related(
-            "repair_order",
-            "repair_order__customer",
-            "repair_order__vehicle",
-        ),
-        pk=pk,
+@transaction.atomic
+def estimate_tax_review(request, pk):
+    documents = Estimate.objects.select_related("repair_order")
+    if request.method == "POST":
+        documents = documents.select_for_update(of=("self",))
+    estimate = get_object_or_404(documents, pk=pk)
+    require_policy(can_manage_estimate(request.user, estimate))
+    detail_url = reverse("estimates:detail", args=[pk])
+
+    if estimate.tax_breakdown_recorded or not estimate_is_editable(estimate):
+        messages.error(request, "Tax review is available for drafts with an unverified breakdown.")
+        return redirect(detail_url)
+
+    form = TaxReviewForm(
+        request.POST if request.method == "POST" else None,
+        line_items=list(estimate.line_items.all()),
     )
+    if request.method == "POST" and form.is_valid():
+        try:
+            with transaction.atomic():
+                form.save(estimate, recalculate=estimate.recalculate_total, actor=request.user)
+        except ValidationError as error:
+            estimate.refresh_from_db()
+            form.add_error(None, error)
+        else:
+            messages.success(request, "Tax breakdown reviewed.")
+            return redirect(detail_url)
+    return render(
+        request,
+        "core/tax_review_form.html",
+        {
+            "form": form,
+            "document": estimate,
+            "title": f"Review Tax for Estimate {estimate.estimate_number}",
+            "detail_url": detail_url,
+        },
+    )
+
+
+@app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
+@transaction.atomic
+def estimate_edit(request, pk):
+    estimates = Estimate.objects.select_related(
+        "repair_order",
+        "repair_order__customer",
+        "repair_order__vehicle",
+    )
+    if request.method == "POST":
+        estimates = estimates.select_for_update(of=("self",))
+    estimate = get_object_or_404(estimates, pk=pk)
     ro = estimate.repair_order
     require_policy(can_manage_estimate(request.user, estimate))
 
@@ -331,7 +376,7 @@ def line_item_create(request, estimate_pk):
         return redirect("estimates:detail", pk=estimate.pk)
 
     if request.method == "POST":
-        form = EstimateLineItemForm(request.POST)
+        form = EstimateLineItemForm(request.POST, estimate=estimate)
         if form.is_valid():
             line_item = form.save(commit=False)
             line_item.estimate = estimate
@@ -339,7 +384,7 @@ def line_item_create(request, estimate_pk):
             messages.success(request, "Estimate line item added.")
             return redirect("estimates:detail", pk=estimate.pk)
     else:
-        form = EstimateLineItemForm()
+        form = EstimateLineItemForm(estimate=estimate)
 
     return render(
         request,
@@ -412,6 +457,10 @@ def line_item_delete(request, pk):
     if request.method != "POST":
         return redirect("estimates:detail", pk=estimate.pk)
 
-    line_item.delete()  # recalculates estimate total
-    messages.success(request, "Estimate line item removed.")
+    try:
+        line_item.delete()
+    except ValidationError as error:
+        messages.error(request, error.messages[0])
+    else:
+        messages.success(request, "Estimate line item removed.")
     return redirect("estimates:detail", pk=estimate.pk)

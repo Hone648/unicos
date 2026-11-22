@@ -224,5 +224,7 @@ class ConversionTaxTests(TestCase):
         invoice = convert_estimate_to_invoice(self.estimate, created_by=self.user)
         self.assertEqual(invoice.subtotal, Decimal("500.00"))
         self.assertEqual(invoice.taxable_subtotal, Decimal("200.00"))
+        self.assertTrue(self.estimate.tax_breakdown_recorded)
+        self.assertTrue(invoice.tax_breakdown_recorded)
         self.assertEqual(invoice.tax_amount, Decimal("12.50"))
         self.assertEqual(invoice.total_amount, self.estimate.total_amount)

@@ -12,6 +12,9 @@
     <a class="btn btn-outline-secondary" href="{% url 'estimates:print' estimate.pk %}">Print Estimate</a>
     {% if can_manage_estimate and is_editable %}
       <a class="btn btn-outline-secondary" href="{% url 'estimates:edit' estimate.pk %}">Edit Estimate</a>
+      {% if not estimate.tax_breakdown_recorded %}
+        <a class="btn btn-outline-secondary" href="{% url 'estimates:tax_review' estimate.pk %}">Review Tax</a>
+      {% endif %}
     {% endif %}
     {% if can_convert_to_invoice %}
       <form method="post" action="{% url 'estimates:convert_to_invoice' estimate.pk %}" class="inline-form">
@@ -125,7 +128,7 @@
             <th>Description</th>
             <th>Quantity</th>
             <th>Unit price</th>
-            <th>Taxable</th>
+            {% if estimate.tax_breakdown_recorded %}<th>Taxable</th>{% endif %}
             <th>Line total</th>
             {% if can_manage_estimate and is_editable %}<th></th>{% endif %}
           </tr>
@@ -137,7 +140,7 @@
               <td>{{ item.description }}</td>
               <td>{{ item.quantity }}</td>
               <td>${{ item.unit_price }}</td>
-              <td>{% if item.is_taxable %}<span class="badge bg-secondary">Yes</span>{% else %}<span class="badge bg-light text-dark">No</span>{% endif %}</td>
+              {% if estimate.tax_breakdown_recorded %}<td>{% if item.is_taxable %}<span class="badge bg-secondary">Yes</span>{% else %}<span class="badge bg-light text-dark">No</span>{% endif %}</td>{% endif %}
               <td>${{ item.line_total }}</td>
               {% if can_manage_estimate and is_editable %}
                 <td class="line-item-actions">
@@ -153,7 +156,7 @@
         </tbody>
         <tfoot>
           <tr>
-            <th colspan="5">Subtotal before tax</th>
+            <th colspan="{% if estimate.tax_breakdown_recorded %}5{% else %}4{% endif %}">Subtotal before tax</th>
             <th>${{ estimate.estimated_total }}</th>
             {% if can_manage_estimate and is_editable %}<th></th>{% endif %}
           </tr>
@@ -173,6 +176,9 @@
 
 <div class="card shadow-sm">
   <h2>Totals</h2>
+  {% if not estimate.tax_breakdown_recorded %}
+    <p class="muted-text">Tax breakdown unavailable for this estimate.</p>
+  {% endif %}
   <div class="table-wrap table-responsive">
     <table class="table table-sm align-middle mb-0 estimate-totals-table">
       <tbody>
@@ -180,16 +186,18 @@
           <th scope="row">Subtotal before tax</th>
           <td>${{ estimate.estimated_total }}</td>
         </tr>
+        {% if estimate.tax_breakdown_recorded and line_items %}
+          <tr>
+            <th scope="row">Taxable subtotal</th>
+            <td>${{ estimate.taxable_subtotal }}</td>
+          </tr>
+          <tr>
+            <th scope="row">Sales tax rate</th>
+            <td>{{ estimate.tax_rate_percent|floatformat:3 }}%</td>
+          </tr>
+        {% endif %}
         <tr>
-          <th scope="row">Taxable subtotal</th>
-          <td>${{ estimate.taxable_subtotal }}</td>
-        </tr>
-        <tr>
-          <th scope="row">Sales tax rate</th>
-          <td>{{ estimate.tax_rate_percent|floatformat:3 }}%</td>
-        </tr>
-        <tr>
-          <th scope="row">Estimated sales tax</th>
+          <th scope="row">{% if estimate.tax_breakdown_recorded %}Estimated sales tax{% else %}Saved tax{% endif %}</th>
           <td>${{ estimate.tax_amount }}</td>
         </tr>
         <tr class="fw-bold">

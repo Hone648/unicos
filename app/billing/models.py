@@ -5,10 +5,11 @@ from core.tax import (
     default_sales_tax_rate,
     quantize_money,
 )
+from core.tax_review import validate_line_tax_edit
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator
-from django.db import models
+from django.db import models, transaction
 
 
 class Invoice(models.Model):
@@ -51,6 +52,8 @@ class Invoice(models.Model):
     )
     taxable_subtotal = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     tax_amount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # Existing documents may carry saved tax without a verified breakdown.
+    tax_breakdown_recorded = models.BooleanField(default=True, editable=False)
     notes = models.TextField(blank=True)
 
     created_by = models.ForeignKey(
@@ -99,6 +102,10 @@ class Invoice(models.Model):
         return (self.subtotal or Decimal("0.00")) + (self.tax_amount or Decimal("0.00"))
 
     @property
+    def has_line_items(self):
+        return bool(self.pk and self.line_items.exists())
+
+    @property
     def tax_rate_percent(self):
         """Tax rate expressed as a percentage for display (e.g. 8.250)."""
         return (self.tax_rate or Decimal("0")) * Decimal("100")
@@ -141,26 +148,24 @@ class Invoice(models.Model):
             self.save(update_fields=["status", "updated_at"])
 
     def recalculate_subtotal_from_line_items(self):
-        """Recalculate subtotal, taxable subtotal, and tax from line items.
-
-        ``subtotal`` sums all line items; ``taxable_subtotal`` sums only taxable
-        line items; ``tax_amount`` applies the snapshotted ``tax_rate``. Payment
-        status is synced afterward, matching the prior behavior.
-        """
+        """Recalculate line totals and keep saved tax on historical invoices."""
         line_items = list(self.line_items.all())
         total = sum((line_item.line_total for line_item in line_items), Decimal("0.00"))
-        taxable = sum(
-            (line_item.line_total for line_item in line_items if line_item.is_taxable),
-            Decimal("0.00"),
-        )
         self.subtotal = quantize_money(total)
-        self.taxable_subtotal = quantize_money(taxable)
-        self.tax_amount = calculate_tax(self.taxable_subtotal, self.tax_rate or Decimal("0"))
+        update_fields = ["subtotal", "updated_at"]
+        if self.tax_breakdown_recorded:
+            taxable = sum(
+                (line_item.line_total for line_item in line_items if line_item.is_taxable),
+                Decimal("0.00"),
+            )
+            self.taxable_subtotal = quantize_money(taxable)
+            self.tax_amount = calculate_tax(self.taxable_subtotal, self.tax_rate or Decimal("0"))
+            update_fields.extend(["taxable_subtotal", "tax_amount"])
         if self.amount_paid > self.total_amount:
             raise ValidationError(
                 "Invoice line items cannot total less than the amount already paid."
             )
-        self.save(update_fields=["subtotal", "taxable_subtotal", "tax_amount", "updated_at"])
+        self.save(update_fields=update_fields)
         self.sync_payment_status()
 
     def __str__(self):
@@ -212,25 +217,36 @@ class InvoiceLineItem(models.Model):
 
         others = list(self.invoice.line_items.exclude(pk=self.pk))
         existing_total = sum((line_item.line_total for line_item in others), Decimal("0.00"))
-        existing_taxable = sum(
-            (line_item.line_total for line_item in others if line_item.is_taxable),
-            Decimal("0.00"),
-        )
         projected_subtotal = existing_total + self.line_total
-        projected_taxable = existing_taxable + (
-            self.line_total if self.is_taxable else Decimal("0.00")
-        )
-        projected_tax = calculate_tax(projected_taxable, self.invoice.tax_rate or Decimal("0"))
+        projected_tax = self.invoice.tax_amount or Decimal("0.00")
+        if self.invoice.tax_breakdown_recorded:
+            existing_taxable = sum(
+                (line_item.line_total for line_item in others if line_item.is_taxable),
+                Decimal("0.00"),
+            )
+            projected_taxable = existing_taxable + (
+                self.line_total if self.is_taxable else Decimal("0.00")
+            )
+            projected_tax = calculate_tax(projected_taxable, self.invoice.tax_rate or Decimal("0"))
         projected_total = projected_subtotal + projected_tax
         if self.invoice.amount_paid > projected_total:
             raise ValidationError(
                 "Line item changes cannot make the invoice total less than the amount already paid."
             )
 
+    def validate_tax_edit(self):
+        if self.invoice_id:
+            validate_line_tax_edit(self, self.invoice, "invoice_id")
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        if self.invoice_id:
+            self.invoice.refresh_from_db(from_queryset=Invoice.objects.select_for_update())
+        self.validate_tax_edit()
         self.full_clean()
         super().save(*args, **kwargs)
-        self.invoice.recalculate_subtotal_from_line_items()
+        if self.invoice.tax_breakdown_recorded:
+            self.invoice.recalculate_subtotal_from_line_items()
 
     def __str__(self):
         return f"{self.get_item_type_display()}: {self.description}"

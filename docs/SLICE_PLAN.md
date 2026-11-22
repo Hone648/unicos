@@ -73,16 +73,15 @@ Post-Slice 45 unnumbered planning step:
 
 Likely next implementation slices:
 
-- Slice 48: production media serving/storage/scanning/backup design or another
-  roadmap-approved candidate
-- Slice 49: supplement-to-invoice handling, repair planning/parts/sublet, or
-  structured customer/insurer contact model
+- Future candidates include production media serving/storage/scanning/backup,
+  supplement-to-invoice handling, repair planning/parts/sublet, and a structured
+  customer/insurer contact model.
 
 Slice order can change after review. Each slice should stay narrow, validate its
 own acceptance criteria, and avoid pulling future scope forward without an
 explicit decision.
 
-Texas estimate/invoice tax totals slice (branch `feat/estimate-tax-totals`):
+Slice 48: Texas estimate/invoice tax totals (branch `feat/estimate-tax-totals`):
 
 - Configurable combined sales tax rate via `SHOP_SALES_TAX_RATE` (default
   `0.0825`), read/normalized as a Decimal in `[0, 1]` and failing loudly at
@@ -97,8 +96,22 @@ Texas estimate/invoice tax totals slice (branch `feat/estimate-tax-totals`):
 - Recalculation derives taxable subtotal and tax from taxable line items and the
   snapshotted rate; estimate-to-invoice conversion copies the rate and per-line
   taxability so converted totals match the approved estimate.
-- Two data migrations backfill `is_taxable` for existing line items and
-  recompute tax snapshots. UI/detail/print show taxable columns and totals with
-  an estimated-tax disclaimer.
+- Slice 48 originally shipped two data backfills. Slice 49 retires those
+  operations and keeps their migration IDs.
 - No new dependencies, no shop profile/admin model, no external tax lookup.
   ADR 0051.
+
+Slice 49: tax migration safety (branch `fix/tax-migration-safety`):
+
+- Both published `0005` migration IDs remain in the graph as no-ops.
+  The `0006` migrations add a tax-breakdown marker. Existing documents keep
+  their amounts and show the saved tax without unverified rates, taxable
+  subtotals, or line taxability.
+- An already-migrated database keeps its current amounts. ADR 0051 documents
+  backup-based recovery and rollback limits for values overwritten by Slice 48.
+- Estimate conversion copies the approved amount, saved rate, and line flags.
+  Itemized invoice tax is read-only in shop and admin forms. Manual invoices
+  continue to allow tax entry.
+- Repricing an unverified draft requires staff to confirm the rate and each
+  line's taxability through Review Tax. The application recalculates the
+  confirmed breakdown before normal pricing edits resume.

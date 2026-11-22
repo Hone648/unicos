@@ -1,3 +1,4 @@
+from django.db import transaction
 from django.utils import timezone
 
 from .models import Estimate
@@ -32,6 +33,7 @@ def estimate_is_editable(estimate):
     return estimate.status == estimate.Status.DRAFT
 
 
+@transaction.atomic
 def transition_estimate_status(
     estimate,
     new_status,
@@ -39,6 +41,7 @@ def transition_estimate_status(
     updated_by=None,
     approval_data=None,
 ):
+    estimate.refresh_from_db(from_queryset=Estimate.objects.select_for_update())
     if new_status not in {value for value, _label in Estimate.Status.choices}:
         raise EstimateStatusTransitionBlocked(f"'{new_status}' is not a valid estimate status.")
 

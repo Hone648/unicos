@@ -5,9 +5,10 @@ from core.tax import (
     default_sales_tax_rate,
     quantize_money,
 )
+from core.tax_review import TAX_REVIEW_REQUIRED, validate_line_tax_edit
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.db import models
+from django.db import models, transaction
 
 
 class Estimate(models.Model):
@@ -91,6 +92,8 @@ class Estimate(models.Model):
         decimal_places=2,
         default=Decimal("0.00"),
     )
+    # Existing documents may carry saved tax without a verified breakdown.
+    tax_breakdown_recorded = models.BooleanField(default=True, editable=False)
     notes = models.TextField(blank=True)
     approval_source = models.CharField(
         max_length=30,
@@ -181,29 +184,20 @@ class Estimate(models.Model):
         return (self.tax_rate or Decimal("0")) * Decimal("100")
 
     def recalculate_total(self):
-        """Recalculate pre-tax subtotal, taxable subtotal, and tax amount.
-
-        ``estimated_total`` sums all line items; ``taxable_subtotal`` sums only
-        taxable line items; ``tax_amount`` applies the snapshotted ``tax_rate``.
-        All reset to 0.00 when no line items remain.
-        """
+        """Recalculate line totals and keep saved tax on historical estimates."""
         line_items = list(self.line_items.all())
         total = sum((line_item.line_total for line_item in line_items), Decimal("0.00"))
-        taxable = sum(
-            (line_item.line_total for line_item in line_items if line_item.is_taxable),
-            Decimal("0.00"),
-        )
         self.estimated_total = quantize_money(total)
-        self.taxable_subtotal = quantize_money(taxable)
-        self.tax_amount = calculate_tax(self.taxable_subtotal, self.tax_rate or Decimal("0"))
-        self.save(
-            update_fields=[
-                "estimated_total",
-                "taxable_subtotal",
-                "tax_amount",
-                "updated_at",
-            ]
-        )
+        update_fields = ["estimated_total", "updated_at"]
+        if self.tax_breakdown_recorded:
+            taxable = sum(
+                (line_item.line_total for line_item in line_items if line_item.is_taxable),
+                Decimal("0.00"),
+            )
+            self.taxable_subtotal = quantize_money(taxable)
+            self.tax_amount = calculate_tax(self.taxable_subtotal, self.tax_rate or Decimal("0"))
+            update_fields.extend(["taxable_subtotal", "tax_amount"])
+        self.save(update_fields=update_fields)
 
     def __str__(self):
         return f"Estimate {self.estimate_number}"
@@ -254,13 +248,32 @@ class EstimateLineItem(models.Model):
         if self.unit_price is not None and self.unit_price < Decimal("0.00"):
             raise ValidationError({"unit_price": "Unit price cannot be negative."})
 
+    def validate_tax_edit(self):
+        if self.estimate_id:
+            validate_line_tax_edit(self, self.estimate, "estimate_id")
+
+    @transaction.atomic
     def save(self, *args, **kwargs):
+        if self.estimate_id:
+            tax_was_reviewed = self.estimate.tax_breakdown_recorded
+            self.estimate.refresh_from_db(from_queryset=Estimate.objects.select_for_update())
+            # A form opened before review has no taxability field. Keep the
+            # reviewed value if review completed while that form was saving.
+            if self.pk and not tax_was_reviewed and self.estimate.tax_breakdown_recorded:
+                self.is_taxable = (
+                    type(self).objects.values_list("is_taxable", flat=True).get(pk=self.pk)
+                )
+        self.validate_tax_edit()
         self.full_clean()
         super().save(*args, **kwargs)
-        self.estimate.recalculate_total()
+        if self.estimate.tax_breakdown_recorded:
+            self.estimate.recalculate_total()
 
+    @transaction.atomic
     def delete(self, *args, **kwargs):
-        estimate = self.estimate
+        estimate = Estimate.objects.select_for_update().get(pk=self.estimate_id)
+        if not estimate.tax_breakdown_recorded:
+            raise ValidationError(TAX_REVIEW_REQUIRED)
         super().delete(*args, **kwargs)
         estimate.recalculate_total()
 

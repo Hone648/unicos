@@ -12,6 +12,7 @@ urlpatterns = [
     ),
     path("invoices/", views.invoice_list, name="invoice_list"),
     path("invoices/<int:pk>/", views.invoice_detail, name="invoice_detail"),
+    path("invoices/<int:pk>/review-tax/", views.invoice_tax_review, name="invoice_tax_review"),
     path("invoices/<int:pk>/edit/", views.invoice_edit, name="invoice_edit"),
     path("invoices/<int:pk>/issue/", views.invoice_issue, name="invoice_issue"),
     path("invoices/<int:pk>/void/", views.invoice_void, name="invoice_void"),
