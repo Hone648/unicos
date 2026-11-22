@@ -6,7 +6,9 @@ class RepairOrderLifecycleError(Exception):
 
 
 class RepairOrderStatusTransitionBlocked(RepairOrderLifecycleError):
-    pass
+    def __init__(self, message, *, invoice):
+        super().__init__(message)
+        self.invoice = invoice
 
 
 def transition_repair_order_status(
@@ -30,7 +32,8 @@ def transition_repair_order_status(
         label = dict(RepairOrder.Status.choices).get(new_status, new_status)
         raise RepairOrderStatusTransitionBlocked(
             f"Repair order cannot be marked {label.lower()} because "
-            f"invoice {blocking_invoice.invoice_number} has a balance due."
+            f"invoice {blocking_invoice.invoice_number} has a balance due.",
+            invoice=blocking_invoice,
         )
 
     repair_order._apply_status_change(new_status, changed_by=changed_by, note=note)

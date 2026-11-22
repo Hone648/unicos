@@ -7,6 +7,7 @@ from accounts.authorization import (
     app_permission_required,
 )
 from accounts.policies import (
+    can_change_repair_order_status,
     can_manage_invoice,
     can_manage_invoice_for_repair_order,
     can_manage_invoice_line_items,
@@ -25,6 +26,11 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
+from repair_orders.status_continuation import (
+    read_status_continuation,
+    sign_status_continuation,
+    status_controls_url,
+)
 
 from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
 from .models import Invoice, InvoiceLineItem
@@ -386,10 +392,23 @@ def payment_create(request, invoice_pk):
     ro = invoice.repair_order
     require_policy(can_record_payment(request.user, invoice))
 
+    data = request.POST if request.method == "POST" else request.GET
+    continuation_token = data.get("status_continuation")
+    attempted_status, _ = read_status_continuation(invoice, continuation_token)
+    if not (
+        attempted_status
+        and can_change_repair_order_status(request.user, ro)
+        and can_view_invoice(request.user, invoice)
+    ):
+        attempted_status = None
+        continuation_token = None
+
     try:
         ensure_payment_recordable(invoice)
     except PaymentRecordingBlocked as error:
         messages.error(request, str(error))
+        if continuation_token:
+            return redirect(status_controls_url(ro.pk, continuation_token))
         return redirect("repair_orders:detail", pk=ro.pk)
 
     if request.method == "POST":
@@ -400,6 +419,11 @@ def payment_create(request, invoice_pk):
             except PaymentRecordingBlocked as error:
                 form.add_error(None, str(error))
             else:
+                if attempted_status:
+                    token = sign_status_continuation(
+                        invoice, attempted_status, payment_recorded=True
+                    )
+                    return redirect(status_controls_url(ro.pk, token))
                 messages.success(request, f"Payment of ${payment.amount} recorded.")
                 return redirect("repair_orders:detail", pk=ro.pk)
     else:
@@ -414,6 +438,7 @@ def payment_create(request, invoice_pk):
             "ro": ro,
             "title": f"Record Payment for Invoice {invoice.invoice_number}",
             "submit_label": "Record Payment",
+            "status_continuation": continuation_token,
         },
     )
 

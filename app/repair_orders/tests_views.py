@@ -1,7 +1,18 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
+from urllib.parse import parse_qs, urlsplit
 
-from accounts.authorization import ROLE_MANAGER, ROLE_READ_ONLY, ROLE_TECHNICIAN
+from accounts.authorization import (
+    PERM_REPAIR_ORDERS_CHANGE_STATUS,
+    PERM_REPAIR_ORDERS_VIEW,
+    ROLE_ESTIMATOR,
+    ROLE_FRONT_DESK,
+    ROLE_MANAGER,
+    ROLE_PERMISSION_MATRIX,
+    ROLE_READ_ONLY,
+    ROLE_TECHNICIAN,
+)
 from billing.models import Invoice, Payment
 from customers.models import Customer
 from django.contrib.auth import get_user_model
@@ -9,6 +20,7 @@ from django.contrib.auth.models import Group
 from django.test import TestCase
 from django.urls import reverse
 from repair_orders.models import RepairOrder, RepairOrderStatusHistory
+from repair_orders.status_continuation import sign_status_continuation
 from vehicles.models import Vehicle
 
 VALID_VIN = "1HGBH41JXMN109186"
@@ -1025,7 +1037,9 @@ class RepairOrderClosureRuleTests(TestCase):
 
     def test_blocked_transition_redirects_to_detail(self):
         response = self._post_status("delivered")
-        self.assertRedirects(response, detail_url(self.ro.pk))
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(urlsplit(response.url).path, detail_url(self.ro.pk))
+        self.assertEqual(urlsplit(response.url).fragment, "status-update-card")
 
     def test_partially_paid_invoice_with_balance_blocks_final_status(self):
         # Pay half the invoice — balance_due is still > 0
@@ -1108,6 +1122,10 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
     def test_htmx_blocked_transition_returns_200(self):
         response = self._htmx_post("delivered")
         self.assertEqual(response.status_code, 200)
+        self.assertNotIn("HX-Redirect", response.headers)
+        self.assertContains(
+            response, 'id="status-balance-warning" class="alert alert-warning" tabindex="-1"'
+        )
 
     def test_htmx_blocked_transition_includes_error_message(self):
         response = self._htmx_post("delivered")
@@ -1132,9 +1150,258 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
 
     def test_htmx_paid_invoice_allows_final_status(self):
         make_payment(self.invoice, Decimal("440.00"))
-        self._htmx_post("delivered")
+        response = self._htmx_post("delivered")
+        self.assertEqual(response.headers.get("HX-Redirect"), detail_url(self.ro.pk))
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+
+
+class RepairOrderPaymentShortcutTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.manager = make_user(username="shortcut-manager")
+        cls.estimator = make_user(username="shortcut-estimator", role_name=ROLE_ESTIMATOR)
+        cls.status_only_role = "Status without billing"
+        cls.status_only = make_user(username="shortcut-status-only", role_name=cls.status_only_role)
+        customer = make_customer()
+        cls.ro = make_repair_order(customer, make_vehicle(customer))
+        cls.invoice = make_invoice(cls.ro)
+        cls.payment_url = reverse("billing:payment_create", kwargs={"invoice_pk": cls.invoice.pk})
+        cls.invoice_url = reverse("billing:invoice_detail", kwargs={"pk": cls.invoice.pk})
+
+    def setUp(self):
+        self.client.force_login(self.manager)
+
+    def _attempt_status(self, target=RepairOrder.Status.CLOSED, *, htmx=True):
+        headers = {"HX-Request": "true"} if htmx else {}
+        return self.client.post(
+            status_url(self.ro.pk), {"new_status": target}, headers=headers, follow=not htmx
+        )
+
+    def _payment_data(self, token, amount):
+        return {
+            "status_continuation": token,
+            "payment_date": "2026-01-15",
+            "amount": amount,
+            "method": Payment.Method.CASH,
+        }
+
+    def _open_shortcut(self, warning):
+        url = warning.context["status_payment_url"]
+        self.assertContains(warning, f'href="{url}"')
+        payment_form = self.client.get(url)
+        token = parse_qs(urlsplit(url).query)["status_continuation"][0]
+        self.assertContains(payment_form, f'name="status_continuation" value="{token}"')
+        return token
+
+    def test_warning_respects_permissions_in_both_post_paths(self):
+        role_permissions = {
+            self.status_only_role: {PERM_REPAIR_ORDERS_VIEW, PERM_REPAIR_ORDERS_CHANGE_STATUS}
+        }
+        with patch.dict(ROLE_PERMISSION_MATRIX, role_permissions):
+            for htmx in (True, False):
+                for user, may_view, may_pay in (
+                    (self.manager, True, True),
+                    (self.estimator, True, False),
+                    (self.status_only, False, False),
+                ):
+                    with self.subTest(htmx=htmx, user=user.username):
+                        self.client.force_login(user)
+                        response = self._attempt_status(htmx=htmx)
+                        self.assertContains(response, 'id="status-balance-warning"')
+                        self.assertEqual(bool(response.context["status_payment_url"]), may_pay)
+                        if may_view:
+                            self.assertContains(
+                                response,
+                                f'<a href="{self.invoice_url}">{self.invoice.invoice_number}</a>',
+                                html=True,
+                            )
+                            self.assertContains(response, "has a balance due of $440.00.")
+                        else:
+                            self.assertContains(
+                                response,
+                                "Repair order cannot be marked closed because "
+                                f"invoice {self.invoice.invoice_number} has a balance due.",
+                            )
+                            self.assertNotContains(response, self.invoice_url)
+                            self.assertNotContains(response, "$440.00")
+                        if may_pay:
+                            self.assertContains(response, 'aria-describedby="status-payment-hint"')
+                            self.assertContains(response, "Record payment")
+                            self.assertContains(
+                                response,
+                                "Just received payment? Enter the amount here, "
+                                "then retry the status update.",
+                            )
+                        else:
+                            self.assertNotContains(response, self.payment_url)
+                            self.assertNotContains(response, "Just received payment?")
+
+    def test_invoice_on_final_repair_order_cannot_offer_payment(self):
+        RepairOrder.objects.filter(pk=self.ro.pk).update(status=RepairOrder.Status.DELIVERED)
+        response = self._attempt_status()
+        self.assertContains(response, "has a balance due of $440.00.")
+        self.assertNotContains(response, self.payment_url)
+
+    def test_full_payment_preselects_closed_but_waits_for_confirmation(self):
+        token = self._open_shortcut(self._attempt_status())
+        response = self.client.post(
+            self.payment_url, self._payment_data(token, "440.00"), follow=True
+        )
+        self.assertEqual(urlsplit(response.redirect_chain[-1][0]).fragment, "status-update-card")
+        self.assertContains(response, "Payment recorded. Invoice paid in full.")
+        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.invoice.refresh_from_db()
+        self.ro.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PAID)
+        self.assertEqual(self.invoice.payments.get().method, Payment.Method.CASH)
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status_history.count(), 1)
+
+        self._attempt_status()
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.ro.status_history.first().new_status, RepairOrder.Status.CLOSED)
+
+    def test_reopening_payment_return_url_after_closure_clears_confirmation(self):
+        confirmation = "Payment recorded. Invoice paid in full."
+        token = self._open_shortcut(self._attempt_status())
+        payment = self.client.post(self.payment_url, self._payment_data(token, "440.00"))
+        self.assertEqual(payment.status_code, 302)
+        return_url = payment["Location"]
+        pending = self.client.get(return_url)
+        self.assertContains(pending, confirmation)
+        self.assertContains(pending, '<option value="closed" selected>Closed</option>', html=True)
+
+        self._attempt_status(htmx=False)
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.invoice.payments.count(), 1)
+
+        completed = self.client.get(return_url)
+        self.assertContains(completed, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertNotContains(completed, confirmation)
+        self.assertNotContains(completed, 'id="status-balance-warning"')
+        self.assertNotContains(completed, 'id="status-payment-hint"')
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.invoice.payments.count(), 1)
+
+    def test_htmx_closure_after_payment_redirects_to_clean_updated_detail(self):
+        token = self._open_shortcut(self._attempt_status())
+        payment = self.client.post(self.payment_url, self._payment_data(token, "440.00"))
+        self.assertEqual(payment.status_code, 302)
+        return_url = payment["Location"]
+        self.assertIn("status_continuation", parse_qs(urlsplit(return_url).query))
+        self.assertContains(self.client.get(return_url), "Edit Repair Order")
+
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": RepairOrder.Status.CLOSED, "note": "Customer collected vehicle."},
+            headers={"HX-Request": "true", "HX-Current-URL": f"http://testserver{return_url}"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers.get("HX-Redirect"), detail_url(self.ro.pk))
+
+        detail = self.client.get(response["HX-Redirect"])
+        self.assertContains(
+            detail,
+            '<span id="ro-status-badge" class="status-badge status-closed" '
+            'hx-swap-oob="true">Closed</span>',
+            html=True,
+        )
+        self.assertContains(detail, "Status updated to &quot;Closed&quot;.")
+        self.assertContains(detail, "<td>Closed</td>", html=True)
+        self.assertContains(detail, "<td>Customer collected vehicle.</td>", html=True)
+        self.assertNotContains(detail, "Edit Repair Order")
+        self.assertNotContains(detail, "status_continuation")
+
+    def test_partial_payment_and_validation_keep_delivered_for_second_payment(self):
+        target = RepairOrder.Status.DELIVERED
+        token = self._open_shortcut(self._attempt_status(target, htmx=False))
+
+        invalid = self.client.post(self.payment_url, self._payment_data(token, "0.00"))
+        self.assertContains(invalid, f'name="status_continuation" value="{token}"')
+        self.assertContains(invalid, "Amount must be greater than zero.")
+        self.assertFalse(self.invoice.payments.exists())
+
+        partial = self.client.post(
+            self.payment_url, self._payment_data(token, "140.00"), follow=True
+        )
+        self.assertContains(partial, "has a remaining balance of $300.00.")
+        self.assertContains(partial, "Record another payment")
+        self.assertContains(
+            partial, '<option value="delivered" selected>Delivered</option>', html=True
+        )
+        self.invoice.refresh_from_db()
+        self.assertEqual(self.invoice.status, Invoice.Status.PARTIALLY_PAID)
+        self.assertContains(self._attempt_status(target), "has a balance due of $300.00.")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+
+        second_token = self._open_shortcut(partial)
+        paid = self.client.post(
+            self.payment_url, self._payment_data(second_token, "300.00"), follow=True
+        )
+        self.assertContains(paid, "Payment recorded. Invoice paid in full.")
+        self.assertContains(
+            paid, '<option value="delivered" selected>Delivered</option>', html=True
+        )
+        self.assertNotContains(paid, "Record another payment")
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self._attempt_status(target)
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, target)
+
+        completed = self.client.get(paid.redirect_chain[-1][0])
+        self.assertNotContains(completed, "Payment recorded. Invoice paid in full.")
+        self.assertNotContains(completed, 'id="status-balance-warning"')
+        self.assertNotContains(completed, 'id="status-payment-hint"')
+
+    def test_invalid_or_other_invoice_continuation_uses_normal_return(self):
+        token = self._open_shortcut(self._attempt_status())
+        other_order = make_repair_order(self.ro.customer, self.ro.vehicle, number="RO-OTHER")
+        other_invoice = make_invoice(other_order, number="INV-OTHER")
+        for invalid_token in (
+            token + "tampered",
+            sign_status_continuation(other_invoice, RepairOrder.Status.DELIVERED),
+            sign_status_continuation(self.invoice, "unknown_status"),
+        ):
+            with self.subTest(token=invalid_token):
+                response = self.client.post(
+                    self.payment_url, self._payment_data(invalid_token, "1.00")
+                )
+                self.assertRedirects(response, detail_url(self.ro.pk))
+        self.assertEqual(self.invoice.payments.count(), 3)
+        self.assertFalse(other_invoice.payments.exists())
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+
+    def test_stale_continuation_after_status_access_is_removed(self):
+        token = self._open_shortcut(self._attempt_status())
+        self.manager.groups.set([Group.objects.get_or_create(name=ROLE_FRONT_DESK)[0]])
+        paid = self.client.post(self.payment_url, self._payment_data(token, "440.00"), follow=True)
+        target_url, _ = paid.redirect_chain[-1]
+        self.assertEqual(target_url, detail_url(self.ro.pk))
+        self.assertNotContains(paid, 'id="status-update-card"')
+        response = self.client.post(
+            status_url(self.ro.pk), {"new_status": RepairOrder.Status.CLOSED}
+        )
+        self.assertEqual(response.status_code, 403)
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+
+    def test_already_reached_status_does_not_show_stale_warning(self):
+        url = self._attempt_status(htmx=False).redirect_chain[-1][0]
+        make_payment(self.invoice, Decimal("440.00"))
+        self.ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.manager)
+        self.ro.set_status(RepairOrder.Status.CLOSED, changed_by=self.manager)
+
+        response = self.client.get(url)
+        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertNotContains(response, 'id="status-balance-warning"')
+        self.assertNotContains(response, self.payment_url)
 
 
 # ---------------------------------------------------------------------------

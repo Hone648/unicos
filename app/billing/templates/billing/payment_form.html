@@ -38,6 +38,9 @@
 <div class="form-card shadow-sm">
   <form method="post">
     {% csrf_token %}
+    {% if status_continuation %}
+      <input type="hidden" name="status_continuation" value="{{ status_continuation }}" />
+    {% endif %}
 
     <div class="form-grid">
 
