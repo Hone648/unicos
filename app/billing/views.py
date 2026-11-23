@@ -27,9 +27,9 @@ from django.urls import reverse
 from repair_orders.business_rules import is_final_repair_order_status
 from repair_orders.models import RepairOrder
 from repair_orders.status_continuation import (
-    read_status_continuation,
     sign_status_continuation,
     status_controls_url,
+    validated_continuation,
 )
 
 from .forms import InvoiceCreateForm, InvoiceEditForm, InvoiceLineItemForm, PaymentForm
@@ -38,6 +38,7 @@ from .services import (
     InvoiceIssueBlocked,
     InvoiceLineItemMutationBlocked,
     InvoiceVoidBlocked,
+    PaymentContinuationObsolete,
     PaymentRecordingBlocked,
     create_invoice_line_item,
     edit_invoice_line_item,
@@ -394,14 +395,19 @@ def payment_create(request, invoice_pk):
 
     data = request.POST if request.method == "POST" else request.GET
     continuation_token = data.get("status_continuation")
-    attempted_status, _ = read_status_continuation(invoice, continuation_token)
-    if not (
-        attempted_status
+    continuation = validated_continuation(invoice, continuation_token, request.user)
+    if continuation_token and not (
+        continuation
         and can_change_repair_order_status(request.user, ro)
         and can_view_invoice(request.user, invoice)
     ):
-        attempted_status = None
-        continuation_token = None
+        messages.info(
+            request,
+            "The pending status action is no longer available. "
+            "Payment was not recorded. Review the current choices.",
+        )
+        return redirect("repair_orders:detail", pk=ro.pk)
+    attempted_status = continuation["status"] if continuation else None
 
     try:
         ensure_payment_recordable(invoice)
@@ -415,13 +421,25 @@ def payment_create(request, invoice_pk):
         form = PaymentForm(request.POST)
         if form.is_valid():
             try:
-                payment = record_payment(invoice, form.cleaned_data, actor=request.user)
+                payment = record_payment(
+                    invoice,
+                    form.cleaned_data,
+                    actor=request.user,
+                    continuation_token=continuation_token,
+                )
+            except PaymentContinuationObsolete as error:
+                messages.info(request, str(error))
+                return redirect("repair_orders:detail", pk=ro.pk)
             except PaymentRecordingBlocked as error:
                 form.add_error(None, str(error))
             else:
                 if attempted_status:
                     token = sign_status_continuation(
-                        invoice, attempted_status, payment_recorded=True
+                        invoice,
+                        attempted_status,
+                        payment_recorded=True,
+                        source_status=continuation["source"],
+                        action=continuation["action"],
                     )
                     return redirect(status_controls_url(ro.pk, token))
                 messages.success(request, f"Payment of ${payment.amount} recorded.")

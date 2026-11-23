@@ -1719,7 +1719,7 @@ class FinalRepairOrderBillingGuardTests(TestCase):
             self.vehicle,
             number="RO-FINAL-NO-INV",
         )
-        self.final_ro_no_invoice.set_status(
+        self.final_ro_no_invoice._apply_status_change(
             RepairOrder.Status.DELIVERED,
             changed_by=self.user,
             note="Final for billing guard test",

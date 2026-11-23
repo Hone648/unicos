@@ -1,8 +1,62 @@
+from accounts.authorization import PERM_REPAIR_ORDERS_CHANGE_STATUS, user_has_app_permission
+from accounts.policies import can_change_repair_order_status, is_owner_admin_or_manager
+from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.helpers import ActionForm
+from django.db import transaction
 
 from .models import RepairOrder, RepairOrderStatusHistory
+from .services import (
+    RepairOrderLifecycleError,
+    RepairOrderTransitionInvalid,
+    transition_repair_order_status,
+)
+from .transition_policy import REOPEN_TARGETS, routine_choices, transition_error
 
 _ACTION_NOTE = "Status changed from Django admin action."
+
+
+class RepairOrderActionForm(ActionForm):
+    transition_reason = forms.CharField(
+        required=False, max_length=500, label="Cancel/reopen reason"
+    )
+
+
+class RepairOrderAdminForm(forms.ModelForm):
+    expected_status = forms.CharField(widget=forms.HiddenInput)
+    transition_actor = None
+
+    class Meta:
+        model = RepairOrder
+        fields = "__all__"
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.saved_status = self.instance.status if self.instance.pk else RepairOrder.Status.INTAKE
+        self.fields["expected_status"].initial = self.saved_status
+        self.fields["status"].choices = [
+            (self.saved_status, dict(RepairOrder.Status.choices)[self.saved_status])
+        ] + (
+            routine_choices(self.saved_status)
+            if can_change_repair_order_status(self.transition_actor, self.instance)
+            else []
+        )
+        if not self.instance.pk:
+            self.fields["status"].initial = RepairOrder.Status.INTAKE
+            self.fields["status"].disabled = True
+
+    def clean(self):
+        data = super().clean()
+        if self.instance.pk and data.get("expected_status") != self.saved_status:
+            raise forms.ValidationError(
+                "Status changed since this page was loaded. Reload to review the current choices."
+            )
+        target = data.get("status")
+        if self.instance.pk and target and target != self.saved_status:
+            error = transition_error(self.instance, target, actor=self.transition_actor)
+            if error:
+                raise forms.ValidationError(error)
+        return data
 
 
 class RepairOrderStatusHistoryInline(admin.TabularInline):
@@ -20,6 +74,8 @@ class RepairOrderStatusHistoryInline(admin.TabularInline):
 
 @admin.register(RepairOrder)
 class RepairOrderAdmin(admin.ModelAdmin):
+    form = RepairOrderAdminForm
+    action_form = RepairOrderActionForm
     list_display = (
         "repair_order_number",
         "customer",
@@ -51,16 +107,19 @@ class RepairOrderAdmin(admin.ModelAdmin):
         "mark_estimating",
         "mark_awaiting_approval",
         "mark_approved",
+        "mark_parts_ordered",
         "mark_in_repair",
         "mark_quality_check",
         "mark_ready_for_pickup",
+        "mark_delivered",
         "mark_closed",
         "mark_canceled",
+        "reopen_repair_orders",
     ]
     fieldsets = (
         (
             "Repair Order",
-            {"fields": ("repair_order_number", "status", "is_closed_display")},
+            {"fields": ("repair_order_number", "status", "expected_status", "is_closed_display")},
         ),
         (
             "Customer & Vehicle",
@@ -91,59 +150,98 @@ class RepairOrderAdmin(admin.ModelAdmin):
     def is_closed_display(self, obj):
         return obj.is_closed
 
+    def get_form(self, request, obj=None, **kwargs):
+        base = super().get_form(request, obj, **kwargs)
+
+        class BoundForm(base):
+            transition_actor = request.user
+
+        return BoundForm
+
+    def get_actions(self, request):
+        actions = super().get_actions(request)
+        if not user_has_app_permission(request.user, PERM_REPAIR_ORDERS_CHANGE_STATUS):
+            for name in list(actions):
+                if name.startswith("mark_"):
+                    actions.pop(name)
+        if not is_owner_admin_or_manager(request.user):
+            actions.pop("mark_canceled", None)
+            actions.pop("reopen_repair_orders", None)
+        return actions
+
+    @transaction.atomic
     def save_model(self, request, obj, form, change):
-        from .services import RepairOrderStatusTransitionBlocked, transition_repair_order_status
-
-        if not change and not obj.created_by_id:
-            obj.created_by = request.user
-        obj.updated_by = request.user
-
-        if change and form is not None and "status" in form.changed_data:
-            # Route the status change through the lifecycle service so rules
-            # are enforced uniformly.  Save other field changes first with
-            # the original status, then let the service apply the transition.
-            desired_status = obj.status
-            obj.status = form.initial["status"]
+        if not change:
+            obj.status = RepairOrder.Status.INTAKE
+            obj.created_by = obj.created_by or request.user
+            obj.updated_by = request.user
             super().save_model(request, obj, form, change)
-            try:
+            return
+
+        current = RepairOrder.objects.select_for_update().get(pk=obj.pk)
+        target = obj.status
+        expected = getattr(form, "cleaned_data", {}).get(
+            "expected_status", getattr(form, "initial", {}).get("status", obj.status)
+        )
+        try:
+            if expected != current.status:
+                raise RepairOrderTransitionInvalid(
+                    "Status changed since this page was loaded. Reload to review current choices."
+                )
+            if target != current.status:
+                error = transition_error(current, target, actor=request.user)
+                if error:
+                    raise RepairOrderTransitionInvalid(error)
+            changed_fields = getattr(form, "changed_data", None)
+            if changed_fields is None:
+                changed_fields = [
+                    field.name for field in obj._meta.concrete_fields if field.editable
+                ]
+            for name in changed_fields:
+                if name not in {"status", "expected_status", "id"}:
+                    setattr(current, name, getattr(obj, name))
+            current.updated_by = request.user
+            current.save()
+            if target != current.status:
                 transition_repair_order_status(
-                    obj,
-                    desired_status,
+                    current,
+                    target,
                     changed_by=request.user,
                     note="Status changed from Django admin.",
+                    expected_status=expected,
                 )
-            except RepairOrderStatusTransitionBlocked as exc:
-                self.message_user(request, str(exc), level=messages.ERROR)
-        else:
-            # Pass the current user as status changer so history records correctly.
-            obj._status_changed_by = request.user
-            super().save_model(request, obj, form, change)
+        except RepairOrderLifecycleError as exc:
+            self.message_user(request, str(exc), level=messages.ERROR)
+        obj.refresh_from_db()
 
-    # ------------------------------------------------------------------
-    # Shared action helper
-    # ------------------------------------------------------------------
-
-    def _apply_status_action(self, request, queryset, target_status):
-        from .services import RepairOrderStatusTransitionBlocked
-
+    def _apply_status_action(self, request, queryset, target_status=None, *, action="routine"):
         updated = 0
         blocked = 0
+        reason = request.POST.get("transition_reason", "").strip()
         for ro in queryset:
-            if ro.status == target_status:
+            target = REOPEN_TARGETS.get(ro.status, "") if action == "reopen" else target_status
+            if action == "routine" and ro.status == target:
                 continue
             try:
-                ro.set_status(target_status, changed_by=request.user, note=_ACTION_NOTE)
+                transition_repair_order_status(
+                    ro,
+                    target,
+                    changed_by=request.user,
+                    note=_ACTION_NOTE,
+                    action=action,
+                    reason=reason,
+                    expected_status=ro.status,
+                )
                 updated += 1
-            except RepairOrderStatusTransitionBlocked as exc:
+            except RepairOrderLifecycleError as exc:
                 blocked += 1
                 self.message_user(request, str(exc), level=messages.ERROR)
-        label = RepairOrder.Status(target_status).label
         if updated:
-            self.message_user(request, f"{updated} repair order(s) set to '{label}'.")
+            self.message_user(request, f"{updated} repair order(s) updated.")
         if blocked:
             self.message_user(
                 request,
-                f"{blocked} repair order(s) could not be set to '{label}' due to lifecycle rules.",
+                f"{blocked} repair order(s) could not be updated due to lifecycle rules.",
                 level=messages.WARNING,
             )
 
@@ -163,6 +261,10 @@ class RepairOrderAdmin(admin.ModelAdmin):
     def mark_approved(self, request, queryset):
         self._apply_status_action(request, queryset, RepairOrder.Status.APPROVED)
 
+    @admin.action(description="Mark as: Parts ordered")
+    def mark_parts_ordered(self, request, queryset):
+        self._apply_status_action(request, queryset, RepairOrder.Status.PARTS_ORDERED)
+
     @admin.action(description="Mark as: In repair")
     def mark_in_repair(self, request, queryset):
         self._apply_status_action(request, queryset, RepairOrder.Status.IN_REPAIR)
@@ -175,13 +277,21 @@ class RepairOrderAdmin(admin.ModelAdmin):
     def mark_ready_for_pickup(self, request, queryset):
         self._apply_status_action(request, queryset, RepairOrder.Status.READY_FOR_PICKUP)
 
+    @admin.action(description="Mark as: Delivered")
+    def mark_delivered(self, request, queryset):
+        self._apply_status_action(request, queryset, RepairOrder.Status.DELIVERED)
+
     @admin.action(description="Mark as: Closed")
     def mark_closed(self, request, queryset):
         self._apply_status_action(request, queryset, RepairOrder.Status.CLOSED)
 
-    @admin.action(description="Mark as: Canceled")
+    @admin.action(description="Cancel Repair Orders (reason required)")
     def mark_canceled(self, request, queryset):
-        self._apply_status_action(request, queryset, RepairOrder.Status.CANCELED)
+        self._apply_status_action(request, queryset, RepairOrder.Status.CANCELED, action="cancel")
+
+    @admin.action(description="Reopen Repair Orders (reason required)")
+    def reopen_repair_orders(self, request, queryset):
+        self._apply_status_action(request, queryset, action="reopen")
 
 
 @admin.register(RepairOrderStatusHistory)

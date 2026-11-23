@@ -13,7 +13,7 @@ document.addEventListener("htmx:afterSettle", (event) => {
   const card = event.target;
   if (card.id !== statusCardId) return;
 
-  const warning = card.querySelector("#status-balance-warning");
+  const warning = card.querySelector("#status-balance-warning, #status-transition-error");
   if (!warning) return;
 
   warning.focus({ preventScroll: true });

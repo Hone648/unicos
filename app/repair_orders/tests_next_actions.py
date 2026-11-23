@@ -106,11 +106,20 @@ class IntakeNextActionTests(TestCase):
         )
 
     def test_htmx_moves_the_single_action_when_entering_and_leaving_intake(self):
-        self.ro.set_status(RepairOrder.Status.ESTIMATING)
+        self.ro._apply_status_change(RepairOrder.Status.CANCELED)
+        self.client.post(
+            status_url(self.ro.pk),
+            {"transition_action": "reopen", "expected_status": "canceled", "reason": "New work"},
+        )
         for status, prominent in [("intake", True), ("estimating", False)]:
             with self.subTest(status=status):
                 response = self.client.post(
-                    status_url(self.ro.pk), {"new_status": status}, HTTP_HX_REQUEST="true"
+                    status_url(self.ro.pk),
+                    {
+                        "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                        "new_status": status,
+                    },
+                    HTTP_HX_REQUEST="true",
                 )
                 self.assertEqual(response.context["show_intake_estimate_action"], prominent)
                 self.assertContains(response, f'href="{self.estimate_url}"', count=1)
@@ -123,7 +132,14 @@ class IntakeNextActionTests(TestCase):
     def test_balance_warning_takes_priority_over_the_intake_action(self):
         make_invoice(self.ro, subtotal=Decimal("100.00"), tax_amount=Decimal("0.00"))
         response = self.client.post(
-            status_url(self.ro.pk), {"new_status": "closed"}, HTTP_HX_REQUEST="true"
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "canceled",
+                "transition_action": "cancel",
+                "reason": "Customer canceled",
+            },
+            HTTP_HX_REQUEST="true",
         )
         self.assertFalse(response.context["show_intake_estimate_action"])
         self.assertContains(response, '<a class="btn btn-primary"', count=1)
@@ -135,12 +151,15 @@ class IntakeNextActionTests(TestCase):
         make_payment(invoice, Decimal("440.00"))
         for recorded in (False, True):
             with self.subTest(payment_recorded=recorded):
-                token = sign_status_continuation(invoice, "closed", payment_recorded=recorded)
+                token = sign_status_continuation(
+                    invoice, "canceled", payment_recorded=recorded, action="cancel"
+                )
                 response = self.client.get(detail_url(self.ro.pk), {"status_continuation": token})
                 self.assertFalse(response.context["show_intake_estimate_action"])
                 self.assertContains(
                     response,
-                    '<button class="btn btn-primary" type="submit">Update Status</button>',
+                    '<button class="btn btn-outline-secondary" type="submit">'
+                    "Update Status</button>",
                     html=True,
                 )
                 self.assertContains(response, f'href="{self.estimate_url}"', count=1)
@@ -157,16 +176,14 @@ class PaymentNextStepTests(TestCase):
         self.manager = make_user()
         self.client.force_login(self.manager)
         customer = make_customer()
-        self.ro = make_repair_order(customer, make_vehicle(customer))
+        self.ro = make_repair_order(
+            customer, make_vehicle(customer), status=RepairOrder.Status.READY_FOR_PICKUP
+        )
         self.invoice = make_invoice(self.ro, subtotal=Decimal("100.00"), tax_amount=Decimal("0.00"))
         self.payment_url = reverse("billing:payment_create", kwargs={"invoice_pk": self.invoice.pk})
 
     def test_full_payment_prompt_matches_requested_status_without_applying_it(self):
-        actions = {
-            "closed": "close this repair order",
-            "delivered": "mark this repair order as delivered",
-            "canceled": "cancel this repair order",
-        }
+        actions = {"delivered": "mark this repair order as delivered"}
         for target, action in actions.items():
             with self.subTest(target=target):
                 self.invoice.payments.all().delete()
@@ -190,12 +207,12 @@ class PaymentNextStepTests(TestCase):
                 )
                 self.assertFalse(response.context["show_intake_estimate_action"])
                 self.ro.refresh_from_db()
-                self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+                self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
                 self.assertIsNone(self.ro.closed_at)
                 self.assertEqual(self.ro.status_history.count(), 1)
 
     def test_partial_payment_then_final_payment_requires_explicit_closure(self):
-        token = sign_status_continuation(self.invoice, "closed")
+        token = sign_status_continuation(self.invoice, "delivered")
         for amount, balance in [("40.00", "60.00"), ("60.00", "0.00")]:
             response = self.client.post(
                 self.payment_url,
@@ -208,9 +225,9 @@ class PaymentNextStepTests(TestCase):
                 follow=True,
             )
             self.ro.refresh_from_db()
-            self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+            self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
             self.assertIsNone(self.ro.closed_at)
-            self.assertEqual(response.context["selected_status"], "closed")
+            self.assertEqual(response.context["selected_status"], "delivered")
             if balance != "0.00":
                 self.assertContains(response, "has a remaining balance of $60.00.")
                 self.assertContains(response, "Record another payment")
@@ -218,13 +235,20 @@ class PaymentNextStepTests(TestCase):
             else:
                 self.assertContains(
                     response,
-                    "Invoice paid in full. Select Update Status to close this repair order.",
+                    "Invoice paid in full. Select Update Status "
+                    "to mark this repair order as delivered.",
                 )
                 self.assertNotContains(response, "Record another payment")
             token = parse_qs(urlsplit(response.redirect_chain[-1][0]).query)["status_continuation"][
                 0
             ]
-        self.client.post(status_url(self.ro.pk), {"new_status": "closed"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {"new_status": "delivered", "expected_status": "ready_for_pickup"},
+        )
+        self.client.post(
+            status_url(self.ro.pk), {"new_status": "closed", "expected_status": "delivered"}
+        )
         self.ro.refresh_from_db()
         self.assertIsNotNone(self.ro.closed_at)
         stale = self.client.get(detail_url(self.ro.pk), {"status_continuation": token})
@@ -235,7 +259,10 @@ class PaymentNextStepTests(TestCase):
 class ClosedDateTransitionTests(TestCase):
     def setUp(self):
         customer = make_customer()
-        self.ro = make_repair_order(customer, make_vehicle(customer))
+        self.ro = make_repair_order(
+            customer, make_vehicle(customer), status=RepairOrder.Status.DELIVERED
+        )
+        self.manager = make_user()
 
     def test_shared_transition_persists_closed_date_and_repeat_preserves_it(self):
         closed_at = timezone.now() - timedelta(days=2)
@@ -287,9 +314,13 @@ class ClosedDateTransitionTests(TestCase):
         self.ro.set_status("closed")
         original_time = self.ro.closed_at
         reopened = RepairOrder.objects.get(pk=self.ro.pk)
-        reopened.set_status("in_repair")
+        reopened.set_status(
+            "in_repair", action="reopen", reason="Additional work", changed_by=self.manager
+        )
         reopened.internal_notes = "New inspection notes saved after reopening."
         reopened.save(update_fields=["internal_notes", "updated_at"])
+        for step in ["quality_check", "ready_for_pickup", "delivered"]:
+            reopened.set_status(step)
         later_time = original_time + timedelta(hours=1)
 
         with patch("repair_orders.services.timezone.now", return_value=later_time):
@@ -302,7 +333,7 @@ class ClosedDateTransitionTests(TestCase):
         self.assertEqual(self.ro.internal_notes, reopened.internal_notes)
         self.assertEqual(self.ro.closed_at, later_time)
         self.assertEqual(self.ro.status_history.filter(new_status="closed").count(), 2)
-        self.assertEqual(self.ro.status_history.first().previous_status, "in_repair")
+        self.assertEqual(self.ro.status_history.first().previous_status, "delivered")
 
     def test_blocked_closure_does_not_set_closed_date(self):
         make_invoice(self.ro)
@@ -312,20 +343,34 @@ class ClosedDateTransitionTests(TestCase):
         self.assertIsNone(self.ro.closed_at)
         self.ro.refresh_from_db()
         self.assertIsNone(self.ro.closed_at)
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
         self.assertEqual(self.ro.status_history.count(), count)
 
     def test_other_transitions_do_not_create_a_closed_date(self):
-        for status in ["delivered", "canceled", "estimating"]:
-            with self.subTest(status=status):
-                self.ro.set_status(status)
+        for source, target, options in [
+            ("ready_for_pickup", "delivered", {}),
+            (
+                "intake",
+                "canceled",
+                {"action": "cancel", "reason": "Customer canceled", "changed_by": self.manager},
+            ),
+            ("intake", "estimating", {}),
+        ]:
+            with self.subTest(target=target):
+                RepairOrder.objects.filter(pk=self.ro.pk).update(status=source)
+                self.ro.refresh_from_db()
+                self.ro.set_status(target, **options)
                 self.ro.refresh_from_db()
                 self.assertIsNone(self.ro.closed_at)
 
     def test_reclosure_records_the_new_closure_time(self):
         self.ro.set_status("closed")
         first = self.ro.closed_at
-        self.ro.set_status("in_repair")
+        self.ro.set_status(
+            "in_repair", action="reopen", reason="Additional work", changed_by=self.manager
+        )
+        for step in ["quality_check", "ready_for_pickup", "delivered"]:
+            self.ro.set_status(step)
         second = first + timedelta(days=1)
         with patch("repair_orders.services.timezone.now", return_value=second):
             self.ro.set_status("closed")
@@ -337,7 +382,7 @@ class ClosedDateTransitionTests(TestCase):
             with self.assertRaises(RuntimeError):
                 self.ro.set_status("closed")
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
         self.assertIsNone(self.ro.closed_at)
 
 
@@ -346,10 +391,18 @@ class ClosedDateDisplayTests(TestCase):
         self.manager = make_user()
         self.client.force_login(self.manager)
         customer = make_customer()
-        self.ro = make_repair_order(customer, make_vehicle(customer))
+        self.ro = make_repair_order(
+            customer, make_vehicle(customer), status=RepairOrder.Status.DELIVERED
+        )
 
     def test_closed_date_survives_detail_reload_and_repeat_post(self):
-        self.client.post(status_url(self.ro.pk), {"new_status": "closed"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "closed",
+            },
+        )
         self.ro.refresh_from_db()
         original = self.ro.closed_at
         self.assertIsNotNone(original)
@@ -358,9 +411,45 @@ class ClosedDateDisplayTests(TestCase):
             self.assertEqual(response.context["displayed_closed_at"], original)
             formatted = date_format(timezone.localtime(original), "Y-m-d H:i")
             self.assertContains(response, f"<dt>Closed</dt><dd>{formatted}</dd>", html=True)
-            self.client.post(status_url(self.ro.pk), {"new_status": "closed"})
+            self.client.post(
+                status_url(self.ro.pk),
+                {
+                    "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                    "new_status": "closed",
+                },
+            )
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.closed_at, original)
+
+    def test_reopened_overview_hides_saved_date_and_reclosure_displays_new_date(self):
+        first = timezone.now() - timedelta(days=2)
+        with patch("repair_orders.services.timezone.now", return_value=first):
+            self.ro.set_status("closed", changed_by=self.manager)
+        original_history = self.ro.status_history.get(new_status="closed")
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": "closed",
+                "transition_action": "reopen",
+                "reason": "Rework authorized",
+            },
+        )
+        reopened = self.client.get(detail_url(self.ro.pk))
+        self.assertIsNone(reopened.context["displayed_closed_at"])
+        self.assertContains(reopened, "<dt>Closed</dt><dd>—</dd>", html=True)
+        self.ro.refresh_from_db()
+        self.assertEqual(self.ro.closed_at, first)
+        self.assertEqual(self.ro.status_history.get(pk=original_history.pk).new_status, "closed")
+        for step in ["quality_check", "ready_for_pickup", "delivered"]:
+            self.ro.set_status(step, changed_by=self.manager)
+        second = first + timedelta(days=1)
+        with patch("repair_orders.services.timezone.now", return_value=second):
+            self.ro.set_status("closed", changed_by=self.manager)
+        response = self.client.get(detail_url(self.ro.pk))
+        self.assertEqual(response.context["displayed_closed_at"], second)
+        formatted = date_format(timezone.localtime(second), "Y-m-d H:i")
+        self.assertContains(response, f"<dt>Closed</dt><dd>{formatted}</dd>", html=True)
+        self.assertEqual(self.ro.status_history.filter(new_status="closed").count(), 2)
 
     def test_legacy_closed_order_displays_latest_closure_without_writing_field(self):
         RepairOrder.objects.filter(pk=self.ro.pk).update(status="closed")

@@ -247,22 +247,70 @@ The detail page shows:
 
 The current status is shown prominently. The full history of status changes is shown below, including who made each change and when.
 
-**Available statuses (approximate lifecycle):**
+### Routine status transitions
 
-```
-Intake → In Repair → Ready for Pickup → Delivered → Closed
-                                      → Canceled
-```
+The dropdown offers only the following next steps from the saved current status.
+The current status remains visible separately. Closed and Canceled jobs show
+**No routine status transitions are available**.
 
-Status transitions are controlled. Not all transitions are available at all times. See [Repair Order Closure Rules](#19-repair-order-closure-rules) for final-status restrictions.
+| Current status | Available next statuses |
+|---|---|
+| Intake | Estimating, In repair |
+| Estimating | Awaiting approval, Approved |
+| Awaiting approval | Approved, Estimating |
+| Approved | Parts ordered, In repair |
+| Parts ordered | In repair |
+| In repair | Quality check |
+| Quality check | Ready for pickup, In repair |
+| Ready for pickup | Delivered, In repair |
+| Delivered | Closed |
+| Closed or Canceled | No routine transitions |
+
+The estimate route is Intake → Estimating → Awaiting approval → Approved, or
+Estimating → Approved when approval has already been received. Parts ordering is
+optional: Approved can go directly to In repair. The direct-to-repair path is
+Intake → In repair. Both routes must pass Quality check before Ready for pickup.
+Quality check and Ready for pickup can return to In repair for rework. These are
+repair-order status changes; estimate approval and invoice issuance remain their
+own separate workflows and are not changed automatically.
 
 ### Changing repair order status
 
-1. From the repair order detail page, use the status update control.
-2. Select the new status.
-3. Submit. The status history updates immediately.
+1. In **Status & next action**, review the current status and choose an available
+   next status. Optionally add a note, then select **Update Status**.
+2. The server checks the saved status under a row lock. If another employee has
+   changed it, review the message and refreshed choices before trying again.
+3. Otherwise-valid final transitions still obey the invoice balance rule. For
+   Ready for pickup → Delivered with a balance, use **Record payment** if permitted.
+   Partial payment returns to the remaining balance; full payment returns with a
+   next-step message. **Update Status** is still required to complete delivery.
+   If the job or your permissions have changed, the pending action is discarded
+   and the current choices are shown. Payment alone never advances the job.
 
-**Who can change repair order status:** Owner/Admin, Manager, Estimator (repair_orders.change_status). Note: Front Desk cannot change status.
+**Who can make routine changes:** Owner/Admin, Manager, and Estimator
+(repair_orders.change_status). Front Desk cannot change status.
+
+### Canceling and reopening repair orders
+
+**Cancel Repair Order** and **Reopen Repair Order** are separate actions, outside
+the routine dropdown. Only Managers and Owners/Admins (including superusers) may
+use them. A nonblank reason is required on the server and is saved in Status
+History with the actor and transition. Django admin uses the same policy; its
+bulk cancel/reopen actions require the **Cancel/reopen reason** field.
+
+- Cancel is available before delivery: Intake through Ready for pickup. Delivered,
+  Closed, and Canceled jobs cannot be canceled again.
+- Reopen a Closed job to **In repair**; reopen a Canceled job to **Intake**.
+- Existing invoices, payments, estimates, and history remain intact. Nothing is
+  automatically voided, deleted, approved, or issued. The existing invoice balance
+  guard also applies to cancellation. If payment is recorded during cancellation,
+  re-enter the reason and explicitly select **Cancel Repair Order** on return.
+- A repeated Closed request preserves the original Closed date and history. A
+  genuine reopen and later closure records a new closure date and history entry.
+  Previously recorded closure dates remain part of the record while reopened.
+
+New repair orders always start at **Intake**, including Django admin. The policy
+does not relabel existing jobs or rewrite their historical statuses.
 
 ### Final repair orders
 

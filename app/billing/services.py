@@ -1,11 +1,14 @@
 """Billing service boundary."""
 
+from accounts.policies import can_record_payment, can_view_invoice
 from core.document_numbers import generate_invoice_number
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.utils import timezone
 from estimates.models import Estimate
 from repair_orders.business_rules import is_final_repair_order_status
+from repair_orders.models import RepairOrder
+from repair_orders.status_continuation import validated_continuation
 
 from .models import Invoice, InvoiceLineItem, Payment
 
@@ -28,6 +31,10 @@ class InvoiceVoidBlocked(BillingOperationBlocked):
 
 class PaymentRecordingBlocked(BillingOperationBlocked):
     """Payment recording is blocked."""
+
+
+class PaymentContinuationObsolete(PaymentRecordingBlocked):
+    """A status shortcut became unavailable before its payment could be saved."""
 
 
 class InvoiceLineItemMutationBlocked(BillingOperationBlocked):
@@ -56,8 +63,20 @@ def _invoice_void_message(invoice):
     return f"Invoice {invoice.invoice_number} is void and cannot be edited."
 
 
-def _lock_invoice(invoice):
-    return Invoice.objects.select_for_update().select_related("repair_order").get(pk=invoice.pk)
+def _lock_invoice(invoice, *, exception_cls):
+    # Lock the repair order first, matching the lifecycle service. Do not rely
+    # on a joined SELECT FOR UPDATE's planner-dependent row-lock order.
+    repair_order = RepairOrder.objects.select_for_update().get(pk=invoice.repair_order_id)
+    locked_invoice = Invoice.objects.select_for_update().get(pk=invoice.pk)
+    if locked_invoice.repair_order_id != repair_order.pk:
+        # Do not replace the saved association or acquire another repair-order
+        # lock after the invoice lock. Staff must reload the reassigned invoice.
+        raise exception_cls(
+            f"Invoice {locked_invoice.invoice_number} has been reassigned to another "
+            "repair order. No changes were saved. Reload the invoice before trying again."
+        )
+    locked_invoice.repair_order = repair_order
+    return locked_invoice
 
 
 def _ensure_repair_order_allows_billing(invoice, exception_cls):
@@ -213,9 +232,28 @@ def void_invoice(invoice, *, actor):
 
 
 @transaction.atomic
-def record_payment(invoice, data, *, actor):
-    """Record a payment while locking the invoice balance row."""
-    locked_invoice = _lock_invoice(invoice)
+def record_payment(invoice, data, *, actor, continuation_token=None):
+    """Record a payment with current repair-order and invoice rows locked.
+
+    Status shortcuts must still be valid at this write boundary. Ordinary
+    invoice payments have no pending status action to validate.
+    """
+    obsolete_message = (
+        "The pending status action is no longer available. "
+        "Payment was not recorded. Review the current choices."
+    )
+    try:
+        locked_invoice = _lock_invoice(invoice, exception_cls=PaymentRecordingBlocked)
+    except PaymentRecordingBlocked as error:
+        if continuation_token:
+            raise PaymentContinuationObsolete(obsolete_message) from error
+        raise
+    if continuation_token and not (
+        validated_continuation(locked_invoice, continuation_token, actor)
+        and can_record_payment(actor, locked_invoice)
+        and can_view_invoice(actor, locked_invoice)
+    ):
+        raise PaymentContinuationObsolete(obsolete_message)
     ensure_payment_recordable(locked_invoice)
 
     payment = Payment(
@@ -236,7 +274,7 @@ def record_payment(invoice, data, *, actor):
 def create_invoice_line_item(invoice, data, *, actor):
     """Create an invoice line item and return it."""
     del actor
-    invoice = _lock_invoice(invoice)
+    invoice = _lock_invoice(invoice, exception_cls=InvoiceLineItemMutationBlocked)
     ensure_invoice_line_items_mutable(invoice)
     line_item = InvoiceLineItem(
         invoice=invoice,
@@ -253,7 +291,7 @@ def create_invoice_line_item(invoice, data, *, actor):
 def edit_invoice_line_item(line_item, data, *, actor):
     """Edit an invoice line item and return it."""
     del actor
-    invoice = _lock_invoice(line_item.invoice)
+    invoice = _lock_invoice(line_item.invoice, exception_cls=InvoiceLineItemMutationBlocked)
     ensure_invoice_line_items_mutable(invoice)
     line_item.refresh_from_db()
     line_item.invoice = invoice
