@@ -1,7 +1,8 @@
 # Roadmap
 
-This roadmap reflects the current implementation after Slice 47. It should guide
-slice planning but can change after implementation review and user feedback.
+This roadmap reflects Slices 48–49 and the merged repair-order follow-ups
+through PR #62. Slice planning can change after implementation review and
+user feedback.
 
 ## Current State
 
@@ -14,7 +15,10 @@ Implemented:
 - Explicit Django admin policy decision: admin is an emergency/development
   back-office console, not the primary shop-facing workflow
 - Customer and vehicle records
-- Repair orders, status history, create/edit workflow, and HTMX status updates
+- Repair-order create/edit workflow and a detail page grouped by overview,
+  next action, estimate and invoice, and activity and files
+- Shared repair-order status rules for shop views and Django admin, auditable
+  cancel/reopen actions, Closed date display, and HTMX status updates
 - New repair-order form vehicle selection is scoped by selected customer and
   loads the vehicle field via HTMX
 - Repair-order communication log for customer/insurer/adjuster/internal history
@@ -27,10 +31,13 @@ Implemented:
   mutations
 - Estimate and insurance spine, estimate line items, supplement lineage,
   browser-printable estimate output, controlled approval status actions, and
-  approval capture for approved estimates
+  approval capture, and approved-estimate-to-draft-invoice conversion
+- Estimate and invoice tax totals, with historical amounts preserved through
+  the tax migration and review for unverified draft tax breakdowns
 - Generated repair-order and invoice numbers
 - Guards for void invoices, final repair-order edits, final repair-order billing
-  mutations, and unpaid-invoice closure blocking
+  mutations, and unpaid-invoice closure blocking. The balance warning offers
+  eligible staff a payment shortcut back to the pending status action.
 - CI with Ruff lint/format checks, Django checks, missing migration checks,
   migrations, full tests, Docker build/runtime smoke, and `/healthz/`
 - Read-only reporting at `/reports/` for repair-order, billing, and estimate
@@ -76,15 +83,15 @@ The app now defines a domain-specific permission matrix and enforces app-level
 permissions in major shop-facing views. `accounts.policies` adds object-level
 policy checks for repair orders, estimates, and billing objects.
 
-Proposed matrix:
+Current shop-facing roles:
 
-| Role | Intended access direction |
+| Role | Access relevant to repair orders |
 | --- | --- |
 | Owner/Admin | All actions |
-| Manager | Most operational actions, reports, and explicitly allowed workflow overrides |
-| Front Desk | Customer intake, vehicle intake, repair-order intake, and possibly payments |
-| Estimator | Estimates, supplements, repair-order notes, and status updates |
-| Technician | View assigned ROs and update production notes/status where allowed |
+| Manager | Shop workflow, reports, and reason-required cancel and reopen actions |
+| Front Desk | Customer, vehicle, and repair-order intake, estimate work, invoice viewing, and payment recording |
+| Estimator | View repair orders, estimates, and invoices and make routine repair-order status changes |
+| Technician | View assigned repair orders |
 | Read-only | View-only access |
 
 Remaining limits:
@@ -109,19 +116,21 @@ Slice 39: Django admin policy decision / ADR
 Slice 43: admin service-alignment / override audit
 ```
 
-Repair-order status transitions are now centralized in
-`repair_orders/services.py`. The unpaid-invoice final-status block is enforced
-uniformly across shop-facing views and Django admin.
+Shop-facing views and Django admin share the repair-order transition policy
+and lifecycle service. The service validates the saved status, enforces the
+invoice balance guard, and records the actor and reason for cancel and reopen
+actions.
 
 Billing mutations are now centralized in `billing/services.py` for invoice
 issue, invoice void, payment recording, and invoice line-item create/edit.
-Payment recording locks the invoice row with `select_for_update()` before
-checking balance and saving the payment.
+Payment recording locks the repair order first and the invoice second before
+checking the balance or saving. A payment shortcut also rechecks the pending
+action and permissions under those locks.
 
-Slice 43 closed the remaining admin gaps: estimate status changes, invoice
-issue/void, payment recording, and invoice line-item mutation now route
-through their respective services (or are made read-only in admin) instead of
-saving directly. See `DECISIONS/0046-admin-service-alignment.md`.
+Slice 43 aligned admin estimate status changes, invoice issue and void,
+payment recording, and invoice line-item mutation with their respective
+services or made the fields read-only. See
+`DECISIONS/0046-admin-service-alignment.md`.
 
 Slice-numbering note: the actual Git-backed sequence is canonical. The
 originally planned separate "billing views call services only" slice was
@@ -357,19 +366,25 @@ Remaining communication gaps:
 - No email/SMS sending or inbound sync.
 - No reminders, follow-up tasks, portal, signatures, or uploads.
 
-Recommended next slices:
+Workflow follow-up candidates:
 
-- Product Slice 48 candidate: production media serving/storage/scanning/backup design.
-- Later candidates: supplement-to-invoice handling, repair planning/parts/sublet,
-  or structured customer/insurer contact model.
+- Repair-order intake from customer and vehicle records, with the existing
+  selections carried into a new order.
+- Clearer estimate action guidance and approval requirements.
+- Payment-form usability, including keyboard entry and date and amount guidance.
+- Supplement-to-invoice handling, repair planning for parts and sublet work,
+  and structured customer and insurer contacts.
+
+Production media storage, serving, scanning, and backups remain open under
+[Production Hardening](#priority-7---production-hardening).
 
 ## Missing Body-Shop Workflow Areas
 
 | Area | Missing examples |
 | --- | --- |
-| Estimating | estimates, supplements, browser-printable estimate output, controlled estimate approval status, approval capture, estimate versions |
-| Insurance | insurer, claim number, adjuster, deductible, DRP fields |
-| Repair planning | labor operations, parts orders, sublet vendors, supplements |
+| Estimating | Full estimate versioning, generated PDFs, and supplement-to-invoice handling |
+| Insurance | Adjuster records, DRP fields, coverage lines, and richer claim tracking |
+| Repair planning | Labor operations, parts orders, and sublet vendor tracking |
 | Customer communication | repair-order communication log implemented; still missing structured contacts, global communication views, email/SMS integrations, reminders, portal, signatures, and uploads |
 | Attachments | repair-order file upload/download/delete implemented with local Docker media persistence and lightweight validation hardening; still missing estimate/invoice-specific attachments, global queue, thumbnails, production media serving, malware scanning |
 | Scheduling | promised date exists, but not production calendar / technician scheduling |

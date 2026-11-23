@@ -115,3 +115,17 @@ Slice 49: tax migration safety (branch `fix/tax-migration-safety`):
 - Repricing an unverified draft requires staff to confirm the rate and each
   line's taxability through Review Tax. The application recalculates the
   confirmed breakdown before normal pricing edits resume.
+
+Merged follow-ups after Slice 49:
+
+- PR #60 (`e669cd4`) adds the balance-due warning's payment shortcut and
+  returns staff to the pending repair-order status action after payment.
+- PR #61 (`5bece09`) reorganizes the repair-order detail page around the
+  job overview, next action, billing, and activity. It also records and
+  displays the Closed date.
+- PR #62 (`8b6ea68`) enforces routine status transitions across shop views and
+  Django admin, adds reason-required cancel and reopen actions, and revalidates
+  payment shortcuts at the billing write boundary.
+
+Unnumbered documentation pass: reconcile the [staff walkthroughs](USER_MANUAL.md#20-common-workflows),
+[architecture](ARCHITECTURE.md), and [roadmap](ROADMAP.md) with those follow-ups.

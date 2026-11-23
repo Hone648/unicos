@@ -59,8 +59,9 @@ Architectural style:
   domain-specific override layer for shop statuses, print views, forms, tables,
   and operational layout. There is no frontend build tooling and no Tailwind
   runtime.
-- HTMX: loaded via CDN script tag (pinned 2.0.4, defer); used only for the
-  repair-order status update form; normal POST/redirect fallback preserved
+- HTMX: loaded via CDN script tag (pinned 2.0.4, defer). It updates repair-order
+  status controls and loads the vehicle field on the repair-order create form.
+  Status actions also support normal POST and redirect.
 
 Current domain models:
 
@@ -71,13 +72,12 @@ Current domain models:
 - `repair_orders.RepairOrder`: central shop workflow record linking customer,
   vehicle, and assigned staff; status is a controlled `TextChoices` enum (not a
   configurable DB table); FKs to customer and vehicle use `PROTECT`; number is
-  system-generated (`RO-YYYY-NNNNNN`) — staff do not type it manually;
-  final-status transitions (delivered, closed, canceled) are blocked by the
-  shop-facing status-update view when a non-void invoice has a balance due;
-  ordinary repair-order field edits and shop-facing billing mutations are
-  blocked once the order is delivered, closed, or canceled, while detail,
-  history, billing summary, printable invoices, and allowed status movement
-  remain visible/available
+  system-generated (`RO-YYYY-NNNNNN`). The lifecycle service blocks otherwise
+  valid final-status transitions (Delivered, Closed, Canceled) when a non-void
+  invoice has a balance due. Ordinary repair-order field edits and shop-facing
+  billing mutations are blocked once the order is delivered, closed, or
+  canceled. Detail, history, billing summary, printable invoices, and allowed
+  status actions remain available.
 - `repair_orders.RepairOrderStatusHistory`: append-only audit trail of status
   changes on a repair order; cascades with the repair order
 - `billing.Invoice`: one-to-one with RepairOrder; tracks subtotal, tax, and
@@ -186,13 +186,13 @@ Authorization:
 
 Current permission matrix:
 
-| Role | Intended access direction |
+| Role | Current shop-facing access relevant to repair orders |
 | --- | --- |
 | Owner/Admin | All actions |
-| Manager | Most operational actions, reports, and explicitly allowed workflow overrides |
-| Front Desk | Customer intake, vehicle intake, repair-order intake, and possibly payments |
-| Estimator | Estimates, supplements, repair-order notes, and status updates |
-| Technician | View assigned ROs and update production notes/status where allowed |
+| Manager | Shop workflow, reports, and reason-required cancel and reopen actions |
+| Front Desk | Customer, vehicle, and repair-order intake, estimate work, invoice viewing, and payment recording |
+| Estimator | View repair orders, estimates, and invoices and make routine repair-order status changes |
+| Technician | View assigned repair orders |
 | Read-only | View-only access |
 
 Remaining limitations:
@@ -247,16 +247,26 @@ Admin policy:
 
 Lifecycle service layer:
 
-- Repair-order status transitions are centralized in `repair_orders/services.py`
-  via `transition_repair_order_status()`.
+- Shop-facing status views and Django admin form saves and bulk actions share
+  `repair_orders/transition_policy.py` and
+  `repair_orders.services.transition_repair_order_status()`. The policy supplies
+  the choices for the saved status and validates the requested destination.
+  The service locks the repair order, checks the expected source status when
+  supplied, and writes the status, Closed date when closing, and history in
+  one transaction. Duplicate routine requests leave the saved history and
+  closure timestamp intact.
 - `RepairOrder.set_status()` delegates to the service and is the normal public
-  entry point.
-- `RepairOrder._apply_status_change()` is a private low-level method for test
-  setup only; application code must not call it.
+  model entry point. The lifecycle service uses the private
+  `RepairOrder._apply_status_change()` persistence helper.
 - The unpaid-invoice final-status block is enforced by the service for all
   callers: shop-facing views, admin bulk actions, and admin status form saves.
-- No admin override pathway exists; a future override slice would require
-  explicit audit semantics.
+- Cancel and reopen are explicit actions for a Manager or Owner/Admin with
+  access to the repair order. Both require a nonblank reason, up to 500
+  characters, which is recorded with the actor in Status History. Cancel is
+  available before delivery and retains the invoice balance guard. Reopen
+  takes Closed to In repair or Canceled to Intake. Existing billing and
+  estimate records are retained. The Overview shows the Closed date only
+  when the current status is Closed.
 - Estimate-to-invoice draft conversion is centralized in `billing/services.py`
   via `convert_estimate_to_invoice()` (with the
   `estimate_can_convert_to_invoice()` predicate). It validates that the estimate
@@ -267,8 +277,19 @@ Lifecycle service layer:
   `create_invoice_line_item()`, and `edit_invoice_line_item()`. The service
   layer owns final-repair-order blocks, void-invoice blocks, invoice lifecycle
   state checks, line-item total checks, payment amount checks, overpayment
-  checks, and payment status synchronization. Payment recording locks the
-  invoice row with `select_for_update()` inside a transaction.
+  checks, and payment status synchronization. Payment recording takes separate
+  `select_for_update()` locks on the repair order first and the invoice second
+  inside one transaction. It checks that the invoice still belongs to the
+  locked repair order before saving anything.
+- A payment shortcut uses a signed continuation bound to the repair order
+  and invoice. It carries the source status, target status, action, and
+  whether a payment was recorded. The billing view checks it on entry.
+  Under both locks, the payment service revalidates the saved source status,
+  transition policy and actor, invoice access, payment permission, and the
+  current billing rules. An obsolete continuation at the write boundary
+  leaves the payment unsaved. A valid payment returns to the pending action
+  for a separate status submission. Cancel still requires the reason on
+  that submission.
 
 Future service-layer direction:
 
