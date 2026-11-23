@@ -1,5 +1,7 @@
+from accounts.authorization import ROLE_MANAGER
 from customers.models import Customer
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import Group
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError
 from django.db.models import ProtectedError
@@ -17,9 +19,11 @@ VALID_VIN_2 = "2T1BURHE0JC043821"
 
 
 def make_user(username="staffuser", **kwargs):
-    return get_user_model().objects.create_user(
+    user = get_user_model().objects.create_user(
         username=username, password="pw-test-12345", **kwargs
     )
+    user.groups.add(Group.objects.get_or_create(name=ROLE_MANAGER)[0])
+    return user
 
 
 def make_customer(first_name="Test", last_name="Customer", **kwargs):
@@ -174,13 +178,13 @@ class RepairOrderStatusHistoryTests(TestCase):
     def test_set_status_records_changed_by(self):
         user = make_user()
         ro = make_repair_order(self.customer, self.vehicle)
-        ro.set_status(RepairOrder.Status.APPROVED, changed_by=user)
+        ro.set_status(RepairOrder.Status.ESTIMATING, changed_by=user)
         latest = ro.status_history.first()
         self.assertEqual(latest.changed_by, user)
 
     def test_set_status_records_note(self):
         ro = make_repair_order(self.customer, self.vehicle)
-        ro.set_status(RepairOrder.Status.APPROVED, note="customer approved via phone")
+        ro.set_status(RepairOrder.Status.ESTIMATING, note="customer approved via phone")
         latest = ro.status_history.first()
         self.assertEqual(latest.note, "customer approved via phone")
 

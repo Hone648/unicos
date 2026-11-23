@@ -178,7 +178,7 @@ class RepairOrderListFilterTests(TestCase):
     def _make_ro(self, number, status=RepairOrder.Status.INTAKE):
         ro = make_repair_order(self.customer, self.vehicle, number=number)
         if status != RepairOrder.Status.INTAKE:
-            ro.set_status(status)
+            ro._apply_status_change(status)
         return ro
 
     def test_list_shows_open_repair_orders_by_default(self):
@@ -414,19 +414,26 @@ class RepairOrderDetailContentTests(TestCase):
         )
         response = self.client.post(
             status_url(self.ro.pk),
-            {"new_status": RepairOrder.Status.ESTIMATING},
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": RepairOrder.Status.ESTIMATING,
+            },
             HTTP_HX_REQUEST="true",
         )
         self.assertContains(response, 'id="status-history-card" hx-swap-oob="true"', count=1)
-        self.assertNotContains(response, "<details")
-        self.assertNotContains(response, "<summary")
+        self.assertNotContains(response, '<details class="ro-history">')
+        self.assertNotContains(response, "<summary>Status History</summary>")
         self.assertContains(response, "<td>Estimating</td>", html=True)
 
     def test_blocked_closure_prioritizes_payment_and_preserves_status_target(self):
+        self.ro._apply_status_change(RepairOrder.Status.READY_FOR_PICKUP)
         make_invoice(self.ro)
         response = self.client.post(
             status_url(self.ro.pk),
-            {"new_status": RepairOrder.Status.CLOSED},
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": RepairOrder.Status.DELIVERED,
+            },
             HTTP_HX_REQUEST="true",
         )
         self.assertContains(response, 'id="status-balance-warning"')
@@ -437,10 +444,12 @@ class RepairOrderDetailContentTests(TestCase):
             '<button class="btn btn-outline-secondary" type="submit">Update Status</button>',
             html=True,
         )
-        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(
+            response, '<option value="delivered" selected>Delivered</option>', html=True
+        )
         self.assertContains(response, 'hx-target="#status-update-card"')
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
 
     def test_404_for_nonexistent_repair_order(self):
         response = self.client.get(detail_url(99999))
@@ -529,13 +538,25 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.ro = make_repair_order(self.customer, self.vehicle, number="RO-STATUS-01")
 
     def test_post_changes_status(self):
-        self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+            },
+        )
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
 
     def test_post_creates_history_with_changed_by(self):
         history_count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
-        self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+            },
+        )
         entries = RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
         self.assertEqual(entries.count(), history_count_before + 1)
         latest = entries.order_by("-changed_at").first()
@@ -543,13 +564,25 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertEqual(latest.new_status, RepairOrder.Status.ESTIMATING)
 
     def test_post_redirects_to_detail(self):
-        response = self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+            },
+        )
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_same_status_does_not_create_duplicate_history(self):
         # RO starts at INTAKE — posting INTAKE again should be a no-op
         history_count_before = RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count()
-        self.client.post(status_url(self.ro.pk), {"new_status": "intake"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "intake",
+            },
+        )
         self.assertEqual(
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro).count(),
             history_count_before,
@@ -557,12 +590,24 @@ class RepairOrderStatusUpdateTests(TestCase):
 
     def test_invalid_status_does_not_mutate_repair_order(self):
         original_status = self.ro.status
-        self.client.post(status_url(self.ro.pk), {"new_status": "not_a_real_status"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "not_a_real_status",
+            },
+        )
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, original_status)
 
     def test_invalid_status_redirects_to_detail(self):
-        response = self.client.post(status_url(self.ro.pk), {"new_status": "not_a_real_status"})
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "not_a_real_status",
+            },
+        )
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_get_to_status_update_url_redirects_to_detail(self):
@@ -570,7 +615,14 @@ class RepairOrderStatusUpdateTests(TestCase):
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_default_note_applied_when_note_blank(self):
-        self.client.post(status_url(self.ro.pk), {"new_status": "estimating", "note": ""})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+                "note": "",
+            },
+        )
         latest = (
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
             .order_by("-changed_at")
@@ -581,7 +633,11 @@ class RepairOrderStatusUpdateTests(TestCase):
     def test_custom_note_is_preserved(self):
         self.client.post(
             status_url(self.ro.pk),
-            {"new_status": "estimating", "note": "Customer approved estimate"},
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+                "note": "Customer approved estimate",
+            },
         )
         latest = (
             RepairOrderStatusHistory.objects.filter(repair_order=self.ro)
@@ -607,7 +663,7 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
     def _htmx_post(self, data):
         return self.client.post(
             status_url(self.ro.pk),
-            data,
+            {"expected_status": self.ro.status, **data},
             HTTP_HX_REQUEST="true",
         )
 
@@ -668,11 +724,23 @@ class RepairOrderStatusUpdateHTMXTests(TestCase):
         self.assertContains(response, "not a valid repair order status")
 
     def test_non_htmx_post_still_redirects(self):
-        response = self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        response = self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+            },
+        )
         self.assertRedirects(response, detail_url(self.ro.pk))
 
     def test_non_htmx_post_still_updates_status(self):
-        self.client.post(status_url(self.ro.pk), {"new_status": "estimating"})
+        self.client.post(
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": "estimating",
+            },
+        )
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, RepairOrder.Status.ESTIMATING)
 
@@ -961,7 +1029,7 @@ class FinalRepairOrderEditGuardTests(TestCase):
         return data
 
     def _set_status(self, status):
-        self.ro.set_status(status, changed_by=self.user, note="Final status for test")
+        self.ro._apply_status_change(status, changed_by=self.user, note="Final status for test")
         self.ro.refresh_from_db()
 
     def test_delivered_repair_order_edit_get_redirects_to_detail(self):
@@ -1059,14 +1127,27 @@ class RepairOrderClosureRuleTests(TestCase):
         self.client.force_login(self.user)
         self.customer = make_customer()
         self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_3)
-        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-CLOSURE-01")
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-CLOSURE-01",
+            status=RepairOrder.Status.READY_FOR_PICKUP,
+        )
         # Draft invoice, total = 440, nothing paid → balance_due = 440
         self.invoice = make_invoice(self.ro, number="INV-CLOSURE-01")
 
     def _post_status(self, new_status, note=""):
+        if new_status == "closed":
+            RepairOrder.objects.filter(pk=self.ro.pk).update(status="delivered")
+            self.ro.refresh_from_db()
+        extra = (
+            {"transition_action": "cancel", "reason": "Customer canceled"}
+            if new_status == "canceled"
+            else {}
+        )
         return self.client.post(
             status_url(self.ro.pk),
-            {"new_status": new_status, "note": note},
+            {"new_status": new_status, "note": note, "expected_status": self.ro.status, **extra},
         )
 
     # --- blocking behavior ---
@@ -1114,8 +1195,19 @@ class RepairOrderClosureRuleTests(TestCase):
     # --- allowed behavior ---
 
     def test_can_transition_to_delivered_with_no_invoice(self):
-        ro = make_repair_order(self.customer, self.vehicle, number="RO-NO-INV")
-        self.client.post(status_url(ro.pk), {"new_status": "delivered"})
+        ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-NO-INV",
+            status=RepairOrder.Status.READY_FOR_PICKUP,
+        )
+        self.client.post(
+            status_url(ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=ro.pk).status,
+                "new_status": "delivered",
+            },
+        )
         ro.refresh_from_db()
         self.assertEqual(ro.status, RepairOrder.Status.DELIVERED)
 
@@ -1146,15 +1238,18 @@ class RepairOrderClosureRuleTests(TestCase):
 
     def test_delivered_to_closed_still_succeeds_when_invoice_rule_allows_it(self):
         ro = make_repair_order(self.customer, self.vehicle, number="RO-DELIV-CLOSE")
-        ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.user)
-        response = self.client.post(status_url(ro.pk), {"new_status": "closed"})
+        ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        response = self.client.post(
+            status_url(ro.pk),
+            {"expected_status": RepairOrder.objects.get(pk=ro.pk).status, "new_status": "closed"},
+        )
         self.assertRedirects(response, detail_url(ro.pk))
         ro.refresh_from_db()
         self.assertEqual(ro.status, RepairOrder.Status.CLOSED)
 
     def test_final_repair_order_status_history_remains_visible(self):
         ro = make_repair_order(self.customer, self.vehicle, number="RO-FINAL-HISTORY")
-        ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.user)
+        ro._apply_status_change(RepairOrder.Status.DELIVERED, changed_by=self.user)
         response = self.client.get(detail_url(ro.pk))
         self.assertContains(response, "Status History")
         self.assertContains(response, "Delivered")
@@ -1171,14 +1266,22 @@ class RepairOrderClosureRuleHTMXTests(TestCase):
         self.client.force_login(self.user)
         self.customer = make_customer()
         self.vehicle = make_vehicle(self.customer, vin=VALID_VIN_2)
-        self.ro = make_repair_order(self.customer, self.vehicle, number="RO-CLOSURE-HX")
+        self.ro = make_repair_order(
+            self.customer,
+            self.vehicle,
+            number="RO-CLOSURE-HX",
+            status=RepairOrder.Status.READY_FOR_PICKUP,
+        )
         # Draft invoice with balance due
         self.invoice = make_invoice(self.ro, number="INV-CLOSURE-HX")
 
     def _htmx_post(self, new_status):
         return self.client.post(
             status_url(self.ro.pk),
-            {"new_status": new_status},
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": new_status,
+            },
             HTTP_HX_REQUEST="true",
         )
 
@@ -1227,7 +1330,9 @@ class RepairOrderPaymentShortcutTests(TestCase):
         cls.status_only_role = "Status without billing"
         cls.status_only = make_user(username="shortcut-status-only", role_name=cls.status_only_role)
         customer = make_customer()
-        cls.ro = make_repair_order(customer, make_vehicle(customer))
+        cls.ro = make_repair_order(
+            customer, make_vehicle(customer), status=RepairOrder.Status.READY_FOR_PICKUP
+        )
         cls.invoice = make_invoice(cls.ro)
         cls.payment_url = reverse("billing:payment_create", kwargs={"invoice_pk": cls.invoice.pk})
         cls.invoice_url = reverse("billing:invoice_detail", kwargs={"pk": cls.invoice.pk})
@@ -1235,10 +1340,16 @@ class RepairOrderPaymentShortcutTests(TestCase):
     def setUp(self):
         self.client.force_login(self.manager)
 
-    def _attempt_status(self, target=RepairOrder.Status.CLOSED, *, htmx=True):
+    def _attempt_status(self, target=RepairOrder.Status.DELIVERED, *, htmx=True):
         headers = {"HX-Request": "true"} if htmx else {}
         return self.client.post(
-            status_url(self.ro.pk), {"new_status": target}, headers=headers, follow=not htmx
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": target,
+            },
+            headers=headers,
+            follow=not htmx,
         )
 
     def _payment_data(self, token, amount):
@@ -1283,7 +1394,7 @@ class RepairOrderPaymentShortcutTests(TestCase):
                         else:
                             self.assertContains(
                                 response,
-                                "Repair order cannot be marked closed because "
+                                "Repair order cannot be marked delivered because "
                                 f"invoice {self.invoice.invoice_number} has a balance due.",
                             )
                             self.assertNotContains(response, self.invoice_url)
@@ -1302,7 +1413,7 @@ class RepairOrderPaymentShortcutTests(TestCase):
 
     def test_invoice_on_final_repair_order_cannot_offer_payment(self):
         RepairOrder.objects.filter(pk=self.ro.pk).update(status=RepairOrder.Status.DELIVERED)
-        response = self._attempt_status()
+        response = self._attempt_status(RepairOrder.Status.CLOSED)
         self.assertContains(response, "has a balance due of $440.00.")
         self.assertNotContains(response, self.payment_url)
 
@@ -1313,43 +1424,53 @@ class RepairOrderPaymentShortcutTests(TestCase):
         )
         self.assertEqual(urlsplit(response.redirect_chain[-1][0]).fragment, "status-update-card")
         self.assertContains(
-            response, "Invoice paid in full. Select Update Status to close this repair order."
+            response,
+            "Invoice paid in full. Select Update Status to mark this repair order as delivered.",
         )
-        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(
+            response, '<option value="delivered" selected>Delivered</option>', html=True
+        )
         self.invoice.refresh_from_db()
         self.ro.refresh_from_db()
         self.assertEqual(self.invoice.status, Invoice.Status.PAID)
         self.assertEqual(self.invoice.payments.get().method, Payment.Method.CASH)
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
         self.assertEqual(self.ro.status_history.count(), 1)
 
         self._attempt_status()
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
-        self.assertEqual(self.ro.status_history.first().new_status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
+        self.assertEqual(self.ro.status_history.first().new_status, RepairOrder.Status.DELIVERED)
 
     def test_reopening_payment_return_url_after_closure_clears_confirmation(self):
-        confirmation = "Invoice paid in full. Select Update Status to close this repair order."
+        confirmation = (
+            "Invoice paid in full. Select Update Status to mark this repair order as delivered."
+        )
         token = self._open_shortcut(self._attempt_status())
         payment = self.client.post(self.payment_url, self._payment_data(token, "440.00"))
         self.assertEqual(payment.status_code, 302)
         return_url = payment["Location"]
         pending = self.client.get(return_url)
         self.assertContains(pending, confirmation)
-        self.assertContains(pending, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(
+            pending, '<option value="delivered" selected>Delivered</option>', html=True
+        )
 
         self._attempt_status(htmx=False)
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
         self.assertEqual(self.invoice.payments.count(), 1)
 
         completed = self.client.get(return_url)
-        self.assertContains(completed, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(
+            completed, '<option value="" selected>Choose next status…</option>', html=True
+        )
+        self.assertContains(completed, '<option value="closed">Closed</option>', html=True)
         self.assertNotContains(completed, confirmation)
         self.assertNotContains(completed, 'id="status-balance-warning"')
         self.assertNotContains(completed, 'id="status-payment-hint"')
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.CLOSED)
+        self.assertEqual(self.ro.status, RepairOrder.Status.DELIVERED)
         self.assertEqual(self.invoice.payments.count(), 1)
 
     def test_htmx_closure_after_payment_redirects_to_clean_updated_detail(self):
@@ -1362,7 +1483,11 @@ class RepairOrderPaymentShortcutTests(TestCase):
 
         response = self.client.post(
             status_url(self.ro.pk),
-            {"new_status": RepairOrder.Status.CLOSED, "note": "Customer collected vehicle."},
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": RepairOrder.Status.DELIVERED,
+                "note": "Customer collected vehicle.",
+            },
             headers={"HX-Request": "true", "HX-Current-URL": f"http://testserver{return_url}"},
         )
         self.assertEqual(response.status_code, 200)
@@ -1371,12 +1496,12 @@ class RepairOrderPaymentShortcutTests(TestCase):
         detail = self.client.get(response["HX-Redirect"])
         self.assertContains(
             detail,
-            '<span id="ro-status-badge" class="status-badge status-closed" '
-            'hx-swap-oob="true">Closed</span>',
+            '<span id="ro-status-badge" class="status-badge status-delivered" '
+            'hx-swap-oob="true">Delivered</span>',
             html=True,
         )
-        self.assertContains(detail, "Status updated to &quot;Closed&quot;.")
-        self.assertContains(detail, "<td>Closed</td>", html=True)
+        self.assertContains(detail, "Status updated to &quot;Delivered&quot;.")
+        self.assertContains(detail, "<td>Delivered</td>", html=True)
         self.assertContains(detail, "<td>Customer collected vehicle.</td>", html=True)
         self.assertNotContains(detail, "Edit Repair Order")
         self.assertNotContains(detail, "status_continuation")
@@ -1402,7 +1527,7 @@ class RepairOrderPaymentShortcutTests(TestCase):
         self.assertEqual(self.invoice.status, Invoice.Status.PARTIALLY_PAID)
         self.assertContains(self._attempt_status(target), "has a balance due of $300.00.")
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
 
         second_token = self._open_shortcut(partial)
         paid = self.client.post(
@@ -1417,7 +1542,7 @@ class RepairOrderPaymentShortcutTests(TestCase):
         )
         self.assertNotContains(paid, "Record another payment")
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
         self._attempt_status(target)
         self.ro.refresh_from_db()
         self.assertEqual(self.ro.status, target)
@@ -1444,10 +1569,10 @@ class RepairOrderPaymentShortcutTests(TestCase):
                     self.payment_url, self._payment_data(invalid_token, "1.00")
                 )
                 self.assertRedirects(response, detail_url(self.ro.pk))
-        self.assertEqual(self.invoice.payments.count(), 3)
+        self.assertFalse(self.invoice.payments.exists())
         self.assertFalse(other_invoice.payments.exists())
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
 
     def test_stale_continuation_after_status_access_is_removed(self):
         token = self._open_shortcut(self._attempt_status())
@@ -1457,20 +1582,23 @@ class RepairOrderPaymentShortcutTests(TestCase):
         self.assertEqual(target_url, detail_url(self.ro.pk))
         self.assertNotContains(paid, 'id="status-update-card"')
         response = self.client.post(
-            status_url(self.ro.pk), {"new_status": RepairOrder.Status.CLOSED}
+            status_url(self.ro.pk),
+            {
+                "expected_status": RepairOrder.objects.get(pk=self.ro.pk).status,
+                "new_status": RepairOrder.Status.DELIVERED,
+            },
         )
         self.assertEqual(response.status_code, 403)
         self.ro.refresh_from_db()
-        self.assertEqual(self.ro.status, RepairOrder.Status.INTAKE)
+        self.assertEqual(self.ro.status, RepairOrder.Status.READY_FOR_PICKUP)
 
     def test_already_reached_status_does_not_show_stale_warning(self):
         url = self._attempt_status(htmx=False).redirect_chain[-1][0]
         make_payment(self.invoice, Decimal("440.00"))
-        self.ro.set_status(RepairOrder.Status.DELIVERED, changed_by=self.manager)
-        self.ro.set_status(RepairOrder.Status.CLOSED, changed_by=self.manager)
+        self.ro._apply_status_change(RepairOrder.Status.CLOSED, changed_by=self.manager)
 
         response = self.client.get(url)
-        self.assertContains(response, '<option value="closed" selected>Closed</option>', html=True)
+        self.assertContains(response, "Current status: <strong>Closed</strong>", html=True)
         self.assertNotContains(response, 'id="status-balance-warning"')
         self.assertNotContains(response, self.payment_url)
 

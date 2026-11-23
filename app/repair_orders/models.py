@@ -104,7 +104,7 @@ class RepairOrder(models.Model):
         self.status = new_status
         self.save()
 
-    def set_status(self, new_status, *, changed_by=None, note=""):
+    def set_status(self, new_status, *, changed_by=None, note="", **transition_options):
         """Change status through the lifecycle service. No-op if status unchanged.
 
         Raises:
@@ -114,7 +114,9 @@ class RepairOrder(models.Model):
         """
         from .services import transition_repair_order_status  # local import
 
-        transition_repair_order_status(self, new_status, changed_by=changed_by, note=note)
+        transition_repair_order_status(
+            self, new_status, changed_by=changed_by, note=note, **transition_options
+        )
 
     def _clear_status_change_context(self):
         """Remove transient set_status attributes so they cannot leak into a later save."""

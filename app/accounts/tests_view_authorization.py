@@ -174,7 +174,7 @@ class ShopFacingAuthorizationTests(TestCase):
         self.assertEqual(
             self.client.post(
                 reverse("repair_orders:status_update", args=[self.ro.pk]),
-                {"new_status": RepairOrder.Status.APPROVED, "note": "Nope"},
+                {"new_status": RepairOrder.Status.ESTIMATING, "note": "Nope"},
             ).status_code,
             403,
         )
@@ -183,7 +183,7 @@ class ShopFacingAuthorizationTests(TestCase):
         self.login_as("estimator-repair", ROLE_ESTIMATOR)
         response = self.client.post(
             reverse("repair_orders:status_update", args=[self.ro.pk]),
-            {"new_status": RepairOrder.Status.APPROVED, "note": "Allowed"},
+            {"new_status": RepairOrder.Status.ESTIMATING, "note": "Allowed"},
         )
         self.assertRedirects(
             response,

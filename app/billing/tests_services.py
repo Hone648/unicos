@@ -404,6 +404,17 @@ class RecordPaymentServiceTests(TestCase):
         with self.assertRaises(PaymentRecordingBlocked):
             record_payment(self.invoice, self._payment_data(), actor=self.user)
 
+    def test_ordinary_payment_rejects_reassigned_invoice_without_writes(self):
+        other = RepairOrder.objects.create(
+            customer=self.ro.customer, vehicle=self.ro.vehicle, repair_order_number="RO-PAY-OTHER"
+        )
+        Invoice.objects.filter(pk=self.invoice.pk).update(repair_order=other)
+        before = Invoice.objects.filter(pk=self.invoice.pk).values().get()
+        with self.assertRaisesRegex(PaymentRecordingBlocked, "reassigned"):
+            record_payment(self.invoice, self._payment_data(Decimal("40.00")), actor=self.user)
+        self.assertEqual(Invoice.objects.filter(pk=self.invoice.pk).values().get(), before)
+        self.assertFalse(self.invoice.payments.exists())
+
     def test_record_payment_locks_invoice_row(self):
         with mock.patch.object(
             Invoice.objects,
@@ -436,6 +447,37 @@ class InvoiceLineItemServiceTests(TestCase):
         }
         data.update(overrides)
         return data
+
+    def test_line_item_mutations_reject_reassigned_invoice_without_writes(self):
+        other = RepairOrder.objects.create(
+            customer=self.ro.customer, vehicle=self.ro.vehicle, repair_order_number="RO-LINE-OTHER"
+        )
+        line_item = make_invoice_line_item(self.invoice)
+        for operation in ["create", "edit"]:
+            with self.subTest(operation=operation):
+                Invoice.objects.filter(pk=self.invoice.pk).update(repair_order=other)
+                before_invoice = Invoice.objects.filter(pk=self.invoice.pk).values().get()
+                before_lines = list(self.invoice.line_items.order_by("pk").values())
+                with self.assertRaisesRegex(InvoiceLineItemMutationBlocked, "reassigned"):
+                    if operation == "create":
+                        create_invoice_line_item(
+                            self.invoice, self._line_item_data(), actor=self.user
+                        )
+                    else:
+                        edit_invoice_line_item(
+                            line_item,
+                            self._line_item_data(
+                                description="Stale edit", unit_price=Decimal("75.00")
+                            ),
+                            actor=self.user,
+                        )
+                self.assertEqual(
+                    Invoice.objects.filter(pk=self.invoice.pk).values().get(), before_invoice
+                )
+                self.assertEqual(
+                    list(self.invoice.line_items.order_by("pk").values()), before_lines
+                )
+                self.assertFalse(self.invoice.payments.exists())
 
     def test_create_invoice_line_item_creates_item_and_recalculates_subtotal(self):
         create_invoice_line_item(self.invoice, self._line_item_data(), actor=self.user)

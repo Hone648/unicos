@@ -33,11 +33,21 @@ from django.urls import reverse
 from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
 from .models import RepairOrder
-from .services import RepairOrderStatusTransitionBlocked, transition_repair_order_status
+from .services import (
+    RepairOrderStatusTransitionBlocked,
+    RepairOrderTransitionInvalid,
+    transition_repair_order_status,
+)
 from .status_continuation import (
-    read_status_continuation,
     sign_status_continuation,
     status_controls_url,
+    validated_continuation,
+)
+from .transition_policy import (
+    CANCELABLE_STATUSES,
+    REOPEN_TARGETS,
+    can_use_exceptions,
+    routine_choices,
 )
 
 # Status values that count as "closed" for default list filtering
@@ -93,22 +103,22 @@ def _repair_order_detail_context(ro, user, *, status_continuation=None):
         can_view_invoice(user, invoice) if invoice else can_view_invoice_for_repair_order(user, ro)
     )
     may_record_payment = bool(invoice and can_record_payment(user, invoice))
-    selected_status = ro.status
+    choices = routine_choices(ro.status)
+    selected_status = ""
+    pending_action = "routine"
     blocking_invoice = None
     status_payment_url = ""
     payment_recorded = False
     status_continuation_active = False
-    if may_change_status:
-        attempted_status, continuation_payment_recorded = read_status_continuation(
-            invoice, status_continuation
-        )
-        if attempted_status and attempted_status != ro.status:
-            status_continuation_active = True
-            selected_status = attempted_status
-            payment_recorded = continuation_payment_recorded
-            blocking_invoice = closure_blocked_by_invoice(ro, attempted_status)
-            if blocking_invoice and may_view_invoice and may_record_payment:
-                status_payment_url = _status_payment_url(blocking_invoice, status_continuation)
+    data = validated_continuation(invoice, status_continuation, user) if may_change_status else None
+    if data:
+        status_continuation_active = True
+        pending_action = data["action"]
+        selected_status = data["status"] if pending_action == "routine" else ""
+        payment_recorded = data["paid"]
+        blocking_invoice = closure_blocked_by_invoice(ro, data["status"])
+        if blocking_invoice and may_view_invoice and may_record_payment:
+            status_payment_url = _status_payment_url(blocking_invoice, status_continuation)
 
     may_create_estimate = can_manage_estimate_for_repair_order(user, ro)
     show_intake_estimate_action = (
@@ -117,7 +127,7 @@ def _repair_order_detail_context(ro, user, *, status_continuation=None):
         and may_create_estimate
         and not status_continuation_active
     )
-    displayed_closed_at = ro.closed_at
+    displayed_closed_at = ro.closed_at if ro.status == RepairOrder.Status.CLOSED else None
     if ro.status == RepairOrder.Status.CLOSED and not displayed_closed_at:
         displayed_closed_at = (
             history.filter(new_status=RepairOrder.Status.CLOSED)
@@ -135,9 +145,17 @@ def _repair_order_detail_context(ro, user, *, status_continuation=None):
         "line_items": line_items,
         "payments": payments,
         "estimates": estimates,
-        "status_choices": RepairOrder.Status.choices,
+        "status_choices": choices,
+        "pending_action": pending_action,
+        "invalid_continuation": bool(status_continuation and not data),
+        "can_cancel_repair_order": can_use_exceptions(user, ro)
+        and ro.status in CANCELABLE_STATUSES,
+        "can_reopen_repair_order": can_use_exceptions(user, ro) and ro.status in REOPEN_TARGETS,
+        "reopen_status_label": dict(RepairOrder.Status.choices).get(REOPEN_TARGETS.get(ro.status)),
         "selected_status": selected_status,
-        "selected_status_label": dict(RepairOrder.Status.choices).get(selected_status),
+        "selected_status_label": dict(RepairOrder.Status.choices).get(
+            data["status"] if data else selected_status
+        ),
         "blocking_invoice": blocking_invoice,
         "status_payment_url": status_payment_url,
         "payment_recorded": payment_recorded and may_view_invoice,
@@ -240,36 +258,43 @@ def repair_order_status_update(request, pk):
 
     ro = get_object_or_404(RepairOrder, pk=pk)
     require_policy(can_change_repair_order_status(request.user, ro))
+    action = request.POST.get("transition_action", "routine")
     new_status = request.POST.get("new_status", "").strip()
-    note = request.POST.get("note", "").strip()
-
-    if new_status not in _VALID_STATUSES:
-        messages.error(request, f"'{new_status}' is not a valid repair order status.")
-        if not is_htmx:
-            return redirect("repair_orders:detail", pk=pk)
-        return render(
-            request,
-            "repair_orders/partials/_status_update_response.html",
-            _repair_order_detail_context(ro, request.user),
-        )
-
-    if new_status == ro.status:
-        messages.info(request, "Status is already set to that value — no change made.")
-        if not is_htmx:
-            return redirect("repair_orders:detail", pk=pk)
-        return render(
-            request,
-            "repair_orders/partials/_status_update_response.html",
-            _repair_order_detail_context(ro, request.user),
-        )
-
-    if not note:
-        note = "Status changed from repair order workspace."
-
+    if action == "cancel":
+        new_status = RepairOrder.Status.CANCELED
+    elif action == "reopen":
+        new_status = REOPEN_TARGETS.get(ro.status, "")
+    note = request.POST.get("note", "").strip() or "Status changed from repair order workspace."
+    reason = request.POST.get("reason", "").strip()
+    expected_status = request.POST.get("expected_status", "")
+    original_status = ro.status
+    error = ""
     try:
-        transition_repair_order_status(ro, new_status, changed_by=request.user, note=note)
+        if expected_status not in _VALID_STATUSES:
+            raise RepairOrderTransitionInvalid(
+                "Reload this page to supply the current status, then choose an available action."
+            )
+        if action == "routine" and not new_status:
+            raise RepairOrderTransitionInvalid(
+                "Choose a next status before selecting Update Status."
+            )
+        if action == "routine" and new_status not in _VALID_STATUSES:
+            raise RepairOrderTransitionInvalid(
+                f"'{new_status}' is not a valid repair order status."
+            )
+        transition_repair_order_status(
+            ro,
+            new_status,
+            changed_by=request.user,
+            note=note,
+            action=action,
+            reason=reason,
+            expected_status=expected_status,
+        )
     except RepairOrderStatusTransitionBlocked as exc:
-        token = sign_status_continuation(exc.invoice, new_status)
+        token = sign_status_continuation(
+            exc.invoice, new_status, source_status=ro.status, action=action
+        )
         if not is_htmx:
             return redirect(status_controls_url(pk, token))
         return render(
@@ -277,22 +302,27 @@ def repair_order_status_update(request, pk):
             "repair_orders/partials/_status_update_response.html",
             _repair_order_detail_context(ro, request.user, status_continuation=token),
         )
-
-    label = dict(RepairOrder.Status.choices).get(new_status, new_status)
-    messages.success(request, f'Status updated to "{label}".')
-
+    except RepairOrderTransitionInvalid as exc:
+        error = str(exc)
+        messages.error(request, error)
+    else:
+        if original_status == ro.status:
+            messages.info(request, "Status is already set to that value — no change made.")
+        else:
+            messages.success(request, f'Status updated to "{ro.get_status_display()}".')
     if not is_htmx:
         return redirect("repair_orders:detail", pk=pk)
-
-    if is_final_repair_order_status(new_status):
-        detail_url = reverse("repair_orders:detail", kwargs={"pk": pk})
-        return HttpResponse(headers={"HX-Redirect": detail_url})
-
-    return render(
-        request,
-        "repair_orders/partials/_status_update_response.html",
-        _repair_order_detail_context(ro, request.user),
-    )
+    if (
+        not error
+        and original_status != ro.status
+        and (is_final_repair_order_status(ro.status) or action == "reopen")
+    ):
+        return HttpResponse(
+            headers={"HX-Redirect": reverse("repair_orders:detail", kwargs={"pk": pk})}
+        )
+    context = _repair_order_detail_context(ro, request.user)
+    context["transition_error"] = error
+    return render(request, "repair_orders/partials/_status_update_response.html", context)
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
