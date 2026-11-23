@@ -168,7 +168,7 @@ Go to `/customers/` to see all customers. You can search by name. The list pagin
 1. Click **New Customer** from the customer list.
 2. Fill in the name fields. For an individual, provide first or last name (or both). For a business, provide the business name.
 3. Optionally add phone, email, and address.
-4. Click **Save**.
+4. Click **Create Customer**.
 
 **Who can create/edit customers:** Owner/Admin, Manager, Front Desk (customers.manage).
 
@@ -193,7 +193,7 @@ Vehicles belong to a customer. A vehicle is identified by its VIN (17-character 
 1. Open the customer's detail page.
 2. Click **Add Vehicle**.
 3. Enter the VIN, year, make, model, and color. The VIN is normalized to uppercase and validated.
-4. Click **Save**.
+4. Click **Add Vehicle**. Unicos returns you to the customer record.
 
 **Who can add vehicles:** Owner/Admin, Manager, Front Desk (customers.manage).
 
@@ -226,7 +226,7 @@ Go to `/repair-orders/` to see all repair orders. You can search by repair order
 1. Click **New Repair Order** from the list.
 2. Select the customer and vehicle. The vehicle must belong to the selected customer.
 3. Optionally set a promised date and add notes.
-4. Click **Save**.
+4. Click **Create Repair Order**.
 
 The repair order starts in **Intake** status.
 
@@ -234,18 +234,15 @@ The repair order starts in **Intake** status.
 
 ### Repair order detail
 
-The detail page shows:
-- Customer and vehicle summary
-- Current status and status history
-- Status update controls
-- Communication log
-- A summary of all estimates
-- Invoice and payment summary
-- Action links for creating estimates and invoices
+The detail page groups the job into **Overview**, **Status & next action**,
+**Estimate & invoice**, and **Activity & files**. The available actions depend
+on the job's current status and your permissions.
 
 ### Status and status history
 
-The current status is shown prominently. The full history of status changes is shown below, including who made each change and when.
+The current status appears in the page header. Expand **Status History** in
+**Status & next action** to see each change, when it happened, who made it,
+and any note or reason.
 
 ### Routine status transitions
 
@@ -305,9 +302,10 @@ bulk cancel/reopen actions require the **Cancel/reopen reason** field.
   automatically voided, deleted, approved, or issued. The existing invoice balance
   guard also applies to cancellation. If payment is recorded during cancellation,
   re-enter the reason and explicitly select **Cancel Repair Order** on return.
-- A repeated Closed request preserves the original Closed date and history. A
-  genuine reopen and later closure records a new closure date and history entry.
-  Previously recorded closure dates remain part of the record while reopened.
+- Reopening hides the old **Closed** date from **Overview**. The earlier closure
+  and its date remain in **Status History**. Closing again records a new date
+  and history entry. Repeating a Closed request preserves the existing date
+  and history.
 
 New repair orders always start at **Intake**, including Django admin. The policy
 does not relabel existing jobs or rewrite their historical statuses.
@@ -343,14 +341,16 @@ Only **Draft** estimates can be edited through normal shop views.
 ### Creating an estimate
 
 1. Open the repair order detail page.
-2. Click **New Estimate**.
+2. Click **Create Estimate**.
 3. Fill in the estimate details:
    - Insurance company name (if insurance)
    - Claim number (if insurance)
    - Deductible amount (if insurance)
-   - Estimated total (manual entry until line items exist)
+   - **Subtotal before tax ($)**. Enter the pre-tax subtotal for a manual
+     estimate. For a new estimate you plan to itemize, leave the default `0.00`.
    - Notes
-4. Click **Save**.
+4. Click **Create Estimate** to save the draft. To itemize it, open the draft
+   and select **Add Line Item**.
 
 The estimate starts in **Draft** status.
 
@@ -372,7 +372,9 @@ From the estimate detail page, click **Edit Estimate**. Only draft estimates can
 
 ## 9. Estimate Line Items
 
-Line items itemize the work and materials in an estimate. Once any line items exist, the estimate total is calculated from them automatically. The manual estimated total field is disabled when line items are present.
+Line items itemize the work and materials in an estimate. Unicos calculates
+the subtotal from all line items and the tax from the taxable items. Adding
+line items makes the manual **Subtotal before tax ($)** field read-only.
 
 ### Adding a line item
 
@@ -380,7 +382,7 @@ Line items itemize the work and materials in an estimate. Once any line items ex
 2. Click **Add Line Item**.
 3. Select the item type (Labor, Parts, Materials, Sublet, or Misc).
 4. Enter a description, quantity, and unit price.
-5. Click **Save**.
+5. Click **Add Line Item**.
 
 The estimate total updates immediately.
 
@@ -403,9 +405,9 @@ A supplement is a child estimate that captures additional work discovered after 
 ### Creating a supplement
 
 1. Open the original (parent) estimate detail page.
-2. Click **New Supplement**.
+2. Click **Create Supplement**.
 3. The supplement form pre-fills insurance and claim fields from the parent. Adjust as needed.
-4. Click **Save**.
+4. Click **Create Supplement**.
 
 The supplement appears in the supplements section of the parent estimate's detail page.
 
@@ -551,7 +553,7 @@ Invoice numbers are system-generated in the format `INV-YYYY-NNNNNN`.
 | Status | Meaning |
 |---|---|
 | Draft | Created but not yet issued; can be edited |
-| Issued | Issued to the customer; balance is due |
+| Issued | Marked issued in Unicos |
 | Partially Paid | Payments have been recorded but balance remains |
 | Paid | Fully paid; no balance due |
 | Void | Voided; no balance due; billing-read-only |
@@ -563,7 +565,7 @@ If no estimate exists or you want to create an invoice without going through the
 1. Open the repair order detail page.
 2. Click **Create Invoice** (requires billing.manage).
 3. Optionally enter a subtotal manually (this will be overridden once line items exist), tax amount, and due date.
-4. Click **Save**.
+4. Click **Create Invoice** to save the draft.
 
 The invoice starts in Draft status.
 
@@ -608,16 +610,16 @@ Each invoice has a browser-printable output page.
 
 ### Printing an invoice
 
-1. Open the invoice detail page.
-2. Click **View / Print Invoice**.
-3. The print page shows:
+1. From **Estimate & invoice** on the repair order, click **View/Print Invoice**
+   to open the invoice detail page. You can also open the invoice from Billing.
+2. The printable invoice shows:
    - Shop and customer information
    - Vehicle details
    - Invoice number, issue date, and due date
    - Line items with individual totals
    - Subtotal, tax, and total
    - Payment history and balance due
-4. Use the browser's print function to print or save as PDF.
+3. Use the browser's print function to print or save as PDF.
 
 ---
 
@@ -625,13 +627,15 @@ Each invoice has a browser-printable output page.
 
 ### Issuing an invoice
 
-Issuing an invoice marks it as sent to the customer. The issue date is recorded and the balance becomes due.
+**Issue Invoice** changes a draft to **Issued** in Unicos and sets the issue
+date if it was blank. Give the customer a printed or PDF copy separately.
 
-1. Open the invoice detail page (must be Draft).
-2. Click **Issue Invoice**.
-3. Confirm the action. The invoice moves to Issued status.
+1. Open the draft invoice or its summary under **Estimate & invoice**.
+2. Click **Issue Invoice**. Unicos returns you to the repair order with the
+   invoice marked **Issued**.
 
-Once issued, the invoice fields and line items are still editable (if the repair order is not final), but payments can now be recorded.
+Once issued, the invoice fields and line items are still editable while the
+repair order is active.
 
 **Who can issue invoices:** Owner/Admin, Manager (billing.manage).
 
@@ -640,8 +644,7 @@ Once issued, the invoice fields and line items are still editable (if the repair
 Voiding cancels an invoice. A voided invoice cannot be paid or edited further.
 
 1. Open the invoice detail page (any non-void status).
-2. Click **Void Invoice**.
-3. Confirm the action. The invoice moves to Void status.
+2. Click **Void Invoice**. The invoice moves to **Void** status.
 
 A voided invoice does not block repair order closure. If the repair order needs to close but the invoice has a balance, consider voiding the invoice or recording a payment to clear the balance.
 
@@ -651,14 +654,14 @@ A voided invoice does not block repair order closure. If the repair order needs 
 
 ## 18. Recording Payments
 
-Payments are recorded against an issued invoice.
+In the usual billing workflow, issue the invoice before recording payment.
 
 ### Recording a payment
 
-1. Open the invoice detail page (invoice should be Issued or Partially Paid).
+1. Open the invoice detail page or its summary on the repair order.
 2. Click **Record Payment**.
-3. Enter the payment amount, method (cash, check, card, etc.), and an optional reference note.
-4. Click **Save**.
+3. Enter the payment date, amount, and method. Add a reference or notes if useful.
+4. Click **Record Payment**. Unicos returns you to the repair order.
 
 The invoice payment status updates automatically. If the payment covers the balance, the invoice moves to Paid. If partial, it moves to Partially Paid.
 
@@ -680,17 +683,18 @@ A repair order must meet certain conditions before it can move to a final status
 
 ### Unpaid invoice block
 
-If the repair order has a non-void invoice with a balance due (Issued or Partially Paid), the status update to a final status is blocked with an error:
+If the repair order has any non-void invoice with a balance due, an otherwise
+allowed move to a final status is blocked. The warning identifies the invoice:
 
 ```
 Repair order cannot be marked [status] because invoice INV-YYYY-NNNNNN has a balance due.
 ```
 
-To resolve:
-- Record a payment that covers the balance, or
-- Void the invoice if the charges are being waived.
-
-Then retry the status update.
+Use **Record payment** in the warning when available. A partial payment leaves
+the remaining balance visible and offers **Record another payment**. Once the
+balance is clear, explicitly retry the pending status action. A Manager or
+Owner/Admin can also void the invoice when the charges are being waived.
+See [Workflow D](#workflow-d-delivery-blocked-by-an-unpaid-invoice).
 
 ### Final-status edit guards
 
@@ -806,53 +810,96 @@ Read-only users and Technician-only users cannot add communication entries.
 
 ### Workflow A: New customer repair (insurance)
 
-1. **Create customer** — go to `/customers/`, click New Customer, enter name and contact info.
-2. **Add vehicle** — from the customer detail page, click Add Vehicle, enter VIN, year, make, model.
-3. **Create repair order** — go to `/repair-orders/`, click New Repair Order, select customer and vehicle.
-4. **Create estimate** — from the repair order detail page, click New Estimate, enter insurance company, claim number, deductible, and notes.
-5. **Add estimate line items** — from the estimate detail page, click Add Line Item for each charge.
-6. **Print estimate** — click Print Estimate, use the browser print function.
-7. **Submit estimate** — from the estimate detail page, click Submit Estimate.
-8. **Approve estimate** — choose approval source, enter the approval contact, optionally add a reference/note, then click Approve Estimate once approval is confirmed.
-9. **Create invoice draft** — click Create Invoice Draft. The app creates a draft invoice with copied line items.
-10. **Review invoice** — open the invoice detail, verify line items and total.
-11. **Issue invoice** — click Issue Invoice.
-12. **Record payment** — click Record Payment, enter amount and method.
-13. **Close repair order** — return to the repair order, change status to Delivered, then Closed when ready. The closure is allowed once the invoice balance is zero.
+For this walkthrough, a Manager or Owner/Admin can complete every step. Front
+Desk can handle intake, estimate work, and payments. An Estimator can make
+routine repair-order status changes. See [roles and access](#3-user-roles-and-access).
+
+1. Go to **Customers** at `/customers/`. Select **New Customer**, enter the name
+   and contact information, then select **Create Customer**.
+2. On the customer page, select **Add Vehicle**. Enter the VIN, year, make, and
+   model. Select **Add Vehicle** again to save and return to the customer.
+3. Go to **Repair Orders** at `/repair-orders/` and select **New Repair Order**.
+   Choose the customer and vehicle and select **Create Repair Order**. The job
+   starts in **Intake**.
+4. On the repair order, select **Create Estimate**. Enter the insurer, claim
+   number, deductible, and any notes, then save with **Create Estimate**.
+   Return to the repair order. In **Status & next action**, select **Estimating**
+   and **Update Status**.
+5. Open the draft estimate under **Estimate & invoice** and select **Add Line Item**
+   for each charge.
+6. Select **Print Estimate** and use the browser to print or save a PDF if needed.
+7. Select **Submit Estimate**. While approval is pending, move the repair order
+   from **Estimating** to **Awaiting approval**.
+8. When approval is confirmed, enter the approval source and contact, then
+   select **Approve Estimate**. Return to the repair order and move it to **Approved**.
+   If approval was already confirmed, **Estimating** can move directly to
+   **Approved**.
+9. Move the repair order through **Parts ordered** if applicable, then to
+   **In repair**. As the work progresses, select **Quality check** and then
+   **Ready for pickup**, saving each change with **Update Status**.
+10. From the approved estimate, select **Create Invoice Draft**. Review the
+    copied line items, tax, and total before billing.
+11. Select **Issue Invoice** to mark the bill issued in Unicos. Use
+    **View/Print Invoice** to print or save a PDF and give the customer a copy.
+12. Select **Record Payment** when payment is received. Enter the date, amount,
+    and method, then save with **Record Payment**.
+13. At handoff, select **Delivered** and **Update Status**. If a balance blocks
+    delivery, follow [Workflow D](#workflow-d-delivery-blocked-by-an-unpaid-invoice).
+    Once the job is delivered, select **Closed** and **Update Status** when
+    ready to close it.
 
 ### Workflow B: Insurance estimate with supplement
 
 1. Complete steps 1–8 from Workflow A to create and approve the initial estimate.
 2. If additional work is found, open the approved estimate detail page.
-3. Click **New Supplement** to create a supplement estimate for the additional work.
+3. Click **Create Supplement** to create a supplement estimate for the additional work.
 4. Add line items to the supplement.
 5. Print the supplement.
 6. Submit and approve the supplement through the same status workflow.
 
-Note: The repair order can have only one invoice. The initial approved estimate conversion creates that invoice. Supplement charges must be added to the invoice manually as additional line items after conversion, or included in the initial estimate before conversion. There is no automatic supplement-to-invoice merge.
+Convert the original approved estimate to create the repair order's single
+invoice. Add the approved supplement charges to that invoice manually as line
+items before finalizing the job.
 
 ### Workflow C: Customer-pay invoice (no estimate)
 
 1. Create customer, vehicle, and repair order as in Workflow A steps 1–3.
-2. From the repair order detail page, click **Create Invoice** (requires billing.manage).
-3. Add line items to the invoice.
-4. Review the invoice total.
-5. Issue the invoice.
-6. Record payment when received.
-7. Close the repair order when the balance is clear.
+2. In **Status & next action**, take the direct **Intake → In repair** route.
+   Select **In repair** and click **Update Status**. If the customer needs an
+   estimate first, follow the estimate route in Workflow A and leave the
+   insurance fields blank.
+3. As the work progresses, use **Update Status** for **Quality check** and
+   then **Ready for pickup**.
+4. In **Estimate & invoice**, select **Create Invoice** (Manager or Owner/Admin).
+   Add the invoice line items and review the total.
+5. Select **Issue Invoice** in Unicos. Open **View/Print Invoice** to print or
+   save a PDF and give the customer a copy separately.
+6. Record any payment received. At handoff, select **Delivered** and
+   **Update Status**. Resolve any remaining balance using
+   [Workflow D](#workflow-d-delivery-blocked-by-an-unpaid-invoice).
+7. Once delivered, select **Closed** and **Update Status**.
 
-### Workflow D: Blocked closure
+### Workflow D: Delivery blocked by an unpaid invoice
 
-**Scenario:** You try to move a repair order to Delivered but get a "balance due" error.
+1. When a job is **Ready for pickup**, select **Delivered** and **Update Status**.
+   If an invoice has a balance, the job stays **Ready for pickup**. Staff with
+   invoice access can open the linked invoice from the warning.
+2. Select **Record payment** in the warning if the action is available. Enter
+   the payment date, amount, and method, then select **Record Payment**.
+3. After a partial payment, Unicos returns to **Status & next action** with
+   **Delivered** still selected and the remaining balance shown. Select
+   **Record another payment** when the next payment arrives.
+4. After a full payment, Unicos returns to the same controls with **Delivered**
+   selected and a paid-in-full message. Select **Update Status** to complete
+   delivery. When ready to close the job, choose **Closed** and select
+   **Update Status** again.
 
-1. Open the repair order detail page.
-2. Note the invoice number shown in the error.
-3. Open the invoice detail page.
-4. Either:
-   - Click **Record Payment** to clear the balance, or
-   - Click **Void Invoice** if the charges are being waived.
-5. Return to the repair order detail page.
-6. Retry the status update to Delivered.
+The shortcut requires permission to change the status, view the invoice, and
+record payments. If the shortcut is unavailable, have an authorized employee
+record the payment. A staff member with status permission can then retry. If a
+Manager or Owner/Admin waives the charges, they can use **Void Invoice** and
+then retry delivery. If Unicos reports that a pending action is no longer
+available, review the current choices before continuing.
 
 ---
 
