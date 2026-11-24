@@ -49,6 +49,7 @@ def customer_detail(request, pk):
         {
             "customer": customer,
             "vehicles": vehicles,
+            "has_active_vehicles": vehicles.filter(is_active=True).exists(),
             "repair_orders": repair_orders,
         },
     )

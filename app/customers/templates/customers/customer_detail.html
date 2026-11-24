@@ -4,14 +4,20 @@
 {% block title %}{{ customer.display_name }} - {{ shop_identity.display_name }}{% endblock %}
 
 {% block content %}
+<div class="intake-detail">
 <a class="back-link" href="{% url 'customers:list' %}">&larr; Back to Customers</a>
 
-<div class="page-header">
+<div class="page-header intake-header">
   <h1>{{ customer.display_name }}</h1>
-  {% if user|has_app_permission:"customers.manage" %}
-    <a class="btn btn-outline-secondary" href="{% url 'customers:edit' customer.pk %}">Edit Customer</a>
-    <a class="btn btn-primary" href="{% url 'customers:vehicle_create' customer.pk %}">Add Vehicle</a>
-  {% endif %}
+  <div class="intake-header-actions">
+    {% if user|has_app_permission:"repair_orders.manage" %}
+      <a class="btn {% if has_active_vehicles %}btn-primary{% else %}btn-outline-secondary{% endif %}" href="{% url 'repair_orders:create_for_customer' customer.pk %}">New Repair Order</a>
+    {% endif %}
+    {% if user|has_app_permission:"customers.manage" %}
+      <a class="btn {% if has_active_vehicles and user|has_app_permission:'repair_orders.manage' %}btn-outline-secondary{% else %}btn-primary{% endif %}" href="{% url 'customers:vehicle_create' customer.pk %}">Add Vehicle</a>
+      <a class="btn btn-outline-secondary" href="{% url 'customers:edit' customer.pk %}">Edit Customer</a>
+    {% endif %}
+  </div>
 </div>
 
 <div class="card-grid">
@@ -138,5 +144,6 @@
   {% else %}
     <p class="muted-text">No repair orders on file.</p>
   {% endif %}
+</div>
 </div>
 {% endblock %}

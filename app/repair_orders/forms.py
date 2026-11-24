@@ -23,7 +23,9 @@ class _RepairOrderBaseForm(forms.ModelForm):
             "internal_notes": forms.Textarea(attrs={"rows": 4}),
         }
 
-    def __init__(self, *args, customer_id=None, enable_vehicle_htmx=False, **kwargs):
+    def __init__(
+        self, *args, customer_id=None, enable_vehicle_htmx=False, vehicle_queryset=None, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.fields["assigned_to"].queryset = get_user_model().objects.order_by("username")
         self.fields["assigned_to"].required = False
@@ -41,7 +43,7 @@ class _RepairOrderBaseForm(forms.ModelForm):
             )
 
         selected_customer_id = self._selected_customer_id(customer_id)
-        self._scope_vehicle_field(selected_customer_id)
+        self._scope_vehicle_field(selected_customer_id, vehicle_queryset)
 
     def _selected_customer_id(self, customer_id):
         if customer_id:
@@ -52,7 +54,7 @@ class _RepairOrderBaseForm(forms.ModelForm):
             return self.instance.customer_id
         return None
 
-    def _scope_vehicle_field(self, customer_id):
+    def _scope_vehicle_field(self, customer_id, vehicle_queryset):
         vehicle_field = self.fields["vehicle"]
         vehicle_field.empty_label = "Select a customer first"
         vehicle_field.queryset = Vehicle.objects.none()
@@ -66,7 +68,9 @@ class _RepairOrderBaseForm(forms.ModelForm):
         except (TypeError, ValueError):
             return
 
-        vehicles = Vehicle.objects.filter(customer_id=customer_pk).order_by("make", "model", "vin")
+        if vehicle_queryset is None:
+            vehicle_queryset = Vehicle.objects.all()
+        vehicles = vehicle_queryset.filter(customer_id=customer_pk)
         if vehicles.exists():
             vehicle_field.empty_label = "Select a vehicle"
             vehicle_field.queryset = vehicles
@@ -79,8 +83,47 @@ class _RepairOrderBaseForm(forms.ModelForm):
     # Django's ModelForm calls automatically via _post_clean() → instance.full_clean().
 
 
+class _IntakeVehicleChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, vehicle):
+        description = " ".join(
+            str(part) for part in (vehicle.year, vehicle.make, vehicle.model) if part
+        )
+        return f"{vehicle.vin} — {description}"
+
+
 class RepairOrderCreateForm(_RepairOrderBaseForm):
-    pass
+    class Meta(_RepairOrderBaseForm.Meta):
+        field_classes = {"vehicle": _IntakeVehicleChoiceField}
+
+    @property
+    def vehicle_choices(self):
+        return self.fields["vehicle"].queryset
+
+    def __init__(
+        self, *args, intake_customer=None, intake_vehicle=None, enable_vehicle_htmx=False, **kwargs
+    ):
+        if intake_customer is None:
+            super().__init__(*args, enable_vehicle_htmx=enable_vehicle_htmx, **kwargs)
+            return
+
+        vehicles = intake_customer.vehicles.filter(is_active=True)
+        if intake_vehicle is not None:
+            vehicles = vehicles.filter(pk=intake_vehicle.pk)
+        vehicle_ids = list(vehicles.values_list("pk", flat=True)[:2])
+        self.has_intake_vehicles = bool(vehicle_ids)
+
+        initial = {"customer": intake_customer.pk}
+        if len(vehicle_ids) == 1:
+            initial["vehicle"] = vehicle_ids[0]
+        super().__init__(
+            *args,
+            customer_id=intake_customer.pk,
+            initial=initial,
+            vehicle_queryset=vehicles,
+            **kwargs,
+        )
+        customer_field = self.fields["customer"]
+        customer_field.queryset = customer_field.queryset.filter(pk=intake_customer.pk)
 
 
 class RepairOrderEditForm(_RepairOrderBaseForm):

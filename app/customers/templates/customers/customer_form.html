@@ -9,7 +9,7 @@
   <a class="back-link" href="{% url 'customers:list' %}">&larr; Back to Customers</a>
 {% endif %}
 
-<div class="page-header">
+<div class="page-header{% if mode == 'create' %} intake-header{% endif %}">
   <h1>{{ title }}</h1>
 </div>
 
@@ -19,7 +19,7 @@
 </div>
 {% endif %}
 
-<div class="form-card shadow-sm">
+<div class="form-card shadow-sm{% if mode == 'create' %} intake-form{% endif %}">
   <form method="post">
     {% csrf_token %}
 

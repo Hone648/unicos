@@ -6,7 +6,9 @@ from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 
 from accounts.authorization import (
+    PERM_CUSTOMERS_VIEW,
     PERM_REPAIR_ORDERS_CHANGE_STATUS,
+    PERM_REPAIR_ORDERS_MANAGE,
     PERM_REPAIR_ORDERS_VIEW,
     ROLE_ESTIMATOR,
     ROLE_FRONT_DESK,
@@ -888,6 +890,197 @@ class RepairOrderCreateTests(TestCase):
         self.assertContains(response, f'value="{self.vehicle.pk}" selected')
         self.assertContains(response, VALID_VIN)
         self.assertNotContains(response, VALID_VIN_3)
+
+
+class RepairOrderIntakeTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.staff = make_user(role_name=ROLE_FRONT_DESK)
+        cls.customer = make_customer()
+        cls.vehicle = make_vehicle(cls.customer)
+        cls.other_customer = make_customer(first_name="Other", last_name="Person")
+        cls.other_vehicle = make_vehicle(cls.other_customer, vin=VALID_VIN_3)
+        cls.customer_detail = reverse("customers:detail", args=[cls.customer.pk])
+        cls.vehicle_detail = reverse("vehicles:detail", args=[cls.vehicle.pk])
+        cls.customer_intake = reverse("repair_orders:create_for_customer", args=[cls.customer.pk])
+        cls.vehicle_intake = reverse("repair_orders:create_for_vehicle", args=[cls.vehicle.pk])
+
+    def setUp(self):
+        self.client.force_login(self.staff)
+
+    def assert_cancel_destination(self, response, url):
+        self.assertContains(
+            response, f'<a class="btn btn-outline-secondary" href="{url}">Cancel</a>', html=True
+        )
+
+    def test_new_repair_order_links_from_both_details(self):
+        for detail, intake in (
+            (self.customer_detail, self.customer_intake),
+            (self.vehicle_detail, self.vehicle_intake),
+        ):
+            with self.subTest(detail=detail):
+                self.assertContains(
+                    self.client.get(detail),
+                    f'<a class="btn btn-primary" href="{intake}">New Repair Order</a>',
+                    html=True,
+                )
+
+    def test_add_vehicle_returns_to_customer_with_primary_intake_action(self):
+        customer = make_customer(first_name="New")
+        intake = reverse("repair_orders:create_for_customer", args=[customer.pk])
+        add_vehicle = reverse("customers:vehicle_create", args=[customer.pk])
+        empty = self.client.get(intake)
+        self.assertContains(empty, f'href="{add_vehicle}"')
+        self.assertContains(empty, "This customer has no active vehicles.")
+        response = self.client.post(
+            add_vehicle,
+            {"vin": VALID_VIN_2, "make": "Honda", "model": "Fit", "is_active": "on"},
+            follow=True,
+        )
+        self.assertRedirects(response, reverse("customers:detail", args=[customer.pk]))
+        self.assertContains(
+            response, f'<a class="btn btn-primary" href="{intake}">New Repair Order</a>', html=True
+        )
+        form = self.client.get(intake).context["form"]
+        self.assertEqual(
+            form.initial, {"customer": customer.pk, "vehicle": customer.vehicles.get().pk}
+        )
+        response = self.client.post(intake, form.initial)
+        order = RepairOrder.objects.get()
+        self.assertEqual((order.customer, order.vehicle), (customer, customer.vehicles.get()))
+        self.assertRedirects(response, detail_url(order.pk))
+
+    def test_customer_prefills_sole_active_vehicle(self):
+        inactive = make_vehicle(self.customer, vin=VALID_VIN_2, is_active=False)
+        response = self.client.get(self.customer_intake)
+        self.assertContains(response, f'value="{self.customer.pk}" selected')
+        self.assertContains(response, f'value="{self.vehicle.pk}" selected')
+        self.assertNotContains(response, inactive.vin)
+        self.assertNotContains(response, self.other_vehicle.vin)
+        self.assert_cancel_destination(response, self.customer_detail)
+
+    def test_customer_with_multiple_active_vehicles_can_choose(self):
+        second = make_vehicle(self.customer, vin=VALID_VIN_2, license_plate="MATCH-02")
+        response = self.client.get(self.customer_intake)
+        form = response.context["form"]
+        self.assertEqual(form["customer"].value(), self.customer.pk)
+        self.assertIsNone(form["vehicle"].value())
+        self.assertCountEqual(form.fields["vehicle"].queryset, [self.vehicle, second])
+        choices = dict(form.fields["vehicle"].choices)
+        for vehicle in (self.vehicle, second):
+            self.assertTrue(choices[vehicle.pk].startswith(vehicle.vin))
+        self.assertContains(response, "Compare vehicle details")
+        self.assertContains(response, f"VIN {second.vin} · Plate MATCH-02")
+        self.assertNotContains(response, self.other_vehicle.vin)
+
+        response = self.client.post(
+            self.customer_intake, {"customer": self.customer.pk, "vehicle": second.pk}
+        )
+        order = RepairOrder.objects.get()
+        self.assertEqual((order.customer, order.vehicle), (self.customer, second))
+        self.assertRedirects(response, detail_url(order.pk))
+
+    def test_no_eligible_vehicles_guides_staff_to_add_vehicle(self):
+        self.vehicle.is_active = False
+        self.vehicle.save(update_fields=["is_active"])
+        response = self.client.get(self.customer_intake)
+        self.assertContains(response, "This customer has no active vehicles.")
+        self.assertContains(
+            response, f'href="{reverse("customers:vehicle_create", args=[self.customer.pk])}"'
+        )
+        self.assertContains(response, 'class="btn btn-primary" disabled>Create Repair Order')
+        self.assert_cancel_destination(response, self.customer_detail)
+        self.assertNotContains(self.client.get(self.vehicle_detail), "New Repair Order")
+        self.assertEqual(self.client.get(self.vehicle_intake).status_code, 404)
+
+    def test_no_vehicles_does_not_show_add_vehicle_without_permission(self):
+        customer = make_customer(first_name="No Vehicle")
+        user = make_user(username="intake-only", role_name="Intake only")
+        self.client.force_login(user)
+        with patch.dict(
+            ROLE_PERMISSION_MATRIX,
+            {"Intake only": {PERM_CUSTOMERS_VIEW, PERM_REPAIR_ORDERS_MANAGE}},
+        ):
+            response = self.client.get(
+                reverse("repair_orders:create_for_customer", args=[customer.pk])
+            )
+        self.assertContains(response, "This customer has no active vehicles.")
+        self.assertNotContains(response, "Add Vehicle")
+
+    def test_vehicle_intake_prefills_owner_and_specific_vehicle(self):
+        make_vehicle(self.customer, vin=VALID_VIN_2)
+        response = self.client.get(self.vehicle_intake)
+        self.assertContains(response, f'value="{self.customer.pk}" selected')
+        self.assertContains(response, f'value="{self.vehicle.pk}" selected')
+        self.assertNotContains(response, VALID_VIN_2)
+        self.assert_cancel_destination(response, self.vehicle_detail)
+        response = self.client.post(
+            self.vehicle_intake, {"customer": self.customer.pk, "vehicle": self.vehicle.pk}
+        )
+        order = RepairOrder.objects.get()
+        self.assertEqual((order.customer, order.vehicle), (self.customer, self.vehicle))
+        self.assertRedirects(response, detail_url(order.pk))
+
+    def test_invalid_input_retains_selections_and_cancel_destination(self):
+        for intake, cancel in (
+            (self.customer_intake, self.customer_detail),
+            (self.vehicle_intake, self.vehicle_detail),
+        ):
+            with self.subTest(intake=intake):
+                response = self.client.post(
+                    intake,
+                    {
+                        "customer": self.customer.pk,
+                        "vehicle": self.vehicle.pk,
+                        "promised_date": "bad",
+                    },
+                )
+                self.assertContains(response, "Enter a valid date.")
+                self.assertContains(response, 'id="id_promised_date_error"')
+                self.assertContains(response, 'aria-describedby="id_promised_date_error"')
+                self.assertContains(response, f'value="{self.customer.pk}" selected')
+                self.assertContains(response, f'value="{self.vehicle.pk}" selected')
+                self.assert_cancel_destination(response, cancel)
+        self.assertFalse(RepairOrder.objects.exists())
+
+    def test_invalid_or_mismatched_post_does_not_save(self):
+        other_same_customer = make_vehicle(self.customer, vin=VALID_VIN_2)
+        for intake, customer, vehicle, error_field in (
+            (self.customer_intake, self.customer.pk, self.other_vehicle.pk, "vehicle"),
+            (self.customer_intake, self.other_customer.pk, self.other_vehicle.pk, "customer"),
+            (self.vehicle_intake, self.customer.pk, other_same_customer.pk, "vehicle"),
+            (self.vehicle_intake, self.customer.pk, "bad-id", "vehicle"),
+        ):
+            with self.subTest(intake=intake, customer=customer, vehicle=vehicle):
+                response = self.client.post(intake, {"customer": customer, "vehicle": vehicle})
+                self.assertContains(response, "Select a valid choice")
+                self.assertIn(error_field, response.context["form"].errors)
+        self.assertFalse(RepairOrder.objects.exists())
+
+    def test_missing_origin_does_not_prefill(self):
+        for name in ("create_for_customer", "create_for_vehicle"):
+            url = reverse(f"repair_orders:{name}", args=[999999])
+            with self.subTest(name=name):
+                self.assertEqual(self.client.get(url).status_code, 404)
+
+    def test_users_without_create_permission_do_not_see_or_use_intake(self):
+        self.client.force_login(make_user(username="intake-reader", role_name=ROLE_READ_ONLY))
+        for detail, intake in (
+            (self.customer_detail, self.customer_intake),
+            (self.vehicle_detail, self.vehicle_intake),
+        ):
+            with self.subTest(detail=detail):
+                self.assertNotContains(self.client.get(detail), "New Repair Order")
+                self.assertEqual(self.client.get(intake).status_code, 403)
+                self.assertEqual(self.client.post(intake).status_code, 403)
+
+    def test_standard_create_stays_unscoped_and_cancels_to_list(self):
+        response = self.client.get(
+            CREATE_URL, {"customer": self.customer.pk, "vehicle": self.vehicle.pk}
+        )
+        self.assertIsNone(response.context["form"]["customer"].value())
+        self.assertIsNone(response.context["form"]["vehicle"].value())
+        self.assert_cancel_destination(response, LIST_URL)
 
 
 # ---------------------------------------------------------------------------
