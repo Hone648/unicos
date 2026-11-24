@@ -5,20 +5,17 @@ local-development Django/PostgreSQL application that runs with Docker Compose.
 
 ## Current Deployment Status
 
-Unicos is local development only and is not production-ready.
+The runnable deployment in this repository is the local development setup.
+Use synthetic data there.
 
-Production deployment still requires:
+The planned single-shop beta uses one dedicated Linux PC, Docker Compose,
+PostgreSQL, and browser access on the shop LAN. The beta has no public access.
+Web serving, HTTPS, secure settings, private media, recovery, and operator
+controls are still implementation work. See the
+[beta plan and acceptance gates](docs/SLICE_PLAN.md#lan-beta-acceptance-gates).
 
-- Production web serving instead of Django `runserver`
-- Secure settings
-- HTTPS
-- Correct `ALLOWED_HOSTS`
-- `DEBUG=False`
-- Secure cookies, CSRF, and proxy header configuration
-- Backups and a restore procedure
-- Admin hardening
-- Production media/document storage, private serving, backup/restore, or equivalent
-- Deployment-specific environment management
+Internet-hosted production remains a future goal and requires a separate
+readiness review. See [ADR 0006](docs/DECISIONS/0006-web-capable-deployment.md).
 
 Screenshots are future work; the repo does not currently include a maintained
 screenshot set.
@@ -32,7 +29,8 @@ screenshot set.
 - Repair orders and status history
 - Shop-facing repair-order workspace
 - HTMX status updates
-- Repair-order create/edit workflow
+- Repair-order create/edit workflow, including intake from customer and
+  vehicle records
 - Repair-order communication log
 - Billing foundation
 - Invoices and payments
@@ -91,6 +89,10 @@ defaults to `0.0825` (8.25%) when unset or blank.
 - The shop should verify the exact rate for its business address using the
   Texas Comptroller Sales Tax Rate Locator. The app does not determine local
   tax jurisdiction automatically.
+- Before beta use with real data, the designated shop owner must verify the
+  configured rate and applicable line-item treatment for the shop. Confirm
+  the expected totals with a synthetic estimate and its converted invoice.
+  Verify the shop rate before using the existing development default in beta.
 - Texas defaults: labor is not taxable; parts and materials are taxable; sublet
   and misc are manually configurable per line item. This is not tax or legal
   advice. See `docs/DECISIONS/0051-texas-estimate-tax-totals.md`.

@@ -1,7 +1,7 @@
 # Roadmap
 
 This roadmap reflects Slices 48–49 and the merged repair-order follow-ups
-through PR #62. Slice planning can change after implementation review and
+through PR #64. Slice planning can change after implementation review and
 user feedback.
 
 ## Current State
@@ -19,8 +19,10 @@ Implemented:
   next action, estimate and invoice, and activity and files
 - Shared repair-order status rules for shop views and Django admin, auditable
   cancel/reopen actions, Closed date display, and HTMX status updates
-- New repair-order form vehicle selection is scoped by selected customer and
-  loads the vehicle field via HTMX
+- New repair orders can start from the list, a customer, or an active vehicle.
+  The form scopes vehicle choice to the selected customer and uses HTMX to
+  refresh the options. The intake update adds responsive forms and vehicle
+  comparison for similar vehicles.
 - Repair-order communication log for customer/insurer/adjuster/internal history
 - Bootstrap-based UI foundation using local static assets, a Bootstrap navbar,
   Bootstrap alerts/buttons/cards/tables on high-traffic pages, and the existing
@@ -53,7 +55,8 @@ Implemented:
   service-backed or read-only, matching the existing repair-order admin
   pattern
 
-The app is local-development only and is not production-ready.
+The current runnable setup is for local development. The single-shop LAN
+beta is planned. Internet-hosted production remains a future goal.
 
 Product Slice 46 is now consumed by the repair-order communication log.
 Product Slice 47 is now consumed by the Bootstrap UI foundation.
@@ -256,23 +259,28 @@ and supplement-to-invoice handling are clearer.
 
 ### Priority 7 - Production Hardening
 
-Track now, implement later.
+The [LAN-00 through LAN-14 plan](SLICE_PLAN.md#lan-beta-slices) tracks the
+first controlled deployment. The approved topology uses one dedicated
+Linux PC with Docker Compose and PostgreSQL. Shop browsers reach it on the
+LAN only. Web serving, TLS and trust, secure settings and secrets, private
+media and upload screening, administrative access, recovery, and release
+controls remain open implementation work.
 
-Required later:
+Record the host, operating system, network, and power
+[prerequisites](SLICE_PLAN.md#lan-beta-deployment-prerequisites) in LAN-01.
+Deployed network verification begins in LAN-03 after the controls are in
+place.
 
-- Replace Django `runserver`.
-- Split development and production Compose/deployment configuration.
-- Harden secure settings.
-- Configure HTTPS/proxy headers.
-- Configure secure cookies and HSTS.
-- Document backups and restore.
-- Lock down admin access.
-- Require explicit audited override reasons for production admin bypasses
-  (admin mutations are now service-backed or read-only as of Slice 43; an
-  audited override pathway for blocked actions is still future work).
-- Design production media serving/storage/scanning/backup for
-  attachments/photos/documents.
-- Define deployment-specific environment management.
+Before shop use, verify the network boundary and restore procedure, confirm
+the shop's tax configuration, and complete the synthetic workflow checks in
+the [acceptance gates](SLICE_PLAN.md#lan-beta-acceptance-gates). One server and
+an on-site NVMe copy leave both downtime and single-site data loss risk.
+
+Internet-hosted production will need its own readiness review under
+[ADR 0006](DECISIONS/0006-web-capable-deployment.md). Open work includes
+hosted network exposure and trust, environment management, broader recovery
+and availability, and any audited admin override pathway. The existing
+development setup remains the path for local testing.
 
 ### Priority 8 - Reporting
 
@@ -368,8 +376,6 @@ Remaining communication gaps:
 
 Workflow follow-up candidates:
 
-- Repair-order intake from customer and vehicle records, with the existing
-  selections carried into a new order.
 - Clearer estimate action guidance and approval requirements.
 - Payment-form usability, including keyboard entry and date and amount guidance.
 - Supplement-to-invoice handling, repair planning for parts and sublet work,
