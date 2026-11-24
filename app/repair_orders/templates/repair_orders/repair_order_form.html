@@ -6,7 +6,7 @@
 {% if mode == "edit" %}
   <a class="back-link" href="{% url 'repair_orders:detail' repair_order.pk %}">&larr; Back to Repair Order {{ repair_order.repair_order_number }}</a>
 {% else %}
-  <a class="back-link" href="{% url 'repair_orders:list' %}">&larr; Back to Repair Orders</a>
+  <a class="back-link" href="{{ cancel_url }}">&larr; Back to {{ back_label }}</a>
 {% endif %}
 
 <div class="page-header">
@@ -21,7 +21,7 @@
 </div>
 {% endif %}
 
-<div class="form-card shadow-sm">
+<div class="form-card shadow-sm{% if mode == 'create' %} intake-form{% endif %}">
   <form method="post">
     {% csrf_token %}
 
@@ -40,11 +40,13 @@
         <label for="{{ form.customer.id_for_label }}">Customer</label>
         {{ form.customer }}
         {% if form.customer.errors %}
-          <ul class="field-errors">
+          <ul class="field-errors" id="{{ form.customer.auto_id }}_error">
             {% for error in form.customer.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
-        <p class="form-field-hint">Need a new customer? <a href="{% url 'customers:create' %}">Add customer</a></p>
+        {% if not intake_customer %}
+          <p class="form-field-hint">Need a new customer? <a href="{% url 'customers:create' %}">Add customer</a></p>
+        {% endif %}
       </div>
 
       {% include "repair_orders/partials/_vehicle_field.html" %}
@@ -53,7 +55,7 @@
         <label for="{{ form.assigned_to.id_for_label }}">Assigned to</label>
         {{ form.assigned_to }}
         {% if form.assigned_to.errors %}
-          <ul class="field-errors">
+          <ul class="field-errors" id="{{ form.assigned_to.auto_id }}_error">
             {% for error in form.assigned_to.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
@@ -63,7 +65,7 @@
         <label for="{{ form.promised_date.id_for_label }}">Promised date</label>
         {{ form.promised_date }}
         {% if form.promised_date.errors %}
-          <ul class="field-errors">
+          <ul class="field-errors" id="{{ form.promised_date.auto_id }}_error">
             {% for error in form.promised_date.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
@@ -73,7 +75,7 @@
         <label for="{{ form.reported_problem.id_for_label }}">Reported problem</label>
         {{ form.reported_problem }}
         {% if form.reported_problem.errors %}
-          <ul class="field-errors">
+          <ul class="field-errors" id="{{ form.reported_problem.auto_id }}_error">
             {% for error in form.reported_problem.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
@@ -83,7 +85,7 @@
         <label for="{{ form.internal_notes.id_for_label }}">Internal notes</label>
         {{ form.internal_notes }}
         {% if form.internal_notes.errors %}
-          <ul class="field-errors">
+          <ul class="field-errors" id="{{ form.internal_notes.auto_id }}_error">
             {% for error in form.internal_notes.errors %}<li>{{ error }}</li>{% endfor %}
           </ul>
         {% endif %}
@@ -92,11 +94,11 @@
     </div>
 
     <div class="form-actions">
-      <button type="submit" class="btn btn-primary">{{ submit_label }}</button>
+      <button type="submit" class="btn btn-primary"{% if intake_customer and not form.has_intake_vehicles %} disabled{% endif %}>{{ submit_label }}</button>
       {% if mode == "edit" %}
         <a class="btn btn-outline-secondary" href="{% url 'repair_orders:detail' repair_order.pk %}">Cancel</a>
       {% else %}
-        <a class="btn btn-outline-secondary" href="{% url 'repair_orders:list' %}">Cancel</a>
+        <a class="btn btn-outline-secondary" href="{{ cancel_url }}">Cancel</a>
       {% endif %}
     </div>
 

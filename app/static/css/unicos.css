@@ -617,6 +617,107 @@ a.dashboard-metric:hover {
 }
 
 /* --------------------------------------------------------------------------
+   Repair order intake
+   -------------------------------------------------------------------------- */
+
+.intake-detail {
+  overflow-wrap: anywhere;
+}
+
+.intake-detail .card-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+}
+
+.intake-detail .card {
+  min-width: 0;
+}
+
+.intake-header {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.intake-header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.intake-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.intake-header-actions .btn,
+.intake-form .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+}
+
+.intake-form .form-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.intake-form .form-field,
+.intake-form :is(input, select, textarea) {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.intake-form .form-actions {
+  flex-wrap: wrap;
+}
+
+.intake-form .field-errors {
+  overflow-wrap: anywhere;
+}
+
+.intake-vehicle-details {
+  overflow-wrap: anywhere;
+}
+
+.intake-vehicle-details summary {
+  width: fit-content;
+  min-height: 44px;
+  padding-block: 0.625rem;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+
+.intake-vehicle-details ul {
+  margin-bottom: 0;
+  padding-inline-start: 1.25rem;
+}
+
+.intake-vehicle-details span {
+  display: block;
+  font-size: 0.875rem;
+}
+
+.intake-detail :is(a, button):focus-visible,
+.intake-form :is(a, button, input, select, summary, textarea):focus-visible {
+  outline: 2px solid #1a2634;
+  outline-offset: 2px;
+  scroll-margin-block-start: 5rem;
+}
+
+@media (max-width: 720px) {
+  .intake-header h1 {
+    flex-basis: 100%;
+  }
+
+  .form-card.intake-form {
+    padding: 1rem;
+  }
+
+  .intake-form .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* --------------------------------------------------------------------------
    Repair order create / edit form
    -------------------------------------------------------------------------- */
 

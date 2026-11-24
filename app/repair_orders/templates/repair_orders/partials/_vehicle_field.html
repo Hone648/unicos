@@ -1,13 +1,38 @@
+{% load app_permissions %}
 <div class="form-field" id="vehicle-field">
   <label for="{{ form.vehicle.id_for_label }}">Vehicle</label>
   {{ form.vehicle }}
   {% if form.vehicle.errors %}
-    <ul class="field-errors">
+    <ul class="field-errors" id="{{ form.vehicle.auto_id }}_error">
       {% for error in form.vehicle.errors %}<li>{{ error }}</li>{% endfor %}
     </ul>
   {% endif %}
-  <p class="form-field-hint">
-    Select a customer to load that customer's vehicles.
-    Need a new vehicle? <a href="{% url 'customers:list' %}">Open Customers</a> to add one.
-  </p>
+  {% with vehicles=form.vehicle_choices %}
+    {% if vehicles %}
+      <details class="intake-vehicle-details">
+        <summary>Compare vehicle details</summary>
+        <ul>
+          {% for vehicle in vehicles %}
+            <li>
+              {{ vehicle.year|default_if_none:"" }} {{ vehicle.make }} {{ vehicle.model }}{% if vehicle.trim %} {{ vehicle.trim }}{% endif %}
+              <span>VIN {{ vehicle.vin }}{% if vehicle.license_plate %} · Plate {{ vehicle.license_plate }}{% if vehicle.license_state %} ({{ vehicle.license_state }}){% endif %}{% endif %}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      </details>
+    {% endif %}
+  {% endwith %}
+  {% if intake_customer %}
+    {% if not form.has_intake_vehicles %}
+      <p class="form-field-hint">This customer has no active vehicles.</p>
+      {% if user|has_app_permission:"customers.manage" %}
+        <div><a class="btn btn-outline-primary" href="{% url 'customers:vehicle_create' intake_customer.pk %}">Add Vehicle</a></div>
+      {% endif %}
+    {% endif %}
+  {% else %}
+    <p class="form-field-hint">
+      Select a customer to load that customer's vehicles.
+      Need a new vehicle? <a href="{% url 'customers:list' %}">Open Customers</a> to add one.
+    </p>
+  {% endif %}
 </div>

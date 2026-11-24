@@ -1,8 +1,10 @@
 from accounts.authorization import (
+    PERM_CUSTOMERS_VIEW,
     PERM_REPAIR_ORDERS_CHANGE_STATUS,
     PERM_REPAIR_ORDERS_MANAGE,
     PERM_REPAIR_ORDERS_VIEW,
     app_permission_required,
+    user_has_app_permission,
 )
 from accounts.policies import (
     can_add_communication_for_repair_order,
@@ -24,11 +26,13 @@ from accounts.policies import can_view_repair_order as policy_can_view_repair_or
 from billing.services import PaymentRecordingBlocked, ensure_payment_recordable
 from core.document_numbers import generate_repair_order_number
 from core.pagination import paginate_queryset, pagination_querystring
+from customers.models import Customer
 from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from vehicles.models import Vehicle
 
 from .business_rules import closure_blocked_by_invoice, is_final_repair_order_status
 from .forms import RepairOrderCreateForm, RepairOrderEditForm
@@ -326,23 +330,40 @@ def repair_order_status_update(request, pk):
 
 
 @app_permission_required(PERM_REPAIR_ORDERS_MANAGE)
-def repair_order_create(request):
-    if request.method == "POST":
-        form = RepairOrderCreateForm(
-            request.POST,
-            customer_id=_posted_customer_id(request),
-            enable_vehicle_htmx=True,
-        )
-        if form.is_valid():
-            ro = form.save(commit=False)
-            ro.repair_order_number = generate_repair_order_number()
-            ro.created_by = request.user
-            ro.updated_by = request.user
-            ro.save()
-            messages.success(request, f"Repair order {ro.repair_order_number} created.")
-            return redirect("repair_orders:detail", pk=ro.pk)
-    else:
-        form = RepairOrderCreateForm(enable_vehicle_htmx=True)
+def repair_order_create(request, customer_pk=None, vehicle_pk=None):
+    intake_customer = None
+    intake_vehicle = None
+    cancel_url = reverse("repair_orders:list")
+    back_label = "Repair Orders"
+    if customer_pk is not None or vehicle_pk is not None:
+        require_policy(user_has_app_permission(request.user, PERM_CUSTOMERS_VIEW))
+        if vehicle_pk is not None:
+            intake_vehicle = get_object_or_404(
+                Vehicle.objects.select_related("customer"), pk=vehicle_pk, is_active=True
+            )
+            intake_customer = intake_vehicle.customer
+            cancel_url = reverse("vehicles:detail", kwargs={"pk": intake_vehicle.pk})
+            back_label = str(intake_vehicle)
+        else:
+            intake_customer = get_object_or_404(Customer, pk=customer_pk)
+            cancel_url = reverse("customers:detail", kwargs={"pk": intake_customer.pk})
+            back_label = intake_customer.display_name
+
+    is_post = request.method == "POST"
+    form = RepairOrderCreateForm(
+        request.POST if is_post else None,
+        intake_customer=intake_customer,
+        intake_vehicle=intake_vehicle,
+        enable_vehicle_htmx=True,
+    )
+    if is_post and form.is_valid():
+        ro = form.save(commit=False)
+        ro.repair_order_number = generate_repair_order_number()
+        ro.created_by = request.user
+        ro.updated_by = request.user
+        ro.save()
+        messages.success(request, f"Repair order {ro.repair_order_number} created.")
+        return redirect("repair_orders:detail", pk=ro.pk)
     return render(
         request,
         "repair_orders/repair_order_form.html",
@@ -352,6 +373,9 @@ def repair_order_create(request):
             "title": "New Repair Order",
             "submit_label": "Create Repair Order",
             "repair_order": None,
+            "intake_customer": intake_customer,
+            "cancel_url": cancel_url,
+            "back_label": back_label,
         },
     )
 
