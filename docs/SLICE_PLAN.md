@@ -126,6 +126,70 @@ Merged follow-ups after Slice 49:
 - PR #62 (`8b6ea68`) enforces routine status transitions across shop views and
   Django admin, adds reason-required cancel and reopen actions, and revalidates
   payment shortcuts at the billing write boundary.
+- PR #64 (`7bb8ae1`) adds repair-order intake from customer and active vehicle
+  records, preserves the list entry point, and improves narrow-screen intake
+  and vehicle identification.
 
-Unnumbered documentation pass: reconcile the [staff walkthroughs](USER_MANUAL.md#20-common-workflows),
-[architecture](ARCHITECTURE.md), and [roadmap](ROADMAP.md) with those follow-ups.
+The unnumbered documentation pass reconciled the
+[staff walkthroughs](USER_MANUAL.md#20-common-workflows),
+[architecture](ARCHITECTURE.md), and [roadmap](ROADMAP.md) with PRs #60–#62.
+These documents now also reflect the intake workflow shipped in PR #64.
+
+## LAN beta slices
+
+This plan uses the approved LAN slice sequence for the controlled beta under
+[ADR 0052](DECISIONS/0052-lan-beta-deployment-topology.md). LAN-00 records the
+architecture. LAN-01 through LAN-14 are planned work. The implementation
+choices and decision statuses are recorded in the ADRs.
+
+| Slice | Approved scope | Planned work and evidence |
+| --- | --- | --- |
+| LAN-00 | ADR and documentation baseline | Record the approved topology and backup constraints, proposed controls, open decisions, and acceptance gates. |
+| LAN-01 | Deployment settings and secrets | Record the deployment prerequisites. Prepare separate beta settings and runtime secret delivery. Check secure defaults and secret handling in isolation. |
+| LAN-02 | Production application runtime | Build a versioned application image with the proposed Gunicorn runtime and locally available browser assets. Run deployment checks and rehearse explicit migrations and restart with separate runtime and migration privileges. |
+| LAN-03 | LAN networking, HTTPS, and database isolation | Choose the service name and certificate strategy. Implement proxy, TLS, network controls, and private PostgreSQL access. Verify trust and renewal, access from approved devices, and denial from disallowed networks. Confirm that Django and PostgreSQL have no published host ports. |
+| LAN-04 | Private persistent media and authorized serving | Persist private media and enforce existing attachment authorization on downloads. Test role and object checks, direct URL denial, and persistence across container recreation. |
+| LAN-05 | Automated local NVMe backups | Automate coordinated, encrypted local backup sets for PostgreSQL, media, and recovery material. Verify backup integrity and record failures. |
+| LAN-06 | Restore and disaster recovery | Restore to an isolated target. Compare observed data loss and downtime against agreed RPO and RTO and verify workflows and attachment authorization. Document site-loss limits and fallback. |
+| LAN-07 | Authentication and administrative security | Check named accounts and least-privilege roles. Restrict Django admin and SSH, and verify denied access, revocation, and local recovery. |
+| LAN-08 | Attachment security and malware controls | Keep upload validation and add screening and quarantine. Verify that scanner failure and suspect uploads keep files unavailable. |
+| LAN-09 | Logging, monitoring, and health | Add logs, health checks, alerts, and an operator runbook. Demonstrate response to a simulated incident. |
+| LAN-10 | Updates and rollback | Rehearse an image upgrade, an application rollback, and recovery after an incompatible migration. Record release and fallback decisions. |
+| LAN-11 | Multi-user and LAN acceptance | Use synthetic records to exercise concurrent staff sessions, role boundaries, and supported browsers and devices on the implemented LAN. Recheck trusted access, network isolation, and browser assets during a WAN interruption. |
+| LAN-12 | Shop workflows and failure testing | Exercise synthetic shop workflows, representative failures, and the staff fallback. Verify shop-specific tax configuration and estimate-to-invoice totals. Obtain readiness sign-off before live use. |
+| LAN-13 | Beta installation and onboarding | Install the approved release on the shop host. Repeat the deployment checks on the installation, then onboard named users within the approved scope and operating window. |
+| LAN-14 | Beta feedback and stabilization | Review incidents, staff feedback, backup evidence, and support. Decide whether to continue, extend, or suspend the beta. |
+
+### LAN beta deployment prerequisites
+
+Record the following prerequisites in LAN-01. Confirm host, OS, and power
+readiness for the runtime environment before LAN-02. Verify deployed network
+controls in LAN-03 once they are implemented. Recheck the prerequisites on
+the shop installation in LAN-13.
+
+- **Host.** Identify the dedicated Linux PC, its operator, and its CPU,
+  memory, and storage needs. Reserve capacity for persistent database and
+  media data, logs, and updates. Confirm access to the external backup NVMe.
+- **Operating system.** Select a supported Linux release compatible with
+  Docker Engine and Compose. Plan OS updates, local console recovery, and
+  maintenance access.
+- **Network.** Identify the shop network owner, approved devices and
+  management path, private address and DNS requirements, and the guest and
+  WAN boundaries. Document what the router and firewall must enforce.
+- **Power.** Identify power dependencies for the PC, network equipment, and
+  backup drive. Plan outage handling and controlled shutdown and restart.
+  Evaluate power protection, including a UPS, with the shop operator.
+
+## LAN beta acceptance gates
+
+Record evidence and sign-off for each phase before moving to the next.
+
+| Phase | Exit gate |
+| --- | --- |
+| Architecture (LAN-00) | Review approved decisions, outstanding choices, and the limits of one host and one site. |
+| Isolated settings and runtime (LAN-01 to LAN-02) | Record deployment prerequisites. Verify beta settings and secret handling in isolation. A versioned release starts, serves local assets, applies migrations explicitly, and passes deployment checks. |
+| LAN boundary and private media (LAN-03 to LAN-04) | After implementing the LAN controls in LAN-03, demonstrate trusted HTTPS, certificate renewal, and denied network access from disallowed devices or networks. Confirm private database access. In LAN-04, verify persistent media and authorized-only downloads. |
+| Local backup and recovery (LAN-05 to LAN-06) | Demonstrate automated, verified encrypted backups to the external NVMe and an isolated restore within agreed RPO and RTO. Record the recovery runbook and the residual risk of keeping backups at one site. |
+| Security and operations (LAN-07 to LAN-10) | Demonstrate named accounts, role and admin restrictions, scanner failure and quarantine handling, monitoring and alert response, and release rollback and recovery. |
+| Pre-beta readiness (LAN-11 to LAN-12) | In LAN-11, verify simultaneous staff use across roles and supported LAN clients. In LAN-12, use synthetic records to exercise customer and vehicle intake, estimates, invoices, payments, closure, attachments, and failure and fallback scenarios. Verify the shop's tax rate and line-item treatment and validate estimate-to-invoice totals. Obtain operator and shop-owner sign-off on the evidence and residual single-site risk before using real data. |
+| Installation and stabilization (LAN-13 to LAN-14) | Confirm the shop installation passes its deployment checks before onboarding. Limit live use to the approved cohort and scope. Review incidents, backups, support, and feedback. Record the continuation or suspension decision. Any internet-hosted release needs a separate readiness review. |

@@ -2,7 +2,9 @@
 
 Unicos is a browser-based body shop workflow app for managing customers, vehicles, repair orders, estimates, invoices, payments, and repair-order closure.
 
-This manual describes the current implemented local-development version of Unicos. It is not a production deployment guide.
+This manual describes the workflows available in the local-development version
+of Unicos. See the [deployment status](../README.md#current-deployment-status)
+for the planned LAN beta and hosted production.
 
 ---
 
@@ -50,7 +52,11 @@ The app is organized around the **repair order** as the central record. Everythi
 
 Be aware of these limitations before using Unicos in day-to-day operations.
 
-- **Local development only.** Unicos runs on a single machine using Docker Compose and is not set up for multi-user network access, HTTPS, or production hosting. Do not store real customer data until a hardened deployment is in place.
+- **Local development only.** Use synthetic records in the development
+  environment. The planned single-shop beta requires a separate, approved LAN
+  deployment. Once the shop clears that deployment for use, open the HTTPS
+  address supplied by the operator from an approved shop device. Report
+  certificate errors to the operator before signing in.
 - **One invoice per repair order.** Each repair order can have only one invoice. If the invoice already exists, a second invoice cannot be created.
 - **No estimate queue.** There is no global list of all estimates across the shop. Estimates are accessed through their repair order.
 - **No multi-estimate invoice merging.** If a repair order has a primary estimate and one or more supplements, they cannot be merged into a single invoice automatically. Only one approved estimate can be converted to the repair order's invoice.
@@ -60,7 +66,6 @@ Be aware of these limitations before using Unicos in day-to-day operations.
 - **No email/SMS or PDF generation.** Estimate and invoice output uses the browser's built-in print function. Communication log entries do not send email or text messages. There is no automated email sending, SMS sending, inbound sync, or server-side PDF export.
 - **Limited object-level permissions.** Shop-facing repair-order, estimate, and billing views now use object-level policy checks. Technician repair-order visibility is limited to assigned repair orders. Full customer/vehicle object policies, multi-shop tenancy, and Django admin object policies are not implemented.
 - **Django admin is separate.** The Django admin interface is an emergency/development back-office console for trusted superusers/staff. It is not a normal production workflow and should not be used to bypass workflow rules except for emergency/development correction.
-- **Deployment is not production-ready.** See the README for production prerequisites.
 
 ---
 
@@ -195,6 +200,9 @@ Vehicles belong to a customer. A vehicle is identified by its VIN (17-character 
 3. Enter the VIN, year, make, model, and color. The VIN is normalized to uppercase and validated.
 4. Click **Add Vehicle**. Unicos returns you to the customer record.
 
+If you can create repair orders, select **New Repair Order** on that record
+to start the job.
+
 **Who can add vehicles:** Owner/Admin, Manager, Front Desk (customers.manage).
 
 ### Viewing and editing a vehicle
@@ -223,10 +231,19 @@ Go to `/repair-orders/` to see all repair orders. You can search by repair order
 
 ### Creating a repair order
 
-1. Click **New Repair Order** from the list.
-2. Select the customer and vehicle. The vehicle must belong to the selected customer.
-3. Optionally set a promised date and add notes.
-4. Click **Create Repair Order**.
+Select **New Repair Order** from one of these screens.
+
+- **Customer record.** Unicos fills in the customer and selects their vehicle
+  when they have exactly one active vehicle. For multiple active vehicles,
+  choose the vehicle. Use **Compare vehicle details** to check VINs and
+  license plates. If there are no active vehicles, select **Add Vehicle**
+  if you have permission, then start the order from the customer record.
+- **Active vehicle record.** Unicos fills in the vehicle and its customer.
+- **Repair Orders list.** Select a customer and then one of that customer's
+  vehicles.
+
+Confirm the pair, optionally set a promised date and add notes, then select
+**Create Repair Order**. **Cancel** returns to the screen you started from.
 
 The repair order starts in **Intake** status.
 
@@ -733,8 +750,8 @@ Estimators, Technicians, and Read-only users cannot upload.
 
 The upload form rejects unsafe filenames, path-like names, disallowed extensions,
 oversized files, mismatched content types, and obvious binary content mismatches
-for image/PDF uploads. Production deployments still require malware scanning and
-private media serving.
+for image/PDF uploads. Malware screening and private storage controls are
+planned for the LAN beta.
 
 ### Viewing and downloading attachments
 
@@ -760,9 +777,10 @@ Click any filename in the attachment table to download the file.
 - There is no global attachment queue or search across the shop.
 - Uploaded files are stored locally. Docker Compose mounts the `media_data`
   volume at `/app/media` so local-development uploads survive container
-  recreation. Backups are still manual and production storage is not designed.
+  recreation. The proposed beta recovery process pairs these files with the
+  database backup.
 - No image thumbnails or in-browser preview — files are download-only.
-- Production media serving, cloud storage, and malware scanning are future work.
+- Hosted media storage remains future work.
 
 ---
 
@@ -818,9 +836,9 @@ routine repair-order status changes. See [roles and access](#3-user-roles-and-ac
    and contact information, then select **Create Customer**.
 2. On the customer page, select **Add Vehicle**. Enter the VIN, year, make, and
    model. Select **Add Vehicle** again to save and return to the customer.
-3. Go to **Repair Orders** at `/repair-orders/` and select **New Repair Order**.
-   Choose the customer and vehicle and select **Create Repair Order**. The job
-   starts in **Intake**.
+3. On the customer record, select **New Repair Order**. Confirm the
+   preselected customer and vehicle, then select **Create Repair Order**.
+   The job starts in **Intake**.
 4. On the repair order, select **Create Estimate**. Enter the insurer, claim
    number, deductible, and any notes, then save with **Create Estimate**.
    Return to the repair order. In **Status & next action**, select **Estimating**

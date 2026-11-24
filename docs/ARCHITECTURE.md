@@ -26,7 +26,10 @@ Architectural style:
     entered through a create-only shop-facing form
   - Customer workspace (`/customers/`): shop-facing customer list, detail,
     create, and edit views; vehicle create-for-customer, detail, and edit under
-    `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`
+    `/customers/<pk>/vehicles/new/` and `/vehicles/<pk>/`. Authorized staff can
+    start a repair order from a customer or active vehicle. Customer intake
+    preselects a single active vehicle or offers a choice among several.
+    The create form verifies the customer and vehicle pairing server-side.
   - Billing workspace (`/billing/`): invoice create-for-repair-order, invoice
     queue/list, invoice edit, invoice detail/print view, invoice line-item
     create/edit, and payment create; invoice summary with line items and
@@ -127,7 +130,7 @@ Current domain models:
   `description`, `size_bytes`, and `uploaded_by` are recorded at upload time; access is
   gated by the repair-order object policy (`can_view_repair_order` for download,
   `can_upload_attachment_for_repair_order` for upload, `can_delete_attachment` for delete);
-  local `FileField` storage only — production storage/serving/scanning/backup is future work
+  local `FileField` storage with private beta storage and scanning proposed
 - `communications.CommunicationEntry`: repair-order-scoped communication history
   linked to `RepairOrder` via `PROTECT`; records occurred time, direction,
   channel, contact role/name, summary, optional next step/outcome,
@@ -142,29 +145,42 @@ Current domain models:
 Status is currently implemented as `RepairOrder.Status` (TextChoices enum). No
 configurable status table exists yet.
 
-Deployment:
+**Deployment environments**
 
-- Development now runs on local Docker Compose (app + PostgreSQL).
-- The intended shop has internet access, so a web-capable / hosted deployment
-  path is expected later.
-- The app is not production-ready yet.
-- Production deployment is not implemented in the current slices. When it
-  happens it will require secure settings, HTTPS, proper `ALLOWED_HOSTS`,
-  `DEBUG=False`, secure cookies/CSRF/proxy headers, backups and restore
-  procedure, admin hardening, production media/document storage, private
-  serving, backup/restore, or equivalent, and deployment-specific environment
-  management. See
-  `DECISIONS/0006-web-capable-deployment.md`.
-- The current Dockerfile uses Django `runserver`.
-- Migrations currently run on container startup.
-- Local Docker Compose is for development.
-- Production settings are not split/hardened yet.
-- HTTPS/proxy/security settings are not configured for deployment.
-- Backups/restore are not specified.
-- Admin hardening is incomplete. Django admin is currently an
-  emergency/development console, not a production operator workflow.
-- Local development media persistence exists for repair-order attachments;
-  production media serving/storage/scanning/backup is not designed yet.
+| Environment | Runtime and access | State |
+| --- | --- | --- |
+| Local development | Compose runs Django `runserver` and PostgreSQL. Startup applies migrations. A named volume persists local attachments. | Implemented for development and synthetic data. |
+| Single-shop LAN beta | One dedicated Linux PC runs the services under Compose with PostgreSQL. Shop browsers use the LAN. Public access is excluded. | Topology approved. Runtime, trust, recovery, and operations controls are planned. |
+| Internet-hosted production | A future internet-accessible deployment with its own network, security, availability, and recovery review. | Long-term direction under [ADR 0006](DECISIONS/0006-web-capable-deployment.md). |
+
+In the proposed beta design, browsers connect to a LAN HTTPS reverse proxy.
+The proxy forwards application requests to Django, which reaches PostgreSQL
+and checks repair-order access before streaming private media. PostgreSQL
+and the application have no published host port. Recovery pairs the database
+and media on an external NVMe drive. The initial beta has no off-site copy.
+The host is a single point of failure, and a site-wide incident can destroy
+both the system and its backup.
+
+- [ADR 0052](DECISIONS/0052-lan-beta-deployment-topology.md) records the approved
+  topology and the proposed network boundary controls.
+- [ADR 0053](DECISIONS/0053-application-runtime-and-configuration.md) and
+  [ADR 0054](DECISIONS/0054-lan-https-and-service-naming.md) propose the
+  application runtime, configuration, and reverse proxy. Certificate strategy
+  remains open.
+- [ADR 0055](DECISIONS/0055-local-backup-and-recovery.md) records the approved
+  backup constraints and proposes the recovery design.
+- [ADR 0056](DECISIONS/0056-private-media-and-upload-security.md),
+  [ADR 0057](DECISIONS/0057-administrative-security-and-operations.md), and
+  [ADR 0058](DECISIONS/0058-beta-data-and-release-policy.md) propose media,
+  operator, and release controls.
+
+Use the [deployment prerequisites](SLICE_PLAN.md#lan-beta-deployment-prerequisites)
+to plan host capacity, Linux and Compose support, network ownership and
+boundaries, and power and restart procedures. LAN-01 and LAN-02 establish
+and test settings and runtime in isolation. Verify deployed ingress and
+database isolation once LAN-03 implements the network controls.
+The [beta acceptance gates](SLICE_PLAN.md#lan-beta-acceptance-gates) govern
+live use.
 
 Authorization:
 
@@ -337,8 +353,9 @@ Media / attachments:
 - Docker Compose mounts the named `media_data` volume at `/app/media` so local
   development uploads survive container recreation.
 - Django serves media files in `DEBUG` mode only (development-only `static()` handler).
-- Production media serving (nginx, S3, presigned URLs), malware scanning, and
-  backup/restore design are future work.
+- Private media serving, malware screening, and coordinated backups are
+  proposed for the beta in [ADR 0056](DECISIONS/0056-private-media-and-upload-security.md)
+  and [ADR 0055](DECISIONS/0055-local-backup-and-recovery.md).
 - `media/` is in `.gitignore` and `.dockerignore`; files are not copied into
   Docker build context.
 - `attachments.Attachment` upload path: `repair_orders/<ro_id>/<uuid>_<safe_basename>`.
